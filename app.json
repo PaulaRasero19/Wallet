@@ -1,0 +1,25 @@
+{
+  "expo": {
+    "name": "FinFlow",
+    "slug": "finflow",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "scheme": "finflow",
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "android": {
+      "package": "com.finflow.app",
+      "permissions": [
+        "POST_NOTIFICATIONS",
+        "SCHEDULE_EXACT_ALARM"
+      ]
+    },
+    "plugins": [
+      "expo-notifications",
+      "expo-font",
+      "expo-asset"
+    ]
+  }
+}
