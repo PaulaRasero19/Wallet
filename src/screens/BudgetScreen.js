@@ -18,7 +18,7 @@ export function BudgetScreen() {
         return (
           <Card key={category.id} style={styles.card}>
             <View style={styles.header}>
-              <Text style={styles.name}>{category.name}</Text>
+              <Text style={styles.name}>{category.name} :)</Text>
               <Text style={styles.percent}>{progress}%</Text>
             </View>
             <Text style={styles.amount}>
