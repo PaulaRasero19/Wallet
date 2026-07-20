@@ -64,14 +64,19 @@ Luego genera una respuesta con:
 La integracion tiene dos modos:
 
 1. Backend con Gemini: `server/ai-server.js` recibe los datos, llama a Gemini usando `GEMINI_API_KEY` y devuelve JSON.
-2. Fallback local: si no hay backend o no hay API key, `src/services/aiAdvisorService.js` genera una recomendacion local basada en reglas. Esto permite evaluar la experiencia sin credenciales.
+2. Fallback local: si no hay backend o no hay API key, `src/services/aiAdvisorService.ts` genera una recomendacion local basada en reglas. Esto permite evaluar la experiencia sin credenciales.
 
 ## Tecnologias utilizadas
 
 - React Native.
 - Expo SDK 53.
 - Expo Dev Client.
-- React Navigation.
+- TypeScript.
+- Expo Router.
+- React Native SVG.
+- React Native Reanimated.
+- Lucide React Native.
+- Zustand.
 - AsyncStorage.
 - Expo Notifications.
 - Android SDK / Gradle.

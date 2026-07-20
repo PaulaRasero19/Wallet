@@ -1,24 +1,27 @@
 # FinFlow
 
-FinFlow es una app movil de finanzas personales para Uruguay, hecha con React Native y Expo.
+FinFlow es una app movil de finanzas personales, organizacion, habitos y planificacion, hecha con React Native, Expo, TypeScript y Expo Router. La direccion visual toma como referencia interfaces conceptuales minimalistas: fondo crema, pantallas negras, mucho espacio negativo y un sistema grafico basado en puntos.
 
 ## Funcionalidades incluidas
 
-- Splash screen y onboarding.
-- Dashboard con saldo, gastos, presupuesto y progreso mensual.
-- Movimientos mockeados.
-- Presupuesto por categorias con barras de progreso.
-- Objetivos de ahorro con accion simulada para agregar ahorro.
-- Suscripciones con switches de recordatorio.
-- Asesor FinFlow IA testeable, con backend Gemini opcional y fallback local.
-- Perfil con datos ficticios.
-- Pantalla de notificaciones con permisos, prueba local, programacion local, cancelacion y switches guardados con AsyncStorage.
+- Splash screen negro con logo de matriz 3 x 3 animada.
+- Onboarding de tres pantallas con composiciones de puntos.
+- Welcome, login, registro y recuperacion de contrasena.
+- Overview oscuro con balance, grafica de puntos, cuentas y actividad reciente.
+- Transactions con lista desplazable y filtros funcionales.
+- Add Expense / Task con guardado en estado global.
+- Budget con grafica circular de puntos calculada desde datos.
+- Savings Goals con progreso en puntos, crear, sumar dinero y eliminar.
+- Planner con semana, agenda, crear evento y marcar como realizado.
+- AI Insights con chat, indicador de escritura, backend Gemini opcional y fallback local.
+- Profile / Settings con pantallas secundarias.
+- Persistencia local con Zustand + AsyncStorage.
 
 ## Ejecutar el proyecto
 
 ```bash
 npm install
-npm start
+npx expo start
 ```
 
 Para Android:
@@ -59,11 +62,10 @@ En Expo Go o emulador algunas funciones pueden depender de permisos y configurac
 
 ## Inteligencia artificial
 
-La pantalla `IA` incluye un asesor financiero que analiza datos mockeados de la app:
+La pantalla `AI Insights` incluye un asesor financiero que analiza datos mockeados y tambien datos modificados durante el uso:
 
 - movimientos;
 - presupuesto por categorias;
-- suscripciones;
 - objetivos de ahorro;
 - pregunta escrita por el usuario.
 
@@ -71,7 +73,7 @@ La app intenta usar un backend local compatible con Gemini si esta configurado. 
 
 ### Probar IA sin API key
 
-Abrir la app y entrar a la pestana `IA`. Escribir una pregunta y tocar `Generar recomendacion IA`.
+Abrir la app, entrar a `Overview` y tocar `AI`. Escribir una pregunta y tocar el boton de enviar.
 
 ### Probar IA con Gemini
 
@@ -117,6 +119,53 @@ npm run apk:release
 ```
 
 Para Play Store, mas adelante conviene generar un AAB firmado y usar una keystore propia.
+
+## Estructura principal
+
+```text
+app/
+  _layout.tsx
+  index.tsx
+  onboarding.tsx
+  welcome.tsx
+  login.tsx
+  register.tsx
+  forgot-password.tsx
+  budget.tsx
+  goals.tsx
+  insights.tsx
+  (tabs)/
+    _layout.tsx
+    overview.tsx
+    transactions.tsx
+    add.tsx
+    planner.tsx
+    profile.tsx
+src/
+  components/
+  data/
+  services/
+  store/
+  theme/
+  types/
+  utils/
+```
+
+## Componentes principales
+
+- `Dot`, `DotGrid`, `DotLogo`, `DotChart`, `DotProgress`, `BudgetDotRing`: identidad visual y graficas con puntos.
+- `ScreenContainer`, `DarkScreenContainer`, `Header`, `BottomNavigation`: estructura de pantalla y navegacion.
+- `TransactionItem`, `BudgetCategoryItem`, `GoalProgressItem`, `CalendarEventItem`, `InsightCard`, `ProfileMenuItem`: componentes reutilizables por pantalla.
+- `useFinFlowStore`: estado global con usuario, cuentas, balance, transacciones, presupuesto, objetivos, eventos, tareas y mensajes IA.
+
+## Dependencias principales
+
+- React Native, Expo, TypeScript, Expo Router.
+- React Native Reanimated para animaciones discretas.
+- React Native SVG para graficas de puntos.
+- Zustand y AsyncStorage para estado global y persistencia.
+- Lucide React Native para iconos lineales.
+- Expo Linear Gradient instalado para futuros fondos sutiles, aunque la interfaz evita degradados llamativos.
 
 ## Documentacion de entrega
 
