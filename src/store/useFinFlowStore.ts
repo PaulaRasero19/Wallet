@@ -3,20 +3,39 @@ import { create } from "zustand";
 import {
   mockAccounts,
   mockBudgets,
+  mockCreditCards,
+  mockExchangeRates,
   mockEvents,
   mockGoals,
   mockMessages,
+  mockRecurringPayments,
   mockTransactions,
   mockUser
 } from "../data/mock";
-import { Account, AiMessage, Budget, Goal, PlannerEvent, Task, Transaction, User } from "../types/finflow";
+import {
+  Account,
+  AiMessage,
+  Budget,
+  CreditCard,
+  ExchangeRates,
+  Goal,
+  PlannerEvent,
+  RecurringPayment,
+  Task,
+  Transaction,
+  User
+} from "../types/finflow";
+import { toBaseCurrency } from "../utils/money";
 
 type FinFlowState = {
   user: User;
   accounts: Account[];
   transactions: Transaction[];
   budgets: Budget[];
+  creditCards: CreditCard[];
+  exchangeRates: ExchangeRates;
   goals: Goal[];
+  recurringPayments: RecurringPayment[];
   events: PlannerEvent[];
   tasks: Task[];
   aiMessages: AiMessage[];
@@ -24,6 +43,9 @@ type FinFlowState = {
   hasHydrated: boolean;
   hydrate: () => Promise<void>;
   addTransaction: (transaction: Omit<Transaction, "id">) => void;
+  confirmRecurringPayment: (paymentId: string) => void;
+  rejectRecurringPayment: (paymentId: string) => void;
+  updateExchangeRate: (currency: keyof ExchangeRates, value: number) => void;
   addTask: (task: Omit<Task, "id">) => void;
   addGoal: (goal: Omit<Goal, "id">) => void;
   addGoalMoney: (goalId: string, amount: number) => void;
@@ -40,8 +62,8 @@ function makeId(prefix: string) {
   return `${prefix}-${Date.now()}-${Math.round(Math.random() * 1000)}`;
 }
 
-function computeBalance(accounts: Account[]) {
-  return accounts.reduce((total, account) => total + account.balance, 0);
+function computeBalance(accounts: Account[], exchangeRates: ExchangeRates) {
+  return accounts.reduce((total, account) => total + toBaseCurrency(account.balance, account.currency, exchangeRates), 0);
 }
 
 function snapshot(state: FinFlowState) {
@@ -50,11 +72,41 @@ function snapshot(state: FinFlowState) {
     aiMessages: state.aiMessages,
     balance: state.balance,
     budgets: state.budgets,
+    creditCards: state.creditCards,
     events: state.events,
+    exchangeRates: state.exchangeRates,
     goals: state.goals,
+    recurringPayments: state.recurringPayments,
     tasks: state.tasks,
     transactions: state.transactions,
     user: state.user
+  };
+}
+
+function normalizeStoredState(rawState: Partial<FinFlowState>) {
+  const exchangeRates = rawState.exchangeRates || mockExchangeRates;
+
+  return {
+    accounts: rawState.accounts?.map((account) => ({ ...account, currency: account.currency || "UYU" })) || mockAccounts,
+    aiMessages: rawState.aiMessages || mockMessages,
+    budgets: rawState.budgets?.map((budget) => ({ ...budget, currency: budget.currency || "UYU" })) || mockBudgets,
+    creditCards: rawState.creditCards || mockCreditCards,
+    events: rawState.events || mockEvents,
+    exchangeRates,
+    goals:
+      rawState.goals?.map((goal) => ({
+        ...goal,
+        currency: goal.currency || "UYU",
+        monthlyContribution: goal.monthlyContribution || 0
+      })) || mockGoals,
+    recurringPayments: rawState.recurringPayments || mockRecurringPayments,
+    tasks: rawState.tasks || [],
+    transactions:
+      rawState.transactions?.map((transaction) => ({
+        ...transaction,
+        currency: transaction.currency || "UYU"
+      })) || mockTransactions,
+    user: rawState.user ? { ...mockUser, ...rawState.user } : mockUser
   };
 }
 
@@ -74,16 +126,24 @@ export const useFinFlowStore = create<FinFlowState>()((set, get) => {
     accounts: mockAccounts,
     transactions: mockTransactions,
     budgets: mockBudgets,
+    creditCards: mockCreditCards,
+    exchangeRates: mockExchangeRates,
     goals: mockGoals,
+    recurringPayments: mockRecurringPayments,
     events: mockEvents,
     tasks: [],
     aiMessages: mockMessages,
-    balance: computeBalance(mockAccounts),
+    balance: computeBalance(mockAccounts, mockExchangeRates),
     hasHydrated: false,
     hydrate: async () => {
       const stored = await AsyncStorage.getItem(STORAGE_KEY);
       if (stored) {
-        set({ ...JSON.parse(stored), hasHydrated: true });
+        const normalizedState = normalizeStoredState(JSON.parse(stored));
+        set({
+          ...normalizedState,
+          balance: computeBalance(normalizedState.accounts, normalizedState.exchangeRates),
+          hasHydrated: true
+        });
         return;
       }
       set({ hasHydrated: true });
@@ -105,9 +165,29 @@ export const useFinFlowStore = create<FinFlowState>()((set, get) => {
 
         return {
           accounts: nextAccounts,
-          balance: computeBalance(nextAccounts),
+          balance: computeBalance(nextAccounts, state.exchangeRates),
           budgets: nextBudgets,
           transactions: [nextTransaction, ...state.transactions]
+        };
+      }),
+    confirmRecurringPayment: (paymentId) =>
+      commit((state) => ({
+        recurringPayments: state.recurringPayments.map((payment) =>
+          payment.id === paymentId ? { ...payment, status: "confirmed" } : payment
+        )
+      })),
+    rejectRecurringPayment: (paymentId) =>
+      commit((state) => ({
+        recurringPayments: state.recurringPayments.map((payment) =>
+          payment.id === paymentId ? { ...payment, status: "rejected" } : payment
+        )
+      })),
+    updateExchangeRate: (currency, value) =>
+      commit((state) => {
+        const nextRates = { ...state.exchangeRates, [currency]: value };
+        return {
+          exchangeRates: nextRates,
+          balance: computeBalance(state.accounts, nextRates)
         };
       }),
     addTask: (task) =>

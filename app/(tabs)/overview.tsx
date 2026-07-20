@@ -5,16 +5,28 @@ import Animated, { FadeInDown } from "react-native-reanimated";
 import { DarkScreenContainer } from "../../src/components/DarkScreenContainer";
 import { Dot } from "../../src/components/Dot";
 import { DotChart } from "../../src/components/DotChart";
+import { ForecastPanel } from "../../src/components/ForecastPanel";
 import { Header } from "../../src/components/Header";
 import { TransactionItem } from "../../src/components/TransactionItem";
+import { buildForecast } from "../../src/services/forecastService";
 import { useFinFlowStore } from "../../src/store/useFinFlowStore";
 import { colors, spacing, typography } from "../../src/theme";
-import { formatMoney } from "../../src/utils/money";
+import { formatMoney, formatUYU } from "../../src/utils/money";
 
 const filters = ["1W", "1M", "3M", "1Y", "All"];
 
 export default function Overview() {
-  const { accounts, balance, transactions, user } = useFinFlowStore();
+  const { accounts, balance, budgets, creditCards, exchangeRates, goals, recurringPayments, transactions, user } = useFinFlowStore();
+  const forecast = buildForecast({
+    accounts,
+    budgets,
+    creditCards,
+    exchangeRates,
+    goals,
+    recurringPayments,
+    transactions,
+    nextIncomeDate: user.nextIncomeDate
+  });
 
   return (
     <DarkScreenContainer>
@@ -37,13 +49,16 @@ export default function Overview() {
           <Dot color="white" size={6} />
         </View>
         <Text style={styles.label}>Total Balance</Text>
-        <Text style={styles.balance}>{formatMoney(balance).replace("+", "")}</Text>
+        <Text style={styles.balance}>{formatUYU(balance, false)}</Text>
         <Text style={styles.growth}>+12.4% vs last month</Text>
+        <Text style={styles.available}>Really available: {formatUYU(forecast.realAvailable, false)}</Text>
       </Animated.View>
 
       <View style={styles.chartWrap}>
         <DotChart />
       </View>
+
+      <ForecastPanel forecast={forecast} dark />
 
       <View style={styles.filters}>
         {filters.map((filter) => (
@@ -78,7 +93,7 @@ export default function Overview() {
                 {account.name} •••• {account.mask}
               </Text>
             </View>
-            <Text style={styles.accountBalance}>{formatMoney(account.balance).replace("+", "")}</Text>
+            <Text style={styles.accountBalance}>{formatMoney(account.balance, account.currency, false)}</Text>
           </View>
         ))}
       </View>
@@ -129,6 +144,11 @@ const styles = StyleSheet.create({
   growth: {
     ...typography.label,
     color: colors.lime
+  },
+  available: {
+    ...typography.label,
+    color: colors.white,
+    marginTop: spacing.xs
   },
   chartWrap: {
     marginTop: spacing.lg

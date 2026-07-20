@@ -22,6 +22,7 @@ export default function RootLayout() {
         <Stack.Screen name="register" />
         <Stack.Screen name="forgot-password" />
         <Stack.Screen name="budget" />
+        <Stack.Screen name="forecast" />
         <Stack.Screen name="goals" />
         <Stack.Screen name="insights" />
         <Stack.Screen name="settings/[section]" />
