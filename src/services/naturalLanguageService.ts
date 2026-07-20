@@ -1,6 +1,10 @@
 import { BudgetCategory, MovementProposal } from "../types/finflow";
 
 function amountFrom(text: string) {
+  const installmentAmount = text.match(/cuotas?\s*(de)?\s*(\d+[\d.,]*)/i);
+  if (installmentAmount?.[2]) {
+    return Number(installmentAmount[2].replace(/\./g, "").replace(",", "."));
+  }
   const match = text.match(/(\d+[\d.,]*)/);
   return match ? Number(match[1].replace(/\./g, "").replace(",", ".")) : 0;
 }
@@ -31,6 +35,7 @@ export function parseMovementProposal(text: string): MovementProposal | null {
   const isIncome = /cobr|salario|sueldo|ingres/i.test(cleanText);
   const isTask = /recordame|recordar|pagar/i.test(cleanText) && amount === 0;
   const installmentsMatch = cleanText.match(/(\d+)\s*cuotas?\s*(de)?\s*(\d+[\d.,]*)?/i);
+  const installmentAmount = String(installmentsMatch?.[3] || amount);
   const category = categoryFrom(cleanText);
   const isAntExpense = !isIncome && amount > 0 && amount <= 700;
 
@@ -60,8 +65,8 @@ export function parseMovementProposal(text: string): MovementProposal | null {
       ? {
           current: 1,
           total: Number(installmentsMatch[1]),
-          amountPerInstallment: Number((installmentsMatch[3] || amount).replace(/\./g, "").replace(",", ".")),
-          remainingAmount: Number(installmentsMatch[1]) * Number((installmentsMatch[3] || amount).replace(/\./g, "").replace(",", ".")),
+          amountPerInstallment: Number(installmentAmount.replace(/\./g, "").replace(",", ".")),
+          remainingAmount: Number(installmentsMatch[1]) * Number(installmentAmount.replace(/\./g, "").replace(",", ".")),
           nextDueDate: "2026-08-10"
         }
       : undefined,

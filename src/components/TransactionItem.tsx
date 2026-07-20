@@ -17,7 +17,7 @@ export function TransactionItem({ transaction, dark = false }: { transaction: Tr
           {transaction.date}, {transaction.time}
         </Text>
       </View>
-      <Text style={[styles.amount, { color: textColor }]}>{formatMoney(transaction.amount)}</Text>
+      <Text style={[styles.amount, { color: textColor }]}>{formatMoney(transaction.amount, transaction.currency)}</Text>
     </View>
   );
 }

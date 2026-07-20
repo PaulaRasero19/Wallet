@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { Header } from "../../src/components/Header";
+import { RecurringDetectionItem } from "../../src/components/RecurringDetectionItem";
 import { ScreenContainer } from "../../src/components/ScreenContainer";
 import { TransactionItem } from "../../src/components/TransactionItem";
 import { useFinFlowStore } from "../../src/store/useFinFlowStore";
@@ -11,7 +12,7 @@ const tabs: Array<"all" | TransactionType> = ["all", "income", "expense", "trans
 
 export default function Transactions() {
   const [active, setActive] = useState<(typeof tabs)[number]>("all");
-  const transactions = useFinFlowStore((state) => state.transactions);
+  const { confirmRecurringPayment, recurringPayments, rejectRecurringPayment, transactions } = useFinFlowStore();
   const filtered = useMemo(
     () => (active === "all" ? transactions : transactions.filter((transaction) => transaction.type === active)),
     [active, transactions]
@@ -31,6 +32,17 @@ export default function Transactions() {
       <View style={styles.list}>
         {filtered.map((transaction) => (
           <TransactionItem key={transaction.id} transaction={transaction} />
+        ))}
+      </View>
+      <Text style={styles.section}>Recurring detected</Text>
+      <View style={styles.panel}>
+        {recurringPayments.map((payment) => (
+          <RecurringDetectionItem
+            key={payment.id}
+            payment={payment}
+            onConfirm={() => confirmRecurringPayment(payment.id)}
+            onReject={() => rejectRecurringPayment(payment.id)}
+          />
         ))}
       </View>
     </ScreenContainer>
@@ -67,5 +79,19 @@ const styles = StyleSheet.create({
   },
   list: {
     marginTop: spacing.sm
+  },
+  section: {
+    ...typography.body,
+    color: colors.black,
+    fontWeight: "600",
+    marginTop: spacing.xl
+  },
+  panel: {
+    backgroundColor: colors.white,
+    borderColor: colors.grayLight,
+    borderRadius: 20,
+    borderWidth: 1,
+    marginTop: spacing.sm,
+    padding: spacing.sm
   }
 });

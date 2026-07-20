@@ -37,6 +37,23 @@ function buildContext({ budgets, goals, transactions }: AdvisorContext) {
   };
 }
 
+function buildSafeSummary(data: AdvisorContext) {
+  const context = buildContext(data);
+
+  return {
+    budgetUsed: context.budgetUsed,
+    expenses: context.expenses,
+    income: context.income,
+    savingsCapacity: context.savingsCapacity,
+    highestCategory: context.highestCategory.name,
+    highestCategoryProgress: percentage(context.highestCategory.spent, context.highestCategory.limit),
+    slowestGoal: context.slowestGoal.name,
+    slowestGoalProgress: percentage(context.slowestGoal.saved, context.slowestGoal.target),
+    transactionCount: data.transactions.length,
+    safety: "No passwords, emails, full card numbers, documents or sensitive bank data are included."
+  };
+}
+
 function localAdvice(question: string, data: AdvisorContext): AdvisorResult {
   const context = buildContext(data);
   const categoryProgress = percentage(context.highestCategory.spent, context.highestCategory.limit);
@@ -53,7 +70,8 @@ function localAdvice(question: string, data: AdvisorContext): AdvisorResult {
     recommendedActions: [
       `Set a 7-day limit for ${context.highestCategory.name}, currently at ${categoryProgress}%.`,
       `Move ${formatMoney(120).replace("+", "")} into ${context.slowestGoal.name}; it is now ${goalProgress}% complete.`,
-      "Turn on a weekly budget review reminder every Sunday."
+      "Turn on a weekly budget review reminder every Sunday.",
+      "This is an educational recommendation, not professional financial advice."
     ],
     notificationSuggestion:
       riskLevel === "High"
@@ -69,7 +87,7 @@ export async function generateAdvisorResult(question: string, data: AdvisorConte
     const response = await fetch(`${AI_API_URL}/api/financial-advice`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ context: data, question })
+      body: JSON.stringify({ context: buildSafeSummary(data), question })
     });
 
     if (!response.ok) throw new Error("AI backend unavailable");

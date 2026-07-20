@@ -13,7 +13,7 @@ export default function Goals() {
   const deleteGoal = useFinFlowStore((state) => state.deleteGoal);
 
   function createGoal() {
-    addGoal({ name: "New Goal", saved: 0, target: 1000, accent: "orange" });
+    addGoal({ name: "New Goal", saved: 0, target: 1000, currency: "UYU", monthlyContribution: 500, accent: "orange" });
     Alert.alert("FinFlow", "Goal created. You can add money or delete it.");
   }
 

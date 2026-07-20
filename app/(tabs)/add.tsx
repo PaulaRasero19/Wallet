@@ -35,8 +35,11 @@ export default function Add() {
         date: "Today",
         time: "9:41 AM",
         amount: -Math.abs(Number(amount) || 0),
+        currency: "UYU",
         type: "expense",
-        accent: selected.accent
+        accent: selected.accent,
+        accountId: "itau-uyu",
+        isAntExpense: Math.abs(Number(amount) || 0) <= 700
       });
       Alert.alert("FinFlow", "Expense added. Balance and budget were updated.");
       return;

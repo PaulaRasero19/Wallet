@@ -8,12 +8,14 @@ FinFlow es una app movil de finanzas personales, organizacion, habitos y planifi
 - Onboarding de tres pantallas con composiciones de puntos.
 - Welcome, login, registro y recuperacion de contrasena.
 - Overview oscuro con balance, grafica de puntos, cuentas y actividad reciente.
+- FinFlow Forecast con dinero realmente disponible, escenarios de fin de mes, cuotas, recurrentes y gastos hormiga.
 - Transactions con lista desplazable y filtros funcionales.
 - Add Expense / Task con guardado en estado global.
 - Budget con grafica circular de puntos calculada desde datos.
 - Savings Goals con progreso en puntos, crear, sumar dinero y eliminar.
 - Planner con semana, agenda, crear evento y marcar como realizado.
 - AI Insights con chat, indicador de escritura, backend Gemini opcional y fallback local.
+- Registro por lenguaje natural con propuesta estructurada y confirmacion antes de guardar.
 - Profile / Settings con pantallas secundarias.
 - Persistencia local con Zustand + AsyncStorage.
 
@@ -175,4 +177,5 @@ src/
 - `docs/AUTOMATIZACION.md`: flujo opcional landing -> formulario -> Google Sheets -> n8n -> email.
 - `docs/API_KEYS_SEGURIDAD.md`: APIs, credenciales y medidas de seguridad.
 - `docs/PROMPTS_IA.md`: prompts principales.
+- `docs/FORECAST_FASES.md`: roadmap por fases, modelos ampliados y alcance de la primera fase.
 - `marketing/landing.html`: landing page estatica de comunicacion.
