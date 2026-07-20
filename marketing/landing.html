@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>FinFlow</title>
+    <style>
+      body {
+        margin: 0;
+        background: #f4f6f8;
+        color: #111827;
+        font-family: Arial, sans-serif;
+      }
+
+      header,
+      section {
+        box-sizing: border-box;
+        margin: 0 auto;
+        max-width: 960px;
+        padding: 48px 20px;
+      }
+
+      .hero {
+        min-height: 70vh;
+        display: grid;
+        align-content: center;
+      }
+
+      h1 {
+        color: #2563eb;
+        font-size: 64px;
+        line-height: 1;
+        margin: 0;
+      }
+
+      h2 {
+        font-size: 28px;
+        margin: 0 0 16px;
+      }
+
+      p {
+        color: #4b5563;
+        font-size: 18px;
+        line-height: 1.6;
+        max-width: 680px;
+      }
+
+      .button {
+        background: #2563eb;
+        border-radius: 8px;
+        color: white;
+        display: inline-block;
+        font-weight: 700;
+        margin-top: 20px;
+        padding: 14px 20px;
+        text-decoration: none;
+      }
+
+      .grid {
+        display: grid;
+        gap: 16px;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      }
+
+      .card {
+        background: white;
+        border: 1px solid #e5e7eb;
+        border-radius: 8px;
+        padding: 20px;
+      }
+
+      .card strong {
+        display: block;
+        font-size: 18px;
+        margin-bottom: 8px;
+      }
+    </style>
+  </head>
+  <body>
+    <header class="hero">
+      <h1>FinFlow</h1>
+      <p>Tu dinero, en flujo inteligente.</p>
+      <p>
+        Una app movil para organizar gastos, controlar presupuesto, seguir objetivos de ahorro y recibir recomendaciones de IA pensadas para tu mes.
+      </p>
+      <a class="button" href="../README.md">Ver instrucciones de demo</a>
+    </header>
+
+    <section>
+      <h2>Que resuelve</h2>
+      <div class="grid">
+        <div class="card">
+          <strong>Presupuesto claro</strong>
+          Ve cuanto usaste y que categorias necesitan atencion.
+        </div>
+        <div class="card">
+          <strong>IA accionable</strong>
+          Recibi recomendaciones segun gastos, objetivos y suscripciones.
+        </div>
+        <div class="card">
+          <strong>Alertas inteligentes</strong>
+          Prepara recordatorios de presupuesto, vencimientos y metas.
+        </div>
+      </div>
+    </section>
+  </body>
+</html>
