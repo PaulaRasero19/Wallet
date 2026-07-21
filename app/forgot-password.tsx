@@ -34,7 +34,7 @@ export default function ForgotPassword() {
       <Header title={t("auth.forgot")} back />
       <View style={styles.form}>
         <Text style={styles.title}>Reset access</Text>
-        <Text style={styles.copy}>Enter your email and Supabase will send a recovery message.</Text>
+        <Text style={styles.copy}>Enter your email and FinFlow will process the recovery request.</Text>
         <InputField accessibilityLabel={t("auth.email")} autoCapitalize="none" keyboardType="email-address" onChangeText={setEmail} placeholder={t("auth.email")} value={email} />
         <PrimaryButton onPress={submit}>Send recovery link</PrimaryButton>
       </View>

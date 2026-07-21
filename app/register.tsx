@@ -10,28 +10,31 @@ import { useSessionStore } from "../src/store/useSessionStore";
 import { spacing, typography } from "../src/theme";
 
 export default function Register() {
-  const { language, profile, register, status } = useSessionStore();
+  const { language, register, status } = useSessionStore();
   const nameInputRef = useRef<TextInput>(null);
   const emailInputRef = useRef<TextInput>(null);
   const passwordInputRef = useRef<TextInput>(null);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
+  const [formMessage, setFormMessage] = useState("");
   const [password, setPassword] = useState("");
   const t = (key: string) => translate(language, key);
 
   async function submit() {
+    setFormMessage("");
+
     if (!name.trim()) {
-      Alert.alert("FinFlow", t("auth.name"));
+      setFormMessage(t("auth.name"));
       return;
     }
 
     if (!email.includes("@")) {
-      Alert.alert("FinFlow", t("auth.invalidEmail"));
+      setFormMessage(t("auth.invalidEmail"));
       return;
     }
 
     if (password.length < 6) {
-      Alert.alert("FinFlow", t("auth.invalidPassword"));
+      setFormMessage(t("auth.invalidPassword"));
       return;
     }
 
@@ -40,13 +43,15 @@ export default function Register() {
 
       if (message) {
         Alert.alert("FinFlow", message);
+        setFormMessage(message);
         router.replace("/login");
         return;
       }
 
-      router.replace(profile?.onboarding_completed ? "/(tabs)/overview" : "/setup");
+      router.replace("/setup");
     } catch (error) {
-      Alert.alert("FinFlow", error instanceof Error ? error.message : t("auth.configMissing"));
+      const message = error instanceof Error ? error.message : t("auth.configMissing");
+      setFormMessage(message);
     }
   }
 
@@ -97,6 +102,7 @@ export default function Register() {
           textContentType="password"
           value={password}
         />
+        {formMessage ? <Text style={styles.message}>{formMessage}</Text> : null}
         <PrimaryButton onPress={submit}>{status === "loading" ? t("common.loading") : t("auth.register")}</PrimaryButton>
       </View>
     </ScreenContainer>
@@ -113,5 +119,9 @@ const styles = StyleSheet.create({
   title: {
     ...typography.display,
     marginBottom: spacing.md
+  },
+  message: {
+    ...typography.body,
+    color: "#ff4b1f"
   }
 });

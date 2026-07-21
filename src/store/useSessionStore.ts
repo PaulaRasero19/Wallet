@@ -1,6 +1,7 @@
-import { Session, User } from "@supabase/supabase-js";
 import { create } from "zustand";
 import {
+  AuthSession,
+  AuthUser,
   getCurrentAuth,
   onAuthChanged,
   saveProfileLanguage,
@@ -10,18 +11,17 @@ import {
   signOut,
   signUpWithEmail
 } from "../services/authService";
-import { isSupabaseConfigured } from "../services/supabase/client";
 import { Language, Profile, ProfileUpdate, updateProfile } from "../services/profileService";
 
-type SessionStatus = "loading" | "authenticated" | "unauthenticated" | "config-missing";
+type SessionStatus = "loading" | "authenticated" | "unauthenticated";
 
 type SessionState = {
-  authUser: User | null;
+  authUser: AuthUser | null;
   error: string | null;
   hasInitialized: boolean;
   language: Language;
   profile: Profile | null;
-  session: Session | null;
+  session: AuthSession | null;
   status: SessionStatus;
   completeOnboarding: (update: ProfileUpdate) => Promise<void>;
   initialize: () => Promise<void>;
@@ -32,13 +32,6 @@ type SessionState = {
   register: (email: string, password: string, fullName: string) => Promise<string | undefined>;
   setLanguage: (language: Language) => Promise<void>;
 };
-
-let authSubscription: { unsubscribe: () => void } | null = null;
-
-function statusFor(session: Session | null) {
-  if (!isSupabaseConfigured) return "config-missing";
-  return session ? "authenticated" : "unauthenticated";
-}
 
 function messageFrom(error: unknown) {
   return error instanceof Error ? error.message : "Unexpected authentication error.";
@@ -64,25 +57,14 @@ export const useSessionStore = create<SessionState>()((set, get) => ({
         language: result.profile?.language || get().language,
         profile: result.profile,
         session: result.session,
-        status: statusFor(result.session)
+        status: result.user ? "authenticated" : "unauthenticated"
       });
-
-      if (!authSubscription) {
-        authSubscription = onAuthChanged((next) => {
-          set({
-            authUser: next.user,
-            language: next.profile?.language || get().language,
-            profile: next.profile,
-            session: next.session,
-            status: statusFor(next.session)
-          });
-        });
-      }
+      onAuthChanged();
     } catch (error) {
       set({
         error: messageFrom(error),
         hasInitialized: true,
-        status: isSupabaseConfigured ? "unauthenticated" : "config-missing"
+        status: "unauthenticated"
       });
     }
   },
@@ -98,7 +80,7 @@ export const useSessionStore = create<SessionState>()((set, get) => ({
         status: "authenticated"
       });
     } catch (error) {
-      set({ error: messageFrom(error), status: isSupabaseConfigured ? "unauthenticated" : "config-missing" });
+      set({ error: messageFrom(error), status: "unauthenticated" });
       throw error;
     }
   },
@@ -111,11 +93,11 @@ export const useSessionStore = create<SessionState>()((set, get) => ({
         language: result.profile?.language || get().language,
         profile: result.profile,
         session: result.session,
-        status: result.session ? "authenticated" : "unauthenticated"
+        status: result.user ? "authenticated" : "unauthenticated"
       });
       return result.message;
     } catch (error) {
-      set({ error: messageFrom(error), status: isSupabaseConfigured ? "unauthenticated" : "config-missing" });
+      set({ error: messageFrom(error), status: "unauthenticated" });
       throw error;
     }
   },
@@ -131,7 +113,7 @@ export const useSessionStore = create<SessionState>()((set, get) => ({
         status: "authenticated"
       });
     } catch (error) {
-      set({ error: messageFrom(error), status: isSupabaseConfigured ? "unauthenticated" : "config-missing" });
+      set({ error: messageFrom(error), status: "unauthenticated" });
       throw error;
     }
   },
@@ -143,7 +125,7 @@ export const useSessionStore = create<SessionState>()((set, get) => ({
         authUser: null,
         profile: null,
         session: null,
-        status: isSupabaseConfigured ? "unauthenticated" : "config-missing"
+        status: "unauthenticated"
       });
     } catch (error) {
       set({ error: messageFrom(error), status: "authenticated" });

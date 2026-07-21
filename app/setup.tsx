@@ -4,7 +4,6 @@ import { router } from "expo-router";
 import { Header } from "../src/components/Header";
 import { InputField } from "../src/components/InputField";
 import { PrimaryButton } from "../src/components/PrimaryButton";
-import { SecondaryButton } from "../src/components/SecondaryButton";
 import { ScreenContainer } from "../src/components/ScreenContainer";
 import { translate } from "../src/i18n";
 import { useSessionStore } from "../src/store/useSessionStore";
@@ -22,6 +21,7 @@ export default function Setup() {
   const [income, setIncome] = useState(profile?.monthly_income ? String(profile.monthly_income) : "");
   const [payday, setPayday] = useState(profile?.payday ? String(profile.payday) : "");
   const [goal, setGoal] = useState(profile?.financial_goal || "");
+  const [formMessage, setFormMessage] = useState("");
   const [saving, setSaving] = useState(false);
   const t = (key: string) => translate(language, key);
 
@@ -32,6 +32,7 @@ export default function Setup() {
   }, [profile?.onboarding_completed]);
 
   async function save(skipSensitive = false) {
+    setFormMessage("");
     setSaving(true);
     try {
       await completeOnboarding({
@@ -44,7 +45,12 @@ export default function Setup() {
       });
       router.replace("/(tabs)/overview");
     } catch (error) {
-      Alert.alert("FinFlow", error instanceof Error ? error.message : "No se pudo guardar la configuración.");
+      const message = error instanceof Error ? error.message : "No se pudo guardar la configuración.";
+      const readableMessage = message.includes("fetch") || message.includes("Failed")
+        ? "No se pudo conectar con el backend local. Verificá que esté corriendo con npm run backend."
+        : message;
+      setFormMessage(readableMessage);
+      Alert.alert("FinFlow", readableMessage);
     } finally {
       setSaving(false);
     }
@@ -89,8 +95,8 @@ export default function Setup() {
       </View>
 
       <View style={styles.actions}>
+        {formMessage ? <Text style={styles.message}>{formMessage}</Text> : null}
         <PrimaryButton onPress={() => void save(false)}>{saving ? t("common.loading") : t("setup.finish")}</PrimaryButton>
-        <SecondaryButton onPress={() => void save(true)}>{t("setup.later")}</SecondaryButton>
       </View>
     </ScreenContainer>
   );
@@ -143,5 +149,9 @@ const styles = StyleSheet.create({
   actions: {
     gap: spacing.sm,
     marginTop: spacing.xl
+  },
+  message: {
+    ...typography.body,
+    color: colors.orange
   }
 });

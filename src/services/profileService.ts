@@ -1,5 +1,5 @@
 import { Currency } from "../types/finflow";
-import { requireSupabase } from "./supabase/client";
+import { apiRequest } from "./localBackend/client";
 
 export type Language = "es" | "en" | "pt";
 
@@ -40,40 +40,24 @@ export type ProfileUpdate = Partial<
 >;
 
 export async function getProfile(userId: string) {
-  const { data, error } = await requireSupabase().from("profiles").select("*").eq("id", userId).single();
-
-  if (error) {
-    throw error;
-  }
-
-  return data as Profile;
+  const response = await apiRequest<{ profile: Profile }>("/api/auth/me", { requireAuth: true });
+  return response.profile;
 }
 
 export async function upsertProfile(userId: string, update: ProfileUpdate) {
-  const { data, error } = await requireSupabase()
-    .from("profiles")
-    .upsert({ id: userId, ...update }, { onConflict: "id" })
-    .select("*")
-    .single();
-
-  if (error) {
-    throw error;
-  }
-
-  return data as Profile;
+  const response = await apiRequest<{ profile: Profile }>("/api/profile", {
+    body: update,
+    method: "PATCH",
+    requireAuth: true
+  });
+  return response.profile;
 }
 
 export async function updateProfile(userId: string, update: ProfileUpdate) {
-  const { data, error } = await requireSupabase()
-    .from("profiles")
-    .update({ ...update, updated_at: new Date().toISOString() })
-    .eq("id", userId)
-    .select("*")
-    .single();
-
-  if (error) {
-    throw error;
-  }
-
-  return data as Profile;
+  const response = await apiRequest<{ profile: Profile }>("/api/profile", {
+    body: update,
+    method: "PATCH",
+    requireAuth: true
+  });
+  return response.profile;
 }
