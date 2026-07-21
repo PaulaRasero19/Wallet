@@ -8,12 +8,17 @@
     "android": "expo run:android",
     "ios": "expo run:ios",
     "web": "expo start --web",
-    "dev": "REACT_NATIVE_PACKAGER_HOSTNAME=127.0.0.1 expo run:android",
-    "backend": "node server/ai-server.js",
+    "dev": "concurrently -k -n server,mobile \"npm run dev:server\" \"npm run dev:mobile\"",
+    "dev:mobile": "REACT_NATIVE_PACKAGER_HOSTNAME=127.0.0.1 expo start --android",
+    "dev:server": "npm run dev --prefix server",
+    "backend": "npm run dev:server",
     "ai-server": "node server/ai-server.js",
+    "server:build": "npm run build --prefix server",
+    "server:start": "npm run start --prefix server",
     "apk": "cd android && NODE_ENV=development ./gradlew assembleDebug",
     "apk:release": "cd android && NODE_ENV=production ./gradlew assembleRelease",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit && npm run typecheck --prefix server",
+    "lint": "npm run lint --prefix server"
   },
   "dependencies": {
     "@expo/metro-runtime": "~5.0.5",
@@ -51,6 +56,7 @@
     "@babel/core": "^7.25.2",
     "@types/node": "^26.1.1",
     "@types/react": "19.0.10",
+    "concurrently": "^10.0.3",
     "typescript": "~5.8.3"
   }
 }
