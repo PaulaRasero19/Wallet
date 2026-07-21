@@ -70,13 +70,12 @@ type ForecastInput = {
   budgets: Budget[];
   creditCards: CreditCard[];
   exchangeRates: ExchangeRates;
+  expectedIncome?: number;
   goals: Goal[];
   recurringPayments: RecurringPayment[];
   transactions: Transaction[];
-  nextIncomeDate: string;
+  nextIncomeDate?: string | null;
 };
-
-const today = new Date("2026-07-20T12:00:00-03:00");
 
 function daysBetween(date: Date, target: Date) {
   const diff = target.getTime() - date.getTime();
@@ -191,11 +190,12 @@ function buildScenario(
 }
 
 export function buildForecast(input: ForecastInput): ForecastResult {
+  const today = new Date();
   const currentBalance = input.accounts.reduce((sum, account) => sum + toUYU(account.balance, account.currency, input.exchangeRates), 0);
   const accumulatedExpenses = input.transactions
     .filter((transaction) => transaction.type === "expense")
     .reduce((sum, transaction) => sum + Math.abs(toUYU(transaction.amount, transaction.currency, input.exchangeRates)), 0);
-  const expectedIncome = 42000;
+  const expectedIncome = input.expectedIncome || 0;
   const pendingPayments = input.recurringPayments.filter((payment) => payment.status !== "rejected" && new Date(payment.nextChargeDate) >= today);
   const pendingFixedPayments = pendingPayments
     .filter((payment) => payment.kind !== "subscription")
@@ -209,10 +209,10 @@ export function buildForecast(input: ForecastInput): ForecastResult {
   }, 0);
   const committedSavings = input.goals.reduce((sum, goal) => sum + toUYU(goal.monthlyContribution, goal.currency, input.exchangeRates), 0);
   const remainingBudgets = input.budgets.reduce((sum, budget) => sum + Math.max(0, toUYU(budget.limit - budget.spent, budget.currency, input.exchangeRates)), 0);
-  const daysUntilIncome = daysBetween(today, new Date(input.nextIncomeDate));
+  const daysUntilIncome = input.nextIncomeDate ? daysBetween(today, new Date(input.nextIncomeDate)) : 1;
   const antExpenses = analyzeAntExpenses(input.transactions, input.goals, accumulatedExpenses, input.exchangeRates);
   const realAvailable = currentBalance - pendingFixedPayments - pendingSubscriptions - pendingInstallments - committedSavings;
-  const elapsedDays = 20;
+  const elapsedDays = Math.max(1, today.getDate());
   const dailyBurn = accumulatedExpenses / elapsedDays;
   const projectedEndBalance = realAvailable + expectedIncome - dailyBurn * daysUntilIncome;
   const dailyLimit = Math.max(0, realAvailable / daysUntilIncome);

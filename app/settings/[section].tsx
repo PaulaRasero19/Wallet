@@ -9,7 +9,7 @@ const copy: Record<string, { title: string; body: string }> = {
   account: { title: "Account", body: "Demo profile controls for name, email and currency." },
   preferences: { title: "Preferences", body: "Theme, language and spending display preferences." },
   notifications: { title: "Notifications", body: "Budget alerts, reminder cadence and AI nudges." },
-  "bank-accounts": { title: "Bank accounts", body: "Connected accounts are mocked for evaluation." },
+  "bank-accounts": { title: "Bank accounts", body: "Connected accounts will be loaded from Supabase in the next phase." },
   security: { title: "Security", body: "Password, biometric access and API key safety notes." },
   help: { title: "Help & Support", body: "Frequently asked questions and contact channels." }
 };

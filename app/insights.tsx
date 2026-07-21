@@ -9,7 +9,6 @@ import { Header } from "../src/components/Header";
 import { InputField } from "../src/components/InputField";
 import { InsightCard } from "../src/components/InsightCard";
 import { generateAdvisorResult } from "../src/services/aiAdvisorService";
-import { parseMovementProposal } from "../src/services/naturalLanguageService";
 import { useFinFlowStore } from "../src/store/useFinFlowStore";
 import { colors, spacing, typography } from "../src/theme";
 import { MovementProposal } from "../src/types/finflow";
@@ -26,10 +25,7 @@ export default function Insights() {
     const prompt = question.trim();
     addAiMessage({ role: "user", text: prompt });
     setQuestion("");
-    const parsed = parseMovementProposal(prompt);
-    if (parsed && (parsed.amount !== 0 || parsed.type === "task")) {
-      setProposal(parsed);
-    }
+    setProposal(null);
     setTyping(true);
     const result = await generateAdvisorResult(prompt, { budgets, goals, transactions });
     addAiMessage({

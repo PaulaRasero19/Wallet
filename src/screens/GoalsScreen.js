@@ -8,18 +8,14 @@ export function GoalsScreen() {
   const [goals, setGoals] = useState(initialGoals);
 
   function handleAddSaving(goalId) {
-    setGoals((currentGoals) =>
-      currentGoals.map((goal) =>
-        goal.id === goalId ? { ...goal, saved: Math.min(goal.saved + 2500, goal.target) } : goal
-      )
-    );
-    Alert.alert("Ahorro agregado", "Sumamos $2.500 de forma simulada a este objetivo.");
+    setGoals((currentGoals) => currentGoals.map((goal) => (goal.id === goalId ? goal : goal)));
+    Alert.alert("Accion no disponible", "Las metas reales se guardaran en Supabase en una fase posterior.");
   }
 
   return (
     <ScrollView style={globalStyles.screen} contentContainerStyle={globalStyles.content}>
       <Text style={globalStyles.title}>Objetivos de ahorro</Text>
-      <Text style={globalStyles.subtitle}>Metas ficticias para mostrar progreso y acciones simples.</Text>
+      <Text style={globalStyles.subtitle}>Las metas reales se cargaran desde Supabase.</Text>
       {goals.map((goal) => (
         <GoalCard key={goal.id} goal={goal} onAddSaving={handleAddSaving} />
       ))}

@@ -2,22 +2,21 @@
 
 FinFlow es una app movil de finanzas personales, organizacion, habitos y planificacion, hecha con React Native, Expo, TypeScript y Expo Router. La direccion visual toma como referencia interfaces conceptuales minimalistas: fondo crema, pantallas negras, mucho espacio negativo y un sistema grafico basado en puntos.
 
-## Funcionalidades incluidas
+## Estado actual: Fase 1 Supabase/Auth
 
 - Splash screen negro con logo de matriz 3 x 3 animada.
 - Onboarding de tres pantallas con composiciones de puntos.
-- Welcome, login, registro y recuperacion de contrasena.
-- Overview oscuro con balance, grafica de puntos, cuentas y actividad reciente.
-- FinFlow Forecast con dinero realmente disponible, escenarios de fin de mes, cuotas, recurrentes y gastos hormiga.
-- Transactions con lista desplazable y filtros funcionales.
-- Add Expense / Task con guardado en estado global.
-- Budget con grafica circular de puntos calculada desde datos.
-- Savings Goals con progreso en puntos, crear, sumar dinero y eliminar.
-- Planner con semana, agenda, crear evento y marcar como realizado.
-- AI Insights con chat, indicador de escritura, backend Gemini opcional y fallback local.
-- Registro por lenguaje natural con propuesta estructurada y confirmacion antes de guardar.
+- Selector inicial de idioma basico: espanol, ingles y portugues.
+- Supabase client con sesion persistida mediante Expo SecureStore en movil.
+- Login, registro, recuperacion de contrasena y logout conectados a Supabase Auth.
+- Perfil de usuario en tabla `profiles` con Row Level Security.
+- Rutas protegidas: las tabs principales requieren sesion y onboarding completo.
+- Setup inicial minimo guardado en `profiles`.
+- Cuenta demo separada mediante credenciales dedicadas.
+- Dashboard vacio para usuarios nuevos: no muestra balances, movimientos, metas ni insights inventados.
 - Profile / Settings con pantallas secundarias.
-- Persistencia local con Zustand + AsyncStorage.
+
+FinFlow ya no carga datos financieros ficticios automaticamente. Las tablas financieras y su CRUD real se implementan en fases posteriores.
 
 ## Ejecutar el proyecto
 
@@ -38,7 +37,7 @@ Para correr la app como development build nativa en el emulador Android:
 npm run dev
 ```
 
-Ese comando ejecuta `npx expo run:android --localhost`, compila e instala FinFlow como app Android propia. Deja Metro abierto; mientras esa terminal siga corriendo, los cambios en JavaScript se actualizan en vivo con Fast Refresh.
+Ese comando ejecuta `REACT_NATIVE_PACKAGER_HOSTNAME=127.0.0.1 expo run:android`, compila e instala FinFlow como app Android propia. Deja Metro abierto; mientras esa terminal siga corriendo, los cambios en JavaScript se actualizan en vivo con Fast Refresh.
 
 Si la app muestra un error de conexion a una IP como `172.x.x.x:8081`, ejecutar:
 
@@ -47,6 +46,49 @@ adb reverse tcp:8081 tcp:8081
 ```
 
 Luego tocar Reload en la app o volver a ejecutar `npm run dev`.
+
+## Variables de entorno
+
+Crear `.env` en la raiz con valores de Supabase:
+
+```bash
+EXPO_PUBLIC_SUPABASE_URL=https://TU-PROYECTO.supabase.co
+EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY=TU_PUBLISHABLE_KEY
+EXPO_PUBLIC_FINFLOW_DEMO_EMAIL=demo@tu-dominio.com
+EXPO_PUBLIC_FINFLOW_DEMO_PASSWORD=UNA_PASSWORD_DEMO
+```
+
+La publishable key de Supabase puede vivir en el cliente siempre que RLS este activo. No agregar `service_role`, `secret key` ni passwords de base de datos a la app.
+
+Para IA, mantener Gemini solo en backend o Edge Function:
+
+```bash
+GEMINI_API_KEY=TU_API_KEY
+GEMINI_MODEL=gemini-2.0-flash
+EXPO_PUBLIC_FINFLOW_AI_URL=http://10.0.2.2:3333
+```
+
+## Supabase
+
+Ejecutar esta migracion en Supabase SQL Editor:
+
+```text
+supabase/migrations/20260720150000_phase1_profiles.sql
+```
+
+La migracion crea:
+
+- `profiles`.
+- RLS para select/insert/update/delete por `auth.uid()`.
+- Trigger `on_auth_user_created` para crear perfil al registrar usuario.
+
+Para la cuenta demo:
+
+1. Crear un usuario en Supabase Auth con el email/password de `.env`.
+2. Iniciar sesion desde el boton `Probar demo`.
+3. La app marca ese perfil con `is_demo = true` y `onboarding_completed = true`.
+
+No cargar datos demo para usuarios normales.
 
 ## Notificaciones
 
@@ -64,20 +106,9 @@ En Expo Go o emulador algunas funciones pueden depender de permisos y configurac
 
 ## Inteligencia artificial
 
-La pantalla `AI Insights` incluye un asesor financiero que analiza datos mockeados y tambien datos modificados durante el uso:
+En la fase 1, FinFlow no genera insights financieros si no hay datos reales suficientes asociados al usuario. La integracion con Gemini queda preparada via backend local, pero no se envia informacion sensible ni se exponen API keys privadas en la app.
 
-- movimientos;
-- presupuesto por categorias;
-- objetivos de ahorro;
-- pregunta escrita por el usuario.
-
-La app intenta usar un backend local compatible con Gemini si esta configurado. Si no hay backend o API key, usa un motor IA local para que la feature sea evaluable sin credenciales.
-
-### Probar IA sin API key
-
-Abrir la app, entrar a `Overview` y tocar `AI`. Escribir una pregunta y tocar el boton de enviar.
-
-### Probar IA con Gemini
+### Probar IA con Gemini mas adelante
 
 Crear `.env` en la raiz:
 
@@ -128,11 +159,13 @@ Para Play Store, mas adelante conviene generar un AAB firmado y usar una keystor
 app/
   _layout.tsx
   index.tsx
+  language.tsx
   onboarding.tsx
   welcome.tsx
   login.tsx
   register.tsx
   forgot-password.tsx
+  setup.tsx
   budget.tsx
   goals.tsx
   insights.tsx
@@ -146,11 +179,15 @@ app/
 src/
   components/
   data/
+  i18n/
   services/
+    supabase/
   store/
   theme/
   types/
   utils/
+supabase/
+  migrations/
 ```
 
 ## Componentes principales
@@ -158,14 +195,17 @@ src/
 - `Dot`, `DotGrid`, `DotLogo`, `DotChart`, `DotProgress`, `BudgetDotRing`: identidad visual y graficas con puntos.
 - `ScreenContainer`, `DarkScreenContainer`, `Header`, `BottomNavigation`: estructura de pantalla y navegacion.
 - `TransactionItem`, `BudgetCategoryItem`, `GoalProgressItem`, `CalendarEventItem`, `InsightCard`, `ProfileMenuItem`: componentes reutilizables por pantalla.
-- `useFinFlowStore`: estado global con usuario, cuentas, balance, transacciones, presupuesto, objetivos, eventos, tareas y mensajes IA.
+- `useSessionStore`: sesion, perfil, idioma, login, registro, demo y logout.
+- `useFinFlowStore`: cache en memoria para datos financieros. En fase 1 arranca vacio y no persiste datos financieros.
 
 ## Dependencias principales
 
 - React Native, Expo, TypeScript, Expo Router.
 - React Native Reanimated para animaciones discretas.
 - React Native SVG para graficas de puntos.
-- Zustand y AsyncStorage para estado global y persistencia.
+- Zustand para estado en memoria.
+- Supabase Auth/PostgreSQL/RLS para autenticacion y datos reales.
+- Expo SecureStore para persistir sesion autenticada en movil.
 - Lucide React Native para iconos lineales.
 - Expo Linear Gradient instalado para futuros fondos sutiles, aunque la interfaz evita degradados llamativos.
 

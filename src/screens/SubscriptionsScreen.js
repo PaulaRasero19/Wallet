@@ -21,7 +21,7 @@ export function SubscriptionsScreen() {
   return (
     <ScrollView style={globalStyles.screen} contentContainerStyle={globalStyles.content}>
       <Text style={globalStyles.title}>Suscripciones</Text>
-      <Text style={globalStyles.subtitle}>Pagos recurrentes y recordatorios simulados.</Text>
+      <Text style={globalStyles.subtitle}>Los pagos recurrentes reales se cargaran desde Supabase.</Text>
       <Card style={{ marginTop: 16 }}>
         {subscriptions.map((subscription) => (
           <SubscriptionItem key={subscription.id} subscription={subscription} onToggle={handleToggle} />

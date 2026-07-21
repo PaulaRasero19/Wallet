@@ -6,7 +6,7 @@ import { colors, spacing } from "../theme";
 export function ScreenContainer({ children, style }: { children: ReactNode; style?: ViewStyle }) {
   return (
     <SafeAreaView style={styles.safe}>
-      <ScrollView contentContainerStyle={[styles.content, style]} showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={[styles.content, style]} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
         {children}
       </ScrollView>
     </SafeAreaView>

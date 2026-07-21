@@ -8,19 +8,19 @@ export function ProfileScreen({ navigation }) {
   return (
     <ScrollView style={globalStyles.screen} contentContainerStyle={globalStyles.content}>
       <Text style={globalStyles.title}>Perfil</Text>
-      <Text style={globalStyles.subtitle}>Datos ficticios y accesos a configuraciones.</Text>
+      <Text style={globalStyles.subtitle}>Perfil conectado a autenticacion real en la app activa.</Text>
       <Card style={styles.card}>
         <View style={styles.row}>
           <Text style={styles.label}>Nombre</Text>
-          <Text style={styles.value}>Paula</Text>
+          <Text style={styles.value}>Sin datos locales</Text>
         </View>
         <View style={styles.row}>
           <Text style={styles.label}>Email</Text>
-          <Text style={styles.value}>paula@finflow.uy</Text>
+          <Text style={styles.value}>Gestionado por Supabase Auth</Text>
         </View>
         <View style={styles.row}>
           <Text style={styles.label}>Moneda</Text>
-          <Text style={styles.value}>Peso uruguayo</Text>
+          <Text style={styles.value}>Gestionada por profiles</Text>
         </View>
       </Card>
 

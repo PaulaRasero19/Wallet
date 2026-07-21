@@ -58,7 +58,7 @@ function sendJson(res, statusCode, data) {
 function buildPrompt({ context, question }) {
   return `
 Sos FinFlow IA, un asesor de finanzas personales para usuarios jovenes de Uruguay.
-Analiza los datos mockeados de la app y devolve una respuesta breve, concreta y accionable.
+Analiza solo agregados reales enviados por la app y devolve una respuesta breve, concreta y accionable.
 No inventes bancos reales ni productos financieros. No des asesoramiento financiero profesional.
 
 Datos:
@@ -82,15 +82,11 @@ Responde SOLO JSON valido con esta forma:
 function fallbackAdvice() {
   return {
     source: "Backend local sin GEMINI_API_KEY",
-    summary: "El backend esta activo, pero no tiene una API key configurada. Se devuelve una respuesta de prueba.",
-    riskLevel: "Medio",
-    answer: "Revisa las categorias con mayor avance y prioriza gastos variables antes de reducir ahorro.",
-    recommendedActions: [
-      "Activar alertas de presupuesto.",
-      "Revisar suscripciones antes del proximo cobro.",
-      "Separar un monto fijo semanal para ahorro."
-    ],
-    notificationSuggestion: "Programar una alerta semanal de revision financiera."
+    summary: "El backend esta activo, pero no tiene una API key configurada.",
+    riskLevel: "Sin datos",
+    answer: "No se generan recomendaciones financieras de prueba.",
+    recommendedActions: ["Configurar GEMINI_API_KEY en el backend o usar una Edge Function segura."],
+    notificationSuggestion: "Sin sugerencias hasta tener datos reales."
   };
 }
 

@@ -1,11 +1,25 @@
-import { StyleSheet, Text, View } from "react-native";
+import { Alert, StyleSheet, Text, View } from "react-native";
 import { router } from "expo-router";
 import { DotLogo } from "../src/components/DotLogo";
 import { PrimaryButton } from "../src/components/PrimaryButton";
 import { SecondaryButton } from "../src/components/SecondaryButton";
+import { translate } from "../src/i18n";
+import { useSessionStore } from "../src/store/useSessionStore";
 import { colors, spacing, typography } from "../src/theme";
 
 export default function Welcome() {
+  const { language, loginDemo, profile, status } = useSessionStore();
+  const t = (key: string) => translate(language, key);
+
+  async function startDemo() {
+    try {
+      await loginDemo();
+      router.replace(profile?.onboarding_completed ? "/(tabs)/overview" : "/setup");
+    } catch (error) {
+      Alert.alert("FinFlow", error instanceof Error ? error.message : t("auth.configMissing"));
+    }
+  }
+
   return (
     <View style={styles.screen}>
       <View style={styles.top}>
@@ -14,10 +28,9 @@ export default function Welcome() {
         <Text style={styles.subtitle}>Take control of your finances{"\n"}and time.</Text>
       </View>
       <View style={styles.actions}>
-        <PrimaryButton onPress={() => router.replace("/(tabs)/overview")}>Get Started</PrimaryButton>
-        <SecondaryButton onPress={() => router.replace("/(tabs)/overview")}>Continue with Apple</SecondaryButton>
-        <SecondaryButton onPress={() => router.replace("/(tabs)/overview")}>G Continue with Google</SecondaryButton>
-        <SecondaryButton onPress={() => router.push("/login")}>Log in</SecondaryButton>
+        <PrimaryButton onPress={() => router.push("/register")}>{t("auth.register")}</PrimaryButton>
+        <SecondaryButton onPress={startDemo}>{status === "loading" ? t("common.loading") : t("auth.demo")}</SecondaryButton>
+        <SecondaryButton onPress={() => router.push("/login")}>{t("auth.login")}</SecondaryButton>
       </View>
     </View>
   );

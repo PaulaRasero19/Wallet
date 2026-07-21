@@ -19,9 +19,9 @@ export default function Forecast() {
     goals,
     recurringPayments,
     rejectRecurringPayment,
-    transactions,
-    user
+    transactions
   } = useFinFlowStore();
+  const hasFinancialData = accounts.length > 0 || transactions.length > 0 || budgets.length > 0 || goals.length > 0;
   const forecast = useMemo(
     () =>
       buildForecast({
@@ -31,15 +31,21 @@ export default function Forecast() {
         exchangeRates,
         goals,
         recurringPayments,
-        transactions,
-        nextIncomeDate: user.nextIncomeDate
+        transactions
       }),
-    [accounts, budgets, creditCards, exchangeRates, goals, recurringPayments, transactions, user.nextIncomeDate]
+    [accounts, budgets, creditCards, exchangeRates, goals, recurringPayments, transactions]
   );
 
   return (
     <ScreenContainer>
       <Header title="FinFlow Forecast" back />
+      {!hasFinancialData ? (
+        <View style={styles.panel}>
+          <Text style={styles.section}>Sin datos financieros reales</Text>
+          <Text style={styles.detail}>La proyección se habilitará cuando existan cuentas, movimientos y pagos reales en Supabase.</Text>
+        </View>
+      ) : (
+        <>
       <Text style={styles.question}>How will I finish the month?</Text>
 
       <View style={styles.summary}>
@@ -101,6 +107,8 @@ export default function Forecast() {
       <Text style={styles.disclaimer}>
         FinFlow uses local simulated data. Recommendations are educational and not professional financial advice.
       </Text>
+        </>
+      )}
     </ScreenContainer>
   );
 }

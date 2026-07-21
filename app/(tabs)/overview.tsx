@@ -5,28 +5,21 @@ import Animated, { FadeInDown } from "react-native-reanimated";
 import { DarkScreenContainer } from "../../src/components/DarkScreenContainer";
 import { Dot } from "../../src/components/Dot";
 import { DotChart } from "../../src/components/DotChart";
-import { ForecastPanel } from "../../src/components/ForecastPanel";
 import { Header } from "../../src/components/Header";
 import { TransactionItem } from "../../src/components/TransactionItem";
-import { buildForecast } from "../../src/services/forecastService";
+import { translate } from "../../src/i18n";
 import { useFinFlowStore } from "../../src/store/useFinFlowStore";
+import { useSessionStore } from "../../src/store/useSessionStore";
 import { colors, spacing, typography } from "../../src/theme";
-import { formatMoney, formatUYU } from "../../src/utils/money";
+import { formatMoney } from "../../src/utils/money";
 
 const filters = ["1W", "1M", "3M", "1Y", "All"];
 
 export default function Overview() {
-  const { accounts, balance, budgets, creditCards, exchangeRates, goals, recurringPayments, transactions, user } = useFinFlowStore();
-  const forecast = buildForecast({
-    accounts,
-    budgets,
-    creditCards,
-    exchangeRates,
-    goals,
-    recurringPayments,
-    transactions,
-    nextIncomeDate: user.nextIncomeDate
-  });
+  const { accounts, transactions } = useFinFlowStore();
+  const { language, profile } = useSessionStore();
+  const t = (key: string) => translate(language, key);
+  const hasFinancialData = accounts.length > 0 || transactions.length > 0;
 
   return (
     <DarkScreenContainer>
@@ -48,17 +41,15 @@ export default function Overview() {
           <Dot color="orange" size={6} />
           <Dot color="white" size={6} />
         </View>
-        <Text style={styles.label}>Total Balance</Text>
-        <Text style={styles.balance}>{formatUYU(balance, false)}</Text>
-        <Text style={styles.growth}>+12.4% vs last month</Text>
-        <Text style={styles.available}>Really available: {formatUYU(forecast.realAvailable, false)}</Text>
+        {profile?.is_demo ? <Text style={styles.demo}>{t("dashboard.demoMode")}</Text> : null}
+        <Text style={styles.label}>{t("dashboard.available")}</Text>
+        {hasFinancialData ? <Text style={styles.balance}>Calculated from Supabase</Text> : <Text style={styles.emptyTitle}>{t("dashboard.emptyTitle")}</Text>}
+        <Text style={styles.available}>{hasFinancialData ? "" : t("dashboard.emptyBody")}</Text>
       </Animated.View>
 
       <View style={styles.chartWrap}>
-        <DotChart />
+        {hasFinancialData ? <DotChart points={[]} /> : <Text style={styles.chartEmpty}>{t("dashboard.emptyChart")}</Text>}
       </View>
-
-      <ForecastPanel forecast={forecast} dark />
 
       <View style={styles.filters}>
         {filters.map((filter) => (
@@ -83,28 +74,34 @@ export default function Overview() {
         </Pressable>
       </View>
 
-      <Text style={styles.section}>Accounts</Text>
-      <View style={styles.panel}>
-        {accounts.map((account) => (
-          <View key={account.id} style={styles.accountRow}>
-            <View style={styles.accountLeft}>
-              <Dot color={account.accent} size={10} />
-              <Text style={styles.accountName}>
-                {account.name} •••• {account.mask}
-              </Text>
-            </View>
-            <Text style={styles.accountBalance}>{formatMoney(account.balance, account.currency, false)}</Text>
+      {hasFinancialData ? (
+        <>
+          <Text style={styles.section}>Accounts</Text>
+          <View style={styles.panel}>
+            {accounts.map((account) => (
+              <View key={account.id} style={styles.accountRow}>
+                <View style={styles.accountLeft}>
+                  <Dot color={account.accent} size={10} />
+                  <Text style={styles.accountName}>
+                    {account.name} •••• {account.mask}
+                  </Text>
+                </View>
+                <Text style={styles.accountBalance}>{formatMoney(account.balance, account.currency, false)}</Text>
+              </View>
+            ))}
           </View>
-        ))}
-      </View>
+        </>
+      ) : null}
 
       <Text style={styles.section}>Recent Activity</Text>
       <View style={styles.panel}>
-        {transactions.slice(0, 3).map((transaction) => (
-          <TransactionItem key={transaction.id} transaction={transaction} dark />
-        ))}
+        {transactions.length > 0 ? (
+          transactions.slice(0, 3).map((transaction) => <TransactionItem key={transaction.id} transaction={transaction} dark />)
+        ) : (
+          <Text style={styles.chartEmpty}>Todavía no registraste movimientos.</Text>
+        )}
       </View>
-      <Text style={styles.footnote}>Signed in as {user.name}</Text>
+      <Text style={styles.footnote}>Signed in as {profile?.full_name || profile?.id}</Text>
     </DarkScreenContainer>
   );
 }
@@ -145,13 +142,34 @@ const styles = StyleSheet.create({
     ...typography.label,
     color: colors.lime
   },
+  demo: {
+    ...typography.label,
+    color: colors.orange,
+    fontWeight: "700"
+  },
+  emptyTitle: {
+    ...typography.title,
+    color: colors.white,
+    fontSize: 25,
+    lineHeight: 31
+  },
   available: {
     ...typography.label,
     color: colors.white,
     marginTop: spacing.xs
   },
   chartWrap: {
-    marginTop: spacing.lg
+    borderColor: colors.grayDark,
+    borderRadius: 18,
+    borderWidth: 1,
+    marginTop: spacing.lg,
+    minHeight: 112,
+    justifyContent: "center",
+    padding: spacing.md
+  },
+  chartEmpty: {
+    ...typography.body,
+    color: colors.transparentWhite
   },
   filters: {
     borderBottomColor: colors.grayDark,

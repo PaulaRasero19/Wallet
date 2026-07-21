@@ -3,24 +3,29 @@ import { useEffect } from "react";
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useFinFlowStore } from "../src/store/useFinFlowStore";
+import { useSessionStore } from "../src/store/useSessionStore";
 
 export default function RootLayout() {
-  const hydrate = useFinFlowStore((state) => state.hydrate);
+  const clearFinancialData = useFinFlowStore((state) => state.clearFinancialData);
+  const initialize = useSessionStore((state) => state.initialize);
 
   useEffect(() => {
-    void hydrate();
-  }, [hydrate]);
+    clearFinancialData();
+    void initialize();
+  }, [clearFinancialData, initialize]);
 
   return (
     <>
       <StatusBar style="dark" />
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="index" />
+        <Stack.Screen name="language" />
         <Stack.Screen name="onboarding" />
         <Stack.Screen name="welcome" />
         <Stack.Screen name="login" />
         <Stack.Screen name="register" />
         <Stack.Screen name="forgot-password" />
+        <Stack.Screen name="setup" />
         <Stack.Screen name="budget" />
         <Stack.Screen name="forecast" />
         <Stack.Screen name="goals" />

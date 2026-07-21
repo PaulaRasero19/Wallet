@@ -37,6 +37,10 @@ function buildContext({ budgets, goals, transactions }: AdvisorContext) {
   };
 }
 
+function hasEnoughData(data: AdvisorContext) {
+  return data.transactions.length >= 3 && data.budgets.length > 0 && data.goals.length > 0;
+}
+
 function buildSafeSummary(data: AdvisorContext) {
   const context = buildContext(data);
 
@@ -55,9 +59,26 @@ function buildSafeSummary(data: AdvisorContext) {
 }
 
 function localAdvice(question: string, data: AdvisorContext): AdvisorResult {
+  if (!hasEnoughData(data)) {
+    return {
+      source: "FinFlow",
+      summary: "Necesitamos más movimientos para ofrecerte un análisis personalizado.",
+      riskLevel: "Unknown",
+      answer: question
+        ? "Todavía no hay suficientes datos reales asociados a tu usuario para responder con precisión."
+        : "Registrá información financiera real para habilitar insights.",
+      recommendedActions: ["No se generaron recomendaciones financieras porque faltan datos reales."],
+      notificationSuggestion: "Configurar recordatorios estará disponible cuando exista información financiera real."
+    };
+  }
+
   const context = buildContext(data);
   const categoryProgress = percentage(context.highestCategory.spent, context.highestCategory.limit);
   const goalProgress = percentage(context.slowestGoal.saved, context.slowestGoal.target);
+  const suggestedGoalAction =
+    context.savingsCapacity > 0
+      ? `Move part of your real savings capacity into ${context.slowestGoal.name}; it is now ${goalProgress}% complete.`
+      : `Review expenses before adding money to ${context.slowestGoal.name}; it is now ${goalProgress}% complete.`;
   const riskLevel = context.budgetUsed > 86 ? "High" : context.budgetUsed > 68 ? "Medium" : "Low";
 
   return {
@@ -69,7 +90,7 @@ function localAdvice(question: string, data: AdvisorContext): AdvisorResult {
       : "FinFlow reviewed your spending, budgets and goals to suggest a practical next step.",
     recommendedActions: [
       `Set a 7-day limit for ${context.highestCategory.name}, currently at ${categoryProgress}%.`,
-      `Move ${formatMoney(120).replace("+", "")} into ${context.slowestGoal.name}; it is now ${goalProgress}% complete.`,
+      suggestedGoalAction,
       "Turn on a weekly budget review reminder every Sunday.",
       "This is an educational recommendation, not professional financial advice."
     ],
@@ -81,6 +102,8 @@ function localAdvice(question: string, data: AdvisorContext): AdvisorResult {
 }
 
 export async function generateAdvisorResult(question: string, data: AdvisorContext): Promise<AdvisorResult> {
+  if (!hasEnoughData(data)) return localAdvice(question, data);
+
   if (!AI_API_URL) return localAdvice(question, data);
 
   try {

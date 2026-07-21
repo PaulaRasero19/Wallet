@@ -55,8 +55,8 @@ export async function sendTestNotification() {
   await Notifications.scheduleNotificationAsync({
     content: {
       title: "FinFlow",
-      body: "Estas cerca de alcanzar tu presupuesto mensual.",
-      data: { type: "budgetLimit" }
+      body: "Notificacion de prueba.",
+      data: { type: "test" }
     },
     trigger: null
   });
@@ -66,8 +66,8 @@ export async function scheduleLocalNotification() {
   return Notifications.scheduleNotificationAsync({
     content: {
       title: "Recordatorio FinFlow",
-      body: "Manana vence tu tarjeta.",
-      data: { type: "cardDue" }
+      body: "Recordatorio de prueba.",
+      data: { type: "test" }
     },
     trigger: {
       seconds: 10,

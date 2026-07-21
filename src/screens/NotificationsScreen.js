@@ -92,7 +92,7 @@ export function NotificationsScreen() {
             runAction(
               "schedule",
               scheduleLocalNotification,
-              "Se programo una notificacion para dentro de 10 segundos."
+              "Se programo una notificacion de prueba."
             )
           }
           variant="secondary"
@@ -113,7 +113,7 @@ export function NotificationsScreen() {
         />
       </Card>
 
-      <Text style={styles.sectionTitle}>Tipos de alertas</Text>
+      <Text style={styles.sectionTitle}>Preferencias de alertas</Text>
       <Card>
         {settings.map((type) => (
           <NotificationToggle
@@ -128,11 +128,8 @@ export function NotificationsScreen() {
       <Card style={styles.examplesCard}>
         <Text style={styles.examplesTitle}>Ejemplos preparados</Text>
         <View style={styles.exampleList}>
-          <Text style={styles.example}>FinFlow: estas cerca de alcanzar tu presupuesto mensual.</Text>
-          <Text style={styles.example}>Recordatorio: manana vence tu tarjeta.</Text>
-          <Text style={styles.example}>Detectamos una suscripcion proxima a cobrarse.</Text>
-          <Text style={styles.example}>Gastaste mas de lo habitual en salidas esta semana.</Text>
-          <Text style={styles.example}>Buen trabajo: estas mas cerca de tu objetivo de ahorro.</Text>
+          <Text style={styles.example}>FinFlow: notificacion de prueba.</Text>
+          <Text style={styles.example}>Recordatorio: mensaje de prueba.</Text>
         </View>
       </Card>
     </ScrollView>

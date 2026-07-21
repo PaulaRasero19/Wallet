@@ -4,12 +4,25 @@ import { router } from "expo-router";
 import Animated, { FadeIn, FadeInUp } from "react-native-reanimated";
 import { colors, spacing, typography } from "../src/theme";
 import { DotLogo } from "../src/components/DotLogo";
+import { useSessionStore } from "../src/store/useSessionStore";
 
 export default function Splash() {
+  const { hasInitialized, profile, status } = useSessionStore();
+
   useEffect(() => {
-    const timer = setTimeout(() => router.replace("/onboarding"), 1900);
+    if (!hasInitialized) return;
+
+    const timer = setTimeout(() => {
+      if (status === "authenticated") {
+        router.replace(profile?.onboarding_completed ? "/(tabs)/overview" : "/setup");
+        return;
+      }
+
+      router.replace("/language");
+    }, 900);
+
     return () => clearTimeout(timer);
-  }, []);
+  }, [hasInitialized, profile?.onboarding_completed, status]);
 
   return (
     <View style={styles.screen}>
