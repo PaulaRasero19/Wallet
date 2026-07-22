@@ -194,3 +194,25 @@ export type MovementProposal = {
   isAntExpense: boolean;
   reminderText?: string;
 };
+
+export type FinFlowNotification = {
+  id: string;
+  type: string;
+  title: string;
+  message: string;
+  status: "pending" | "read" | "completed" | "snoozed";
+  priority: "low" | "normal" | "high" | "urgent";
+  readAt?: string | null;
+  read_at?: string | null;
+  scheduledFor?: string | null;
+  scheduled_for?: string | null;
+  relatedEntityType?: string;
+  related_entity_type?: string;
+  relatedEntityId?: string;
+  related_entity_id?: string;
+  actionType?: string;
+  action_type?: string;
+  metadata?: Record<string, unknown>;
+  createdAt?: string;
+  created_at?: string;
+};

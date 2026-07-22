@@ -12,9 +12,11 @@ import { accountRouter } from "./routes/account.routes";
 import { aiRouter } from "./routes/ai.routes";
 import { authRouter } from "./routes/auth.routes";
 import { categoryRouter } from "./routes/category.routes";
+import { deviceRouter } from "./routes/device.routes";
 import { healthRouter } from "./routes/health.routes";
 import { financeRouter } from "./routes/finance.routes";
 import { profileRouter } from "./routes/profile.routes";
+import { notificationRouter } from "./routes/notification.routes";
 import { statisticsRouter } from "./routes/statistics.routes";
 import { transactionRouter } from "./routes/transaction.routes";
 import { AppError } from "./utils/appError";
@@ -49,7 +51,9 @@ export function createApp() {
   app.use("/api/accounts", accountRouter);
   app.use("/api/ai", aiRouter);
   app.use("/api/categories", categoryRouter);
+  app.use("/api/devices", deviceRouter);
   app.use("/api/finance", financeRouter);
+  app.use("/api/notifications", notificationRouter);
   app.use("/api/transactions", transactionRouter);
   app.use("/api/statistics", statisticsRouter);
 

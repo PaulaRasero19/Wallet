@@ -1,5 +1,12 @@
 import { create } from "zustand";
 import {
+  completeNotificationApi,
+  fetchNotifications,
+  markAllNotificationsReadApi,
+  markNotificationReadApi,
+  snoozeNotificationApi
+} from "../services/notificationsService";
+import {
   createAccountApi,
   createRecurringPaymentApi,
   createTransferApi,
@@ -21,6 +28,7 @@ import {
   Currency,
   DashboardOverview,
   ExchangeRates,
+  FinFlowNotification,
   Goal,
   PlannerEvent,
   RecurringPayment,
@@ -93,6 +101,7 @@ type FinFlowState = {
   recurringPayments: RecurringPayment[];
   events: PlannerEvent[];
   tasks: Task[];
+  notifications: FinFlowNotification[];
   aiMessages: AiMessage[];
   balance: number;
   error: string | null;
@@ -110,6 +119,11 @@ type FinFlowState = {
   updateTransaction: (id: string, input: Partial<Transaction>) => Promise<Transaction>;
   deleteTransaction: (id: string) => Promise<void>;
   loadOverview: (period?: string) => Promise<void>;
+  loadNotifications: (status?: "pending" | "read") => Promise<void>;
+  markNotificationRead: (id: string) => Promise<void>;
+  markAllNotificationsRead: () => Promise<void>;
+  snoozeNotification: (id: string) => Promise<void>;
+  completeNotification: (id: string) => Promise<void>;
   addTransaction: (transaction: Omit<Transaction, "id">) => void;
   confirmRecurringPayment: (paymentId: string) => void;
   rejectRecurringPayment: (paymentId: string) => void;
@@ -153,6 +167,7 @@ function emptyState() {
     goals: [],
     hasLoaded: true,
     loading: false,
+    notifications: [],
     overview: null,
     recurringPayments: [],
     tasks: [],
@@ -173,6 +188,7 @@ export const useFinFlowStore = create<FinFlowState>()((set, get) => {
     categories: [],
     overview: null,
     loading: false,
+    notifications: [],
     errors: null,
     budgets: [],
     creditCards: [],
@@ -311,6 +327,34 @@ export const useFinFlowStore = create<FinFlowState>()((set, get) => {
       } catch (error) {
         fail(error);
       }
+    },
+    loadNotifications: async (status) => {
+      try {
+        const notifications = await fetchNotifications(status);
+        set({ notifications });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "No se pudieron cargar las notificaciones.";
+        set({ error: message, errors: message });
+      }
+    },
+    markNotificationRead: async (id) => {
+      const notification = await markNotificationReadApi(id);
+      if (!notification) return;
+      set((state) => ({ notifications: state.notifications.map((item) => (item.id === id ? notification : item)) }));
+    },
+    markAllNotificationsRead: async () => {
+      await markAllNotificationsReadApi();
+      set((state) => ({ notifications: state.notifications.map((item) => (item.status === "pending" ? { ...item, status: "read", readAt: new Date().toISOString() } : item)) }));
+    },
+    snoozeNotification: async (id) => {
+      const notification = await snoozeNotificationApi(id);
+      if (!notification) return;
+      set((state) => ({ notifications: state.notifications.map((item) => (item.id === id ? notification : item)) }));
+    },
+    completeNotification: async (id) => {
+      const notification = await completeNotificationApi(id);
+      if (!notification) return;
+      set((state) => ({ notifications: state.notifications.map((item) => (item.id === id ? notification : item)) }));
     },
     addTransaction: () => set({ error: "Usá createTransaction para guardar movimientos reales en MongoDB.", errors: "Usá createTransaction para guardar movimientos reales en MongoDB." }),
     confirmRecurringPayment: (paymentId) =>

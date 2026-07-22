@@ -19,7 +19,7 @@ export default function Overview() {
   const [period, setPeriod] = useState<HomePeriod>("1W");
   const insets = useSafeAreaInsets();
   const { height } = useWindowDimensions();
-  const { accounts, creditCards, events, goals, loadOverview, overview, recurringPayments, transactions } = useFinFlowStore();
+  const { accounts, creditCards, events, goals, loadNotifications, loadOverview, notifications, overview, recurringPayments, transactions } = useFinFlowStore();
   const { profile } = useSessionStore();
   const primaryCurrency = profile?.primary_currency || "UYU";
   const firstName = String(profile?.full_name || "Lucía").split(" ")[0];
@@ -28,6 +28,10 @@ export default function Overview() {
   useEffect(() => {
     void loadOverview(periodToApi(period));
   }, [loadOverview, period]);
+
+  useEffect(() => {
+    void loadNotifications("pending");
+  }, [loadNotifications]);
 
   const metrics = overviewMetrics({
     accounts,
@@ -51,6 +55,7 @@ export default function Overview() {
           avatarUrl={profile?.avatar_url || profile?.avatarUrl}
           firstName={firstName}
           fullName={profile?.full_name || firstName}
+          notificationCount={notifications.filter((notification) => notification.status === "pending").length}
           onAvatarPress={() => router.push("/profile")}
           onNotificationsPress={() => router.push("/notifications")}
         />
