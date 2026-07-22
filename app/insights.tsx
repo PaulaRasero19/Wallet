@@ -1,96 +1,103 @@
-import { useEffect, useMemo, useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { useEffect, useRef, useState } from "react";
+import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { SendHorizontal } from "lucide-react-native";
-import { ScreenContainer } from "../src/components/ScreenContainer";
 import { Header } from "../src/components/Header";
-import { InputField } from "../src/components/InputField";
+import { ScreenContainer } from "../src/components/ScreenContainer";
+import { askFinFlowAi, AiBlock } from "../src/services/aiService";
 import { useFinFlowStore } from "../src/store/useFinFlowStore";
 import { useSessionStore } from "../src/store/useSessionStore";
 import { colors, spacing, typography } from "../src/theme";
-import { categorySummary, getAntExpenses, overviewMetrics } from "../src/utils/financeInsights";
-import { formatMoney } from "../src/utils/money";
 
 const prompts = [
-  "¿En qué gasté más?",
   "¿Cuánto puedo gastar por día?",
+  "¿En qué gasté más?",
   "¿Voy a cumplir mi meta?",
   "¿Qué tengo comprometido?",
   "¿Cuáles son mis gastos hormiga?",
   "¿Cómo puedo ahorrar?"
 ];
 
+type ChatMessage = {
+  id: string;
+  role: "assistant" | "user";
+  text: string;
+  blocks?: AiBlock[];
+};
+
+function makeId() {
+  return `${Date.now()}-${Math.round(Math.random() * 10000)}`;
+}
+
 export default function Insights() {
   const [question, setQuestion] = useState("");
-  const [answer, setAnswer] = useState("");
-  const { accounts, creditCards, events, goals, loadOverview, overview, recurringPayments, transactions } = useFinFlowStore();
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [loading, setLoading] = useState(false);
+  const scrollRef = useRef<ScrollView>(null);
+  const { loadOverview } = useFinFlowStore();
   const profile = useSessionStore((state) => state.profile);
-  const primaryCurrency = profile?.primary_currency || "UYU";
-  const metrics = overviewMetrics({ accounts, creditCards, events, goals, overview, payday: profile?.payday, primaryCurrency, recurringPayments, transactions, monthlyIncome: Number(profile?.monthly_income || 0) });
-  const categories = useMemo(() => categorySummary(transactions), [transactions]);
-  const ant = useMemo(() => getAntExpenses(transactions), [transactions]);
+  const firstName = String(profile?.full_name || "Lucía").split(" ")[0];
 
   useEffect(() => {
     void loadOverview("30d");
   }, [loadOverview]);
 
-  function ask(value = question) {
-    const q = value.trim();
-    if (!q) return;
-    setQuestion(q);
-    setAnswer(buildAnswer(q));
-  }
+  useEffect(() => {
+    setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 80);
+  }, [messages]);
 
-  function buildAnswer(q: string) {
-    const lower = q.toLowerCase();
-    if (!transactions.length) return "Todavía no hay datos suficientes. Registrá movimientos reales para que FinFlow pueda responder con contexto.";
-    if (lower.includes("gasté más") || lower.includes("gaste mas")) {
-      const top = categories[0];
-      return top ? `Tu mayor gasto es ${top.name}: ${formatMoney(top.total, primaryCurrency, false)}, ${top.percent}% del gasto del período.` : "No encontré gastos en el período.";
+  async function ask(value = question) {
+    const text = value.trim();
+    if (!text || loading) return;
+    setQuestion("");
+    setLoading(true);
+    setMessages((current) => [...current, { id: makeId(), role: "user", text }]);
+    try {
+      const response = await askFinFlowAi(text);
+      setMessages((current) => [...current, { blocks: response.blocks, id: makeId(), role: "assistant", text: response.text }]);
+    } catch (error) {
+      setMessages((current) => [
+        ...current,
+        {
+          id: makeId(),
+          role: "assistant",
+          text: error instanceof Error ? error.message : "No pude responder ahora. Probá de nuevo en unos segundos."
+        }
+      ]);
+    } finally {
+      setLoading(false);
     }
-    if (lower.includes("por día") || lower.includes("por dia")) {
-      return `Podés gastar aproximadamente ${formatMoney(metrics.dailyLimit, primaryCurrency, false)} por día hasta el próximo cobro, considerando compromisos.`;
-    }
-    if (lower.includes("meta")) {
-      const goal = goals[0];
-      return goal ? `Tu meta "${goal.name}" está en ${Math.round((goal.saved / goal.target) * 100)}%. Te faltan ${formatMoney(goal.target - goal.saved, goal.currency, false)}.` : "No hay una meta activa para evaluar.";
-    }
-    if (lower.includes("comprometido")) {
-      return `Tenés ${formatMoney(metrics.committed, primaryCurrency, false)} comprometidos entre pagos recurrentes y cuotas próximas.`;
-    }
-    if (lower.includes("hormiga")) {
-      const total = ant.reduce((sum, item) => sum + Math.abs(item.raw_amount ?? item.rawAmount ?? item.amount), 0);
-      return `Detecté ${ant.length} gastos hormiga por ${formatMoney(total, primaryCurrency, false)}. Reducir la mitad liberaría ${formatMoney(total * 0.5, primaryCurrency, false)}.`;
-    }
-    return metrics.priorityInsight;
   }
 
   return (
     <ScreenContainer>
-      <Header title="Asistente" dark back />
-      <Text style={styles.lead}>Preguntá sobre tus datos reales. Las respuestas usan movimientos, cuentas, metas y vencimientos cargados.</Text>
+      <Header title="IA FinFlow" />
+      <View style={styles.intro}>
+        <Text style={styles.introTitle}>Hola {firstName}.</Text>
+        <Text style={styles.introText}>Puedo analizar tus movimientos, tus metas, tus tarjetas y tus próximos pagos.</Text>
+      </View>
       <View style={styles.suggestions}>
         {prompts.map((prompt) => (
-          <Pressable key={prompt} accessibilityRole="button" onPress={() => ask(prompt)} style={styles.prompt}>
+          <Pressable accessibilityRole="button" key={prompt} onPress={() => ask(prompt)} style={styles.prompt}>
             <Text style={styles.promptText}>{prompt}</Text>
           </Pressable>
         ))}
       </View>
-      {answer ? (
-        <View style={styles.answer}>
-          <Text style={styles.answerTitle}>{question}</Text>
-          <Text style={styles.answerText}>{answer}</Text>
-        </View>
-      ) : (
-        <View style={styles.answer}>
-          <Text style={styles.answerTitle}>Recomendación prioritaria</Text>
-          <Text style={styles.answerText}>{metrics.priorityInsight}</Text>
-        </View>
-      )}
+      <ScrollView ref={scrollRef} scrollEnabled={false} style={styles.thread}>
+        {messages.length ? (
+          messages.map((message) => <Bubble key={message.id} message={message} />)
+        ) : (
+          <Bubble message={{ id: "initial", role: "assistant", text: "Preguntame algo concreto. Si falta información, te lo voy a decir en vez de inventar datos." }} />
+        )}
+        {loading ? <Bubble message={{ id: "loading", role: "assistant", text: "Analizando tus datos..." }} /> : null}
+      </ScrollView>
       <View style={styles.inputBar}>
-        <InputField
+        <TextInput
           accessibilityLabel="Preguntale a FinFlow"
+          autoCapitalize="sentences"
           onChangeText={setQuestion}
+          onSubmitEditing={() => ask()}
           placeholder="Preguntale a FinFlow..."
+          placeholderTextColor={colors.grayMedium}
           style={styles.input}
           value={question}
         />
@@ -102,17 +109,83 @@ export default function Insights() {
   );
 }
 
+function Bubble({ message }: { message: ChatMessage }) {
+  const mine = message.role === "user";
+  return (
+    <View style={[styles.bubble, mine && styles.userBubble]}>
+      <Text style={[styles.bubbleText, mine && styles.userText]}>{message.text}</Text>
+      {message.blocks?.map((block) => (
+        <View key={block.title} style={styles.block}>
+          <Text style={styles.blockTitle}>{block.title}</Text>
+          {block.rows.map((row) => (
+            <Text key={row} style={styles.blockRow}>{row}</Text>
+          ))}
+        </View>
+      ))}
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
-  lead: {
+  block: {
+    borderTopColor: colors.appGrayBorder,
+    borderTopWidth: 1,
+    gap: 4,
+    marginTop: spacing.md,
+    paddingTop: spacing.sm
+  },
+  blockRow: {
+    ...typography.label,
+    color: colors.transparentWhite
+  },
+  blockTitle: {
+    ...typography.label,
+    color: colors.white,
+    fontWeight: "900"
+  },
+  bubble: {
+    alignSelf: "flex-start",
+    backgroundColor: colors.appGrayDark,
+    borderColor: colors.appGrayBorder,
+    borderRadius: 8,
+    borderWidth: 1,
+    marginTop: spacing.sm,
+    maxWidth: "92%",
+    padding: spacing.md
+  },
+  bubbleText: {
     ...typography.body,
-    color: colors.transparentWhite,
+    color: colors.white
+  },
+  input: {
+    ...typography.body,
+    color: colors.white,
+    flex: 1,
+    minHeight: 44,
+    paddingHorizontal: spacing.md
+  },
+  inputBar: {
+    alignItems: "center",
+    backgroundColor: colors.appGrayDark,
+    borderColor: colors.appGrayBorder,
+    borderRadius: 8,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: spacing.sm,
+    marginTop: spacing.lg,
+    padding: 4
+  },
+  intro: {
     marginTop: spacing.lg
   },
-  suggestions: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: spacing.sm,
-    marginTop: spacing.xl
+  introText: {
+    ...typography.body,
+    color: colors.transparentWhite,
+    marginTop: spacing.xs
+  },
+  introTitle: {
+    ...typography.title,
+    color: colors.white
   },
   prompt: {
     borderColor: colors.appGrayBorder,
@@ -125,42 +198,7 @@ const styles = StyleSheet.create({
   promptText: {
     ...typography.label,
     color: colors.white,
-    fontWeight: "700"
-  },
-  answer: {
-    backgroundColor: colors.appGrayDark,
-    borderColor: colors.appGrayBorder,
-    borderWidth: 1,
-    borderRadius: 8,
-    gap: spacing.sm,
-    marginTop: spacing.xl,
-    padding: spacing.lg
-  },
-  answerTitle: {
-    ...typography.body,
-    color: colors.white,
-    fontWeight: "700"
-  },
-  answerText: {
-    ...typography.body,
-    color: colors.transparentWhite
-  },
-  inputBar: {
-    alignItems: "center",
-    borderColor: colors.appGrayBorder,
-    borderRadius: 8,
-    borderWidth: 1,
-    flexDirection: "row",
-    gap: spacing.sm,
-    marginTop: spacing.lg,
-    padding: 4
-  },
-  input: {
-    backgroundColor: "transparent",
-    borderWidth: 0,
-    color: colors.white,
-    flex: 1,
-    minHeight: 44
+    fontWeight: "800"
   },
   send: {
     alignItems: "center",
@@ -169,5 +207,23 @@ const styles = StyleSheet.create({
     height: 40,
     justifyContent: "center",
     width: 40
+  },
+  suggestions: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: spacing.sm,
+    marginTop: spacing.xl
+  },
+  thread: {
+    marginTop: spacing.xl,
+    maxHeight: 380
+  },
+  userBubble: {
+    alignSelf: "flex-end",
+    backgroundColor: colors.white,
+    borderColor: colors.white
+  },
+  userText: {
+    color: colors.black
   }
 });

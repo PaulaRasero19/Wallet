@@ -33,5 +33,6 @@ export const env = {
   jwtAccessExpiresIn: values.JWT_ACCESS_EXPIRES_IN,
   jwtRefreshExpiresIn: values.JWT_REFRESH_EXPIRES_IN,
   corsOrigins: values.CORS_ORIGIN.split(",").map((origin) => origin.trim()).filter(Boolean),
+  geminiApiKey: values.GEMINI_API_KEY,
   geminiConfigured: Boolean(values.GEMINI_API_KEY)
 };

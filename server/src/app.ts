@@ -9,6 +9,7 @@ import { requireDatabase } from "./middlewares/requireDatabase";
 import { apiRateLimit } from "./middlewares/rateLimit";
 import { sanitizeMongoOperators } from "./utils/security";
 import { accountRouter } from "./routes/account.routes";
+import { aiRouter } from "./routes/ai.routes";
 import { authRouter } from "./routes/auth.routes";
 import { categoryRouter } from "./routes/category.routes";
 import { healthRouter } from "./routes/health.routes";
@@ -46,6 +47,7 @@ export function createApp() {
   app.use("/api/auth", authRouter);
   app.use("/api/profile", profileRouter);
   app.use("/api/accounts", accountRouter);
+  app.use("/api/ai", aiRouter);
   app.use("/api/categories", categoryRouter);
   app.use("/api/finance", financeRouter);
   app.use("/api/transactions", transactionRouter);
