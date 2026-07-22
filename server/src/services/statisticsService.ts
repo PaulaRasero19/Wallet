@@ -43,7 +43,8 @@ export async function getOverview(userId: Types.ObjectId, period = "30d") {
     days = Math.max(1, Math.round((today.getTime() - from.getTime()) / 86400000) + 1);
   }
 
-  const periodTransactions = transactions.filter((transaction) => transaction.date >= from).slice(-100).reverse();
+  const periodTransactions = transactions.filter((transaction) => transaction.date >= from);
+  const recentTransactions = [...periodTransactions].slice(-100).reverse();
 
   const totalByCurrency = accounts.reduce<Record<string, number>>((acc, account) => {
     acc[account.currency] = (acc[account.currency] || 0) + account.currentBalance;
@@ -91,8 +92,8 @@ export async function getOverview(userId: Types.ObjectId, period = "30d") {
     average_daily_expense: expenses / days,
     topExpenseCategory: topCategory ? { categoryId: topCategory[0], total: topCategory[1] } : null,
     top_expense_category: topCategory ? { category_id: topCategory[0], total: topCategory[1] } : null,
-    recentTransactions: periodTransactions.slice(0, 5).map(transactionDTO),
-    recent_transactions: periodTransactions.slice(0, 5).map(transactionDTO),
+    recentTransactions: recentTransactions.slice(0, 5).map(transactionDTO),
+    recent_transactions: recentTransactions.slice(0, 5).map(transactionDTO),
     antExpenseTotal: antExpenses,
     ant_expense_total: antExpenses,
     history
