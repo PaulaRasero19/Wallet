@@ -12,7 +12,12 @@ const envSchema = z.object({
   JWT_ACCESS_EXPIRES_IN: z.string().trim().default("15m"),
   JWT_REFRESH_EXPIRES_IN: z.string().trim().default("30d"),
   CORS_ORIGIN: z.string().trim().default("http://localhost:8082"),
-  GEMINI_API_KEY: z.string().trim().optional().default("")
+  GEMINI_API_KEY: z.string().trim().optional().default(""),
+  WHATSAPP_ENABLED: z.coerce.boolean().default(false),
+  WHATSAPP_ACCESS_TOKEN: z.string().trim().optional().default(""),
+  WHATSAPP_PHONE_NUMBER_ID: z.string().trim().optional().default(""),
+  WHATSAPP_TEMPLATE_PAYMENT_REMINDER: z.string().trim().optional().default(""),
+  WHATSAPP_TEMPLATE_WEEKLY_SUMMARY: z.string().trim().optional().default("")
 });
 
 const parsed = envSchema.safeParse(process.env);
@@ -34,5 +39,12 @@ export const env = {
   jwtRefreshExpiresIn: values.JWT_REFRESH_EXPIRES_IN,
   corsOrigins: values.CORS_ORIGIN.split(",").map((origin) => origin.trim()).filter(Boolean),
   geminiApiKey: values.GEMINI_API_KEY,
-  geminiConfigured: Boolean(values.GEMINI_API_KEY)
+  geminiConfigured: Boolean(values.GEMINI_API_KEY),
+  whatsapp: {
+    accessToken: values.WHATSAPP_ACCESS_TOKEN,
+    enabled: values.WHATSAPP_ENABLED,
+    paymentReminderTemplate: values.WHATSAPP_TEMPLATE_PAYMENT_REMINDER,
+    phoneNumberId: values.WHATSAPP_PHONE_NUMBER_ID,
+    weeklySummaryTemplate: values.WHATSAPP_TEMPLATE_WEEKLY_SUMMARY
+  }
 };

@@ -1,4 +1,5 @@
 import { DeviceToken } from "../models/DeviceToken";
+import { env } from "../config/env";
 
 export type NotificationPayload = {
   userId: string;
@@ -37,7 +38,21 @@ export class ExpoPushProvider implements NotificationChannelProvider {
 }
 
 export class WhatsAppProvider implements NotificationChannelProvider {
-  async send(_payload: NotificationPayload) {
+  async send(payload: NotificationPayload) {
+    if (!env.whatsapp.enabled || !env.whatsapp.accessToken || !env.whatsapp.phoneNumberId || !payload.metadata?.phoneNumber) return;
+    await fetch(`https://graph.facebook.com/v19.0/${env.whatsapp.phoneNumberId}/messages`, {
+      body: JSON.stringify({
+        messaging_product: "whatsapp",
+        template: {
+          language: { code: "es" },
+          name: env.whatsapp.paymentReminderTemplate
+        },
+        to: payload.metadata.phoneNumber,
+        type: "template"
+      }),
+      headers: { Authorization: `Bearer ${env.whatsapp.accessToken}`, "Content-Type": "application/json" },
+      method: "POST"
+    }).catch(() => undefined);
     return;
   }
 }

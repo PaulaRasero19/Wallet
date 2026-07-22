@@ -1,5 +1,5 @@
 import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
-import { Bell, CircleHelp, CreditCard, LogOut, Settings, Shield, UserRound } from "lucide-react-native";
+import { Bell, Brain, CircleHelp, CreditCard, LogOut, Settings, Shield, UserRound, WalletCards } from "lucide-react-native";
 import { router } from "expo-router";
 import { DotLogo } from "../../src/components/DotLogo";
 import { ProfileMenuItem } from "../../src/components/ProfileMenuItem";
@@ -11,7 +11,7 @@ import { colors, spacing, typography } from "../../src/theme";
 
 export default function Profile() {
   const clearFinancialData = useFinFlowStore((state) => state.clearFinancialData);
-  const { language, logout, profile, setLanguage } = useSessionStore();
+  const { authUser, language, logout, profile, setLanguage } = useSessionStore();
   const t = (key: string) => translate(language, key);
 
   async function submitLogout() {
@@ -31,7 +31,7 @@ export default function Profile() {
         <View>
           {profile?.is_demo ? <Text style={styles.demo}>{t("dashboard.demoMode")}</Text> : null}
           <Text style={styles.name}>{profile?.full_name || "FinFlow"}</Text>
-          <Text style={styles.email}>{profile?.id}</Text>
+          <Text style={styles.email}>{authUser?.email || "Cuenta FinFlow"}</Text>
         </View>
       </View>
       <View style={styles.languagePanel}>
@@ -50,12 +50,14 @@ export default function Profile() {
         </View>
       </View>
       <View style={styles.menu}>
-        <ProfileMenuItem icon={UserRound} title="Account" description="Manage your account" onPress={() => router.push("/settings/account")} />
-        <ProfileMenuItem icon={Settings} title="Preferences" description="App settings and preferences" onPress={() => router.push("/settings/preferences")} />
-        <ProfileMenuItem icon={Bell} title="Notifications" description="Manage alerts and reminders" onPress={() => router.push("/settings/notifications")} />
-        <ProfileMenuItem icon={CreditCard} title="Bank accounts" description="Manage connected accounts" onPress={() => router.push("/settings/bank-accounts")} />
-        <ProfileMenuItem icon={Shield} title="Security" description="Password and biometric" onPress={() => router.push("/settings/security")} />
-        <ProfileMenuItem icon={CircleHelp} title="Help & Support" description="FAQs and contact us" onPress={() => router.push("/settings/help")} />
+        <ProfileMenuItem icon={UserRound} title="Perfil" description="Nombre, email, país e idioma" onPress={() => router.push("/settings/account")} />
+        <ProfileMenuItem icon={WalletCards} title="Finanzas" description="Monedas, ingresos, cuentas y categorías" onPress={() => router.push("/settings/finance")} />
+        <ProfileMenuItem icon={Bell} title="Notificaciones" description="Push, WhatsApp, email y horarios" onPress={() => router.push("/settings/notifications")} />
+        <ProfileMenuItem icon={Brain} title="IA" description="Análisis personalizado e historial" onPress={() => router.push("/settings/ai")} />
+        <ProfileMenuItem icon={CreditCard} title="Tarjetas" description="Carga manual e importación futura" onPress={() => router.push("/settings/cards")} />
+        <ProfileMenuItem icon={Shield} title="Seguridad" description="Contraseña, sesiones y cuenta" onPress={() => router.push("/settings/security")} />
+        <ProfileMenuItem icon={CircleHelp} title="General" description="Ayuda, privacidad y acerca de FinFlow" onPress={() => router.push("/settings/general")} />
+        <ProfileMenuItem icon={Settings} title="Todos los ajustes" description="Ver perfil y ajustes completos" onPress={() => router.push("/settings")} />
       </View>
       <Text onPress={submitLogout} style={styles.logout}>
         {t("profile.logout")}
