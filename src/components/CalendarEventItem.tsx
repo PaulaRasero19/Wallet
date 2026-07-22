@@ -13,7 +13,7 @@ export function CalendarEventItem({ event, onToggle }: { event: PlannerEvent; on
         <Text style={[styles.title, event.done && styles.done]}>{event.title}</Text>
         <Text style={styles.category}>{event.category}</Text>
       </View>
-      {event.done ? <Check color={colors.black} size={16} /> : null}
+      {event.done ? <Check color={colors.white} size={16} /> : null}
     </Pressable>
   );
 }
@@ -21,13 +21,19 @@ export function CalendarEventItem({ event, onToggle }: { event: PlannerEvent; on
 const styles = StyleSheet.create({
   row: {
     alignItems: "center",
+    backgroundColor: colors.appGrayDark,
+    borderColor: colors.appGrayBorder,
+    borderRadius: 8,
+    borderWidth: 1,
     flexDirection: "row",
     gap: spacing.sm,
-    minHeight: 58
+    marginBottom: spacing.sm,
+    minHeight: 62,
+    paddingHorizontal: spacing.md
   },
   time: {
     ...typography.label,
-    color: colors.black,
+    color: colors.white,
     width: 48
   },
   info: {
@@ -35,7 +41,7 @@ const styles = StyleSheet.create({
   },
   title: {
     ...typography.body,
-    color: colors.black,
+    color: colors.white,
     fontWeight: "500"
   },
   done: {
@@ -44,5 +50,7 @@ const styles = StyleSheet.create({
   },
   category: {
     ...typography.label
+    ,
+    color: colors.transparentWhite
   }
 });

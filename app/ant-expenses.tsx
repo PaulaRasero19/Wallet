@@ -64,14 +64,15 @@ function top(values: string[]) {
 const styles = StyleSheet.create({
   lead: {
     ...typography.body,
-    color: colors.grayDark,
+    color: colors.transparentWhite,
     marginTop: spacing.lg
   },
   metrics: {
     marginTop: spacing.lg
   },
   scenarios: {
-    borderColor: colors.grayLight,
+    backgroundColor: colors.appGrayDark,
+    borderColor: colors.appGrayBorder,
     borderRadius: 8,
     borderWidth: 1,
     gap: spacing.xs,
@@ -80,12 +81,12 @@ const styles = StyleSheet.create({
   },
   title: {
     ...typography.body,
-    color: colors.black,
+    color: colors.white,
     fontWeight: "700",
     marginTop: spacing.xl
   },
   line: {
     ...typography.body,
-    color: colors.grayDark
+    color: colors.transparentWhite
   }
 });

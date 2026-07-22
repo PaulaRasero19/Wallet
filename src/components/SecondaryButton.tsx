@@ -17,8 +17,8 @@ export function SecondaryButton({ children, onPress, style }: { children: ReactN
 const styles = StyleSheet.create({
   button: {
     alignItems: "center",
-    backgroundColor: colors.white,
-    borderColor: colors.grayLight,
+    backgroundColor: "transparent",
+    borderColor: colors.appGrayBorder,
     borderRadius: radii.pill,
     borderWidth: 1,
     justifyContent: "center",
@@ -27,7 +27,7 @@ const styles = StyleSheet.create({
   },
   text: {
     ...typography.button,
-    color: colors.black
+    color: colors.white
   },
   pressed: {
     opacity: 0.72

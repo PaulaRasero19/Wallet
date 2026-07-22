@@ -13,7 +13,7 @@ type HeaderProps = {
   right?: ReactNode;
 };
 
-export function Header({ title, dark = false, back = false, actions = [], right }: HeaderProps) {
+export function Header({ title, dark = true, back = false, actions = [], right }: HeaderProps) {
   const tint = dark ? colors.white : colors.black;
   const muted = dark ? colors.transparentWhite : colors.grayMedium;
 
@@ -52,7 +52,7 @@ const styles = StyleSheet.create({
   },
   title: {
     ...typography.title,
-    fontSize: 16
+    fontSize: 18
   },
   iconButton: {
     alignItems: "center",

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { SendHorizontal } from "lucide-react-native";
-import { DarkScreenContainer } from "../src/components/DarkScreenContainer";
+import { ScreenContainer } from "../src/components/ScreenContainer";
 import { Header } from "../src/components/Header";
 import { InputField } from "../src/components/InputField";
 import { useFinFlowStore } from "../src/store/useFinFlowStore";
@@ -65,7 +65,7 @@ export default function Insights() {
   }
 
   return (
-    <DarkScreenContainer>
+    <ScreenContainer>
       <Header title="Asistente" dark back />
       <Text style={styles.lead}>Preguntá sobre tus datos reales. Las respuestas usan movimientos, cuentas, metas y vencimientos cargados.</Text>
       <View style={styles.suggestions}>
@@ -98,7 +98,7 @@ export default function Insights() {
           <SendHorizontal color={colors.black} size={18} />
         </Pressable>
       </View>
-    </DarkScreenContainer>
+    </ScreenContainer>
   );
 }
 
@@ -115,7 +115,7 @@ const styles = StyleSheet.create({
     marginTop: spacing.xl
   },
   prompt: {
-    borderColor: colors.grayDark,
+    borderColor: colors.appGrayBorder,
     borderRadius: 8,
     borderWidth: 1,
     minHeight: 38,
@@ -128,7 +128,9 @@ const styles = StyleSheet.create({
     fontWeight: "700"
   },
   answer: {
-    backgroundColor: colors.white,
+    backgroundColor: colors.appGrayDark,
+    borderColor: colors.appGrayBorder,
+    borderWidth: 1,
     borderRadius: 8,
     gap: spacing.sm,
     marginTop: spacing.xl,
@@ -136,16 +138,16 @@ const styles = StyleSheet.create({
   },
   answerTitle: {
     ...typography.body,
-    color: colors.black,
+    color: colors.white,
     fontWeight: "700"
   },
   answerText: {
     ...typography.body,
-    color: colors.grayDark
+    color: colors.transparentWhite
   },
   inputBar: {
     alignItems: "center",
-    borderColor: colors.grayDark,
+    borderColor: colors.appGrayBorder,
     borderRadius: 8,
     borderWidth: 1,
     flexDirection: "row",

@@ -1,6 +1,10 @@
 export const colors = {
   background: "#F7F4EF",
   surface: "#FFFFFF",
+  appGray: "#55554F",
+  appGrayDark: "#3F403B",
+  appGraySoft: "rgba(255,255,255,0.1)",
+  appGrayBorder: "rgba(255,255,255,0.16)",
   black: "#0A0A0A",
   darkSurface: "#151515",
   grayDark: "#333333",

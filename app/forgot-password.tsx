@@ -7,7 +7,7 @@ import { PrimaryButton } from "../src/components/PrimaryButton";
 import { ScreenContainer } from "../src/components/ScreenContainer";
 import { translate } from "../src/i18n";
 import { useSessionStore } from "../src/store/useSessionStore";
-import { spacing, typography } from "../src/theme";
+import { colors, spacing, typography } from "../src/theme";
 
 export default function ForgotPassword() {
   const { language, recoverPassword } = useSessionStore();
@@ -50,9 +50,11 @@ const styles = StyleSheet.create({
     gap: spacing.md
   },
   title: {
-    ...typography.display
+    ...typography.display,
+    color: colors.white
   },
   copy: {
-    ...typography.body
+    ...typography.body,
+    color: colors.transparentWhite
   }
 });

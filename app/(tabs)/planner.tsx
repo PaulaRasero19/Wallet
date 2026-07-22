@@ -22,10 +22,10 @@ export default function Planner() {
       <Header title="Plan" />
       <Text style={styles.lead}>Planificá lo que ya está comprometido antes de decidir nuevos gastos.</Text>
       <View style={styles.grid}>
-        <Shortcut icon={<WalletCards color={colors.black} size={20} />} title="Presupuesto" />
-        <Shortcut icon={<PiggyBank color={colors.black} size={20} />} title="Ahorro" onPress={() => router.push("/plan?tab=Ahorro")} />
-        <Shortcut icon={<CreditCard color={colors.black} size={20} />} title="Tarjetas" onPress={() => router.push("/plan?tab=Tarjetas")} />
-        <Shortcut icon={<CalendarDays color={colors.black} size={20} />} title="Calendario" onPress={() => router.push("/plan?tab=Calendario")} />
+        <Shortcut icon={<WalletCards color={colors.white} size={20} />} title="Presupuesto" />
+        <Shortcut icon={<PiggyBank color={colors.white} size={20} />} title="Ahorro" onPress={() => router.push("/plan?tab=Ahorro")} />
+        <Shortcut icon={<CreditCard color={colors.white} size={20} />} title="Tarjetas" onPress={() => router.push("/plan?tab=Tarjetas")} />
+        <Shortcut icon={<CalendarDays color={colors.white} size={20} />} title="Calendario" onPress={() => router.push("/plan?tab=Calendario")} />
       </View>
       <Text style={styles.section}>Próximos eventos</Text>
       <View style={styles.agenda}>
@@ -50,7 +50,7 @@ function Shortcut({ icon, onPress, title }: { icon: React.ReactNode; onPress?: (
 const styles = StyleSheet.create({
   lead: {
     ...typography.body,
-    color: colors.grayDark,
+    color: colors.transparentWhite,
     marginTop: spacing.lg
   },
   grid: {
@@ -61,8 +61,8 @@ const styles = StyleSheet.create({
   },
   shortcut: {
     alignItems: "flex-start",
-    backgroundColor: colors.white,
-    borderColor: colors.grayLight,
+    backgroundColor: colors.appGrayDark,
+    borderColor: colors.appGrayBorder,
     borderRadius: 8,
     borderWidth: 1,
     gap: spacing.sm,
@@ -72,12 +72,12 @@ const styles = StyleSheet.create({
   },
   shortcutTitle: {
     ...typography.body,
-    color: colors.black,
+    color: colors.white,
     fontWeight: "700"
   },
   section: {
     ...typography.body,
-    color: colors.black,
+    color: colors.white,
     fontWeight: "700",
     marginTop: spacing.xl
   },
@@ -86,6 +86,6 @@ const styles = StyleSheet.create({
   },
   empty: {
     ...typography.body,
-    color: colors.grayDark
+    color: colors.transparentWhite
   }
 });

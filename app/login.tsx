@@ -7,7 +7,7 @@ import { PrimaryButton } from "../src/components/PrimaryButton";
 import { SecondaryButton } from "../src/components/SecondaryButton";
 import { ScreenContainer } from "../src/components/ScreenContainer";
 import { translate } from "../src/i18n";
-import { spacing, typography } from "../src/theme";
+import { colors, spacing, typography } from "../src/theme";
 import { useSessionStore } from "../src/store/useSessionStore";
 
 type LoginErrors = {
@@ -102,6 +102,7 @@ const styles = StyleSheet.create({
   },
   title: {
     ...typography.display,
+    color: colors.white,
     marginBottom: spacing.md
   },
   message: {

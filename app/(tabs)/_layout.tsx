@@ -4,6 +4,7 @@ import { Tabs } from "expo-router";
 import { router } from "expo-router";
 import { FloatingTabBar } from "../../src/components/navigation/FloatingTabBar";
 import { useSessionStore } from "../../src/store/useSessionStore";
+import { colors } from "../../src/theme";
 
 export default function TabLayout() {
   const { profile, status } = useSessionStore();
@@ -23,14 +24,14 @@ export default function TabLayout() {
 
   if (status === "loading" || status !== "authenticated" || !profile?.onboarding_completed) {
     return (
-      <View style={{ flex: 1, justifyContent: "center", padding: 24 }}>
-        <Text>Loading FinFlow...</Text>
+      <View style={{ backgroundColor: colors.black, flex: 1, justifyContent: "center", padding: 24 }}>
+        <Text style={{ color: colors.white }}>Loading FinFlow...</Text>
       </View>
     );
   }
 
   return (
-    <Tabs tabBar={(props) => <FloatingTabBar {...props} />} screenOptions={{ headerShown: false }}>
+    <Tabs tabBar={(props) => <FloatingTabBar {...props} />} screenOptions={{ headerShown: false, sceneStyle: { backgroundColor: colors.black } }}>
       <Tabs.Screen name="overview" options={{ title: "Inicio" }} />
       <Tabs.Screen name="transactions" options={{ title: "Movimientos" }} />
       <Tabs.Screen name="add" options={{ title: "Agregar" }} />

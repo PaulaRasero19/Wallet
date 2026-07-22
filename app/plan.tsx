@@ -103,7 +103,7 @@ const styles = StyleSheet.create({
     marginTop: spacing.lg
   },
   tab: {
-    borderColor: colors.grayLight,
+    borderColor: colors.appGrayBorder,
     borderRadius: 8,
     borderWidth: 1,
     minHeight: 38,
@@ -111,22 +111,23 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md
   },
   activeTab: {
-    backgroundColor: colors.black,
-    borderColor: colors.black
+    backgroundColor: colors.white,
+    borderColor: colors.white
   },
   tabText: {
     ...typography.label,
-    color: colors.black,
+    color: colors.white,
     fontWeight: "700"
   },
   activeTabText: {
-    color: colors.white
+    color: colors.black
   },
   section: {
     marginTop: spacing.xl
   },
   block: {
-    borderColor: colors.grayLight,
+    backgroundColor: colors.appGrayDark,
+    borderColor: colors.appGrayBorder,
     borderRadius: 8,
     borderWidth: 1,
     marginBottom: spacing.md,
@@ -134,27 +135,27 @@ const styles = StyleSheet.create({
   },
   title: {
     ...typography.body,
-    color: colors.black,
+    color: colors.white,
     fontWeight: "700",
     marginBottom: spacing.sm
   },
   row: {
-    borderBottomColor: colors.grayLight,
+    borderBottomColor: colors.appGrayBorder,
     borderBottomWidth: 1,
     paddingVertical: spacing.md
   },
   rowTitle: {
     ...typography.body,
-    color: colors.black,
+    color: colors.white,
     fontWeight: "700"
   },
   rowMeta: {
     ...typography.label,
-    color: colors.grayDark,
+    color: colors.transparentWhite,
     marginTop: spacing.xs
   },
   empty: {
     ...typography.body,
-    color: colors.grayDark
+    color: colors.transparentWhite
   }
 });

@@ -82,11 +82,11 @@ export function ValueDotChart({ title, period, points, metric = "balance", onMet
       </View>
 
       <Svg width="100%" height={height} viewBox={`0 0 ${width} ${height}`}>
-        <Line x1={0} x2={width} y1={12} y2={12} stroke={colors.grayLight} strokeWidth={1} />
-        <Line x1={0} x2={width} y1={height - 12} y2={height - 12} stroke={colors.grayLight} strokeWidth={1} />
-        <Polyline points={polyline} fill="none" stroke={colors.black} strokeWidth={1.6} />
+        <Line x1={0} x2={width} y1={12} y2={12} stroke={colors.appGrayBorder} strokeWidth={1} />
+        <Line x1={0} x2={width} y1={height - 12} y2={height - 12} stroke={colors.appGrayBorder} strokeWidth={1} />
+        <Polyline points={polyline} fill="none" stroke={colors.white} strokeWidth={1.8} />
         {chartPoints.map((point, index) => (
-          <Circle key={`${point.date}-${index}`} cx={point.x} cy={point.y} r={index === selected ? 5.5 : 3.6} fill={index === selected ? colors.orange : colors.black} />
+          <Circle key={`${point.date}-${index}`} cx={point.x} cy={point.y} r={index === selected ? 5.8 : 3.8} fill={index === selected ? colors.orange : colors.white} />
         ))}
       </Svg>
 
@@ -129,7 +129,7 @@ const styles = StyleSheet.create({
   },
   title: {
     ...typography.body,
-    color: colors.black,
+    color: colors.white,
     fontWeight: "700"
   },
   period: {
@@ -137,20 +137,20 @@ const styles = StyleSheet.create({
   },
   range: {
     ...typography.label,
-    color: colors.grayDark,
+    color: colors.transparentWhite,
     flex: 1,
     textAlign: "right"
   },
   empty: {
     ...typography.body,
-    color: colors.grayDark
+    color: colors.transparentWhite
   },
   switchRow: {
     flexDirection: "row",
     gap: spacing.xs
   },
   switch: {
-    borderColor: colors.grayLight,
+    borderColor: colors.appGrayBorder,
     borderRadius: 8,
     borderWidth: 1,
     minHeight: 30,
@@ -158,16 +158,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.sm
   },
   switchActive: {
-    backgroundColor: colors.black,
-    borderColor: colors.black
+    backgroundColor: colors.white,
+    borderColor: colors.white
   },
   switchText: {
     ...typography.label,
-    color: colors.black,
+    color: colors.white,
     fontWeight: "700"
   },
   switchTextActive: {
-    color: colors.white
+    color: colors.black
   },
   touchRow: {
     flexDirection: "row",
@@ -185,11 +185,11 @@ const styles = StyleSheet.create({
   },
   axisText: {
     ...typography.label,
-    color: colors.grayMedium
+    color: colors.transparentWhite
   },
   tooltip: {
     ...typography.label,
-    color: colors.black,
+    color: colors.white,
     flex: 1,
     textAlign: "center"
   },
@@ -198,7 +198,7 @@ const styles = StyleSheet.create({
     gap: spacing.xs
   },
   periodButton: {
-    borderColor: colors.grayLight,
+    borderColor: colors.appGrayBorder,
     borderRadius: 8,
     borderWidth: 1,
     minHeight: 28,
@@ -206,15 +206,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.sm
   },
   periodActive: {
-    backgroundColor: colors.orange,
-    borderColor: colors.orange
+    backgroundColor: colors.white,
+    borderColor: colors.white
   },
   periodText: {
     ...typography.label,
-    color: colors.black,
+    color: colors.white,
     fontWeight: "700"
   },
   periodTextActive: {
-    color: colors.white
+    color: colors.black
   }
 });

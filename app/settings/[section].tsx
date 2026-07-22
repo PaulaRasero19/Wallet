@@ -32,18 +32,20 @@ export default function SettingSection() {
 
 const styles = StyleSheet.create({
   panel: {
-    backgroundColor: colors.white,
-    borderColor: colors.grayLight,
-    borderRadius: 20,
+    backgroundColor: colors.appGrayDark,
+    borderColor: colors.appGrayBorder,
+    borderRadius: 8,
     borderWidth: 1,
     gap: spacing.md,
     marginTop: spacing.xl,
     padding: spacing.lg
   },
   title: {
-    ...typography.title
+    ...typography.title,
+    color: colors.white
   },
   body: {
-    ...typography.body
+    ...typography.body,
+    color: colors.transparentWhite
   }
 });

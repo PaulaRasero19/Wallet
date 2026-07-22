@@ -19,14 +19,15 @@ export function PrimaryButton({ children, disabled = false, onPress, style }: { 
 const styles = StyleSheet.create({
   button: {
     alignItems: "center",
-    backgroundColor: colors.black,
+    backgroundColor: colors.white,
     borderRadius: radii.pill,
     justifyContent: "center",
     minHeight: 52,
     paddingHorizontal: 22
   },
   text: {
-    ...typography.button
+    ...typography.button,
+    color: colors.black
   },
   pressed: {
     opacity: 0.76,

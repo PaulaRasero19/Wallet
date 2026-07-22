@@ -128,12 +128,12 @@ export default function Add() {
       <Header title="Agregar" />
       {mode === "menu" ? (
         <View style={styles.actions}>
-          <Action icon={<Minus color={colors.black} size={22} />} title="Gasto" body="Registrar una salida" onPress={() => startMovement("expense")} />
-          <Action icon={<Plus color={colors.black} size={22} />} title="Ingreso" body="Actualizar saldo" onPress={() => startMovement("income")} />
-          <Action icon={<ArrowLeftRight color={colors.black} size={22} />} title="Transferencia" body="Mover entre cuentas" onPress={() => setMode("transfer")} />
-          <Action icon={<CreditCard color={colors.black} size={22} />} title="Compra en cuotas" body="Registrar compromiso" onPress={() => setMode("installment")} />
-          <Action icon={<Camera color={colors.black} size={22} />} title="Escanear" body="Preparar comprobante" onPress={() => setMode("scan")} />
-          <Action icon={<Brain color={colors.black} size={22} />} title="Registrar con IA" body="Escribí en lenguaje natural" onPress={() => setMode("ai")} />
+          <Action icon={<Minus color={colors.white} size={22} />} title="Gasto" body="Registrar una salida" onPress={() => startMovement("expense")} />
+          <Action icon={<Plus color={colors.white} size={22} />} title="Ingreso" body="Actualizar saldo" onPress={() => startMovement("income")} />
+          <Action icon={<ArrowLeftRight color={colors.white} size={22} />} title="Transferencia" body="Mover entre cuentas" onPress={() => setMode("transfer")} />
+          <Action icon={<CreditCard color={colors.white} size={22} />} title="Compra en cuotas" body="Registrar compromiso" onPress={() => setMode("installment")} />
+          <Action icon={<Camera color={colors.white} size={22} />} title="Escanear" body="Preparar comprobante" onPress={() => setMode("scan")} />
+          <Action icon={<Brain color={colors.white} size={22} />} title="Registrar con IA" body="Escribí en lenguaje natural" onPress={() => setMode("ai")} />
         </View>
       ) : null}
 
@@ -222,8 +222,8 @@ const styles = StyleSheet.create({
     marginTop: spacing.xl
   },
   action: {
-    backgroundColor: colors.white,
-    borderColor: colors.grayLight,
+    backgroundColor: colors.appGrayDark,
+    borderColor: colors.appGrayBorder,
     borderRadius: 8,
     borderWidth: 1,
     gap: spacing.sm,
@@ -233,12 +233,12 @@ const styles = StyleSheet.create({
   },
   actionTitle: {
     ...typography.body,
-    color: colors.black,
+    color: colors.white,
     fontWeight: "700"
   },
   actionBody: {
     ...typography.label,
-    color: colors.grayDark
+    color: colors.transparentWhite
   },
   form: {
     gap: spacing.md,
@@ -246,7 +246,7 @@ const styles = StyleSheet.create({
   },
   lead: {
     ...typography.body,
-    color: colors.grayDark
+    color: colors.transparentWhite
   },
   segment: {
     flexDirection: "row",
@@ -254,7 +254,7 @@ const styles = StyleSheet.create({
   },
   label: {
     ...typography.label,
-    color: colors.grayDark,
+    color: colors.transparentWhite,
     fontWeight: "700"
   },
   wrap: {
@@ -263,8 +263,8 @@ const styles = StyleSheet.create({
     gap: spacing.sm
   },
   chip: {
-    backgroundColor: colors.white,
-    borderColor: colors.grayLight,
+    backgroundColor: colors.appGrayDark,
+    borderColor: colors.appGrayBorder,
     borderRadius: 8,
     borderWidth: 1,
     minHeight: 38,
@@ -273,18 +273,19 @@ const styles = StyleSheet.create({
   },
   chipText: {
     ...typography.label,
-    color: colors.black,
+    color: colors.white,
     fontWeight: "700"
   },
   active: {
-    backgroundColor: colors.black,
-    borderColor: colors.black
+    backgroundColor: colors.white,
+    borderColor: colors.white
   },
   activeText: {
-    color: colors.white
+    color: colors.black
   },
   proposal: {
-    borderColor: colors.grayLight,
+    backgroundColor: colors.appGrayDark,
+    borderColor: colors.appGrayBorder,
     borderRadius: 8,
     borderWidth: 1,
     gap: spacing.sm,
@@ -292,11 +293,11 @@ const styles = StyleSheet.create({
   },
   proposalTitle: {
     ...typography.body,
-    color: colors.black,
+    color: colors.white,
     fontWeight: "700"
   },
   proposalLine: {
     ...typography.body,
-    color: colors.grayDark
+    color: colors.transparentWhite
   }
 });

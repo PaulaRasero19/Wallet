@@ -58,7 +58,7 @@ export default function Onboarding() {
 
 const styles = StyleSheet.create({
   screen: {
-    backgroundColor: colors.background,
+    backgroundColor: colors.appGray,
     flex: 1,
     justifyContent: "space-between",
     padding: spacing.xl,
@@ -68,11 +68,12 @@ const styles = StyleSheet.create({
     gap: spacing.sm
   },
   title: {
-    ...typography.display
+    ...typography.display,
+    color: colors.white
   },
   subtitle: {
     ...typography.body,
-    color: colors.black
+    color: colors.transparentWhite
   },
   footer: {
     alignItems: "center",
@@ -81,7 +82,9 @@ const styles = StyleSheet.create({
   },
   next: {
     alignItems: "center",
-    backgroundColor: colors.black,
+    backgroundColor: colors.appGrayDark,
+    borderColor: colors.appGrayBorder,
+    borderWidth: 1,
     borderRadius: 24,
     height: 48,
     justifyContent: "center",

@@ -13,21 +13,22 @@ export function InsightMetric({ label, meta, value }: { label: string; meta?: st
 
 const styles = StyleSheet.create({
   wrap: {
-    borderBottomColor: colors.grayLight,
+    borderBottomColor: colors.appGrayBorder,
     borderBottomWidth: 1,
     paddingVertical: spacing.md
   },
   label: {
     ...typography.label,
-    color: colors.grayMedium
+    color: colors.transparentWhite
   },
   value: {
     ...typography.title,
+    color: colors.white,
     marginTop: spacing.xs
   },
   meta: {
     ...typography.label,
-    color: colors.grayDark,
+    color: colors.transparentWhite,
     marginTop: spacing.xs
   }
 });

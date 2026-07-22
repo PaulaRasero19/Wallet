@@ -116,7 +116,7 @@ const styles = StyleSheet.create({
     marginTop: spacing.lg
   },
   tab: {
-    borderColor: colors.grayLight,
+    borderColor: colors.appGrayBorder,
     borderRadius: 8,
     borderWidth: 1,
     minHeight: 38,
@@ -124,32 +124,32 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md
   },
   activeTab: {
-    backgroundColor: colors.black,
-    borderColor: colors.black
+    backgroundColor: colors.white,
+    borderColor: colors.white
   },
   tabText: {
     ...typography.label,
-    color: colors.black,
+    color: colors.white,
     fontWeight: "700"
   },
   activeTabText: {
-    color: colors.white
+    color: colors.black
   },
   section: {
     marginTop: spacing.xl
   },
   explain: {
     ...typography.body,
-    color: colors.grayDark,
+    color: colors.transparentWhite,
     marginTop: spacing.lg
   },
   empty: {
     ...typography.body,
-    color: colors.grayDark
+    color: colors.transparentWhite
   },
   row: {
     alignItems: "center",
-    borderBottomColor: colors.grayLight,
+    borderBottomColor: colors.appGrayBorder,
     borderBottomWidth: 1,
     flexDirection: "row",
     gap: spacing.md,
@@ -161,17 +161,17 @@ const styles = StyleSheet.create({
   },
   rowTitle: {
     ...typography.body,
-    color: colors.black,
+    color: colors.white,
     fontWeight: "700"
   },
   rowMeta: {
     ...typography.label,
-    color: colors.grayDark,
+    color: colors.transparentWhite,
     marginTop: spacing.xs
   },
   rowValue: {
     ...typography.body,
-    color: colors.black,
+    color: colors.white,
     fontWeight: "700"
   },
   filters: {
@@ -180,7 +180,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md
   },
   filter: {
-    borderColor: colors.grayLight,
+    borderColor: colors.appGrayBorder,
     borderRadius: 8,
     borderWidth: 1,
     minHeight: 34,
@@ -189,11 +189,12 @@ const styles = StyleSheet.create({
   },
   filterText: {
     ...typography.label,
-    color: colors.black,
+    color: colors.white,
     fontWeight: "700"
   },
   cardBlock: {
-    borderColor: colors.grayLight,
+    backgroundColor: colors.appGrayDark,
+    borderColor: colors.appGrayBorder,
     borderRadius: 8,
     borderWidth: 1,
     padding: spacing.lg

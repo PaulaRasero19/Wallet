@@ -5,6 +5,7 @@ import { StatusBar } from "expo-status-bar";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { useFinFlowStore } from "../src/store/useFinFlowStore";
 import { useSessionStore } from "../src/store/useSessionStore";
+import { colors } from "../src/theme";
 
 export default function RootLayout() {
   const clearFinancialData = useFinFlowStore((state) => state.clearFinancialData);
@@ -16,9 +17,9 @@ export default function RootLayout() {
   }, [clearFinancialData, initialize]);
 
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
-      <StatusBar style="dark" />
-      <Stack screenOptions={{ headerShown: false }}>
+    <GestureHandlerRootView style={{ backgroundColor: colors.black, flex: 1 }}>
+      <StatusBar backgroundColor="transparent" translucent style="light" />
+      <Stack screenOptions={{ contentStyle: { backgroundColor: colors.black }, headerShown: false }}>
         <Stack.Screen name="index" />
         <Stack.Screen name="language" />
         <Stack.Screen name="onboarding" />

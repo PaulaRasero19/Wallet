@@ -23,7 +23,7 @@ export default function Welcome() {
   return (
     <View style={styles.screen}>
       <View style={styles.top}>
-        <DotLogo />
+        <DotLogo light />
         <Text style={styles.title}>Welcome to{"\n"}FinFlow</Text>
         <Text style={styles.subtitle}>Take control of your finances{"\n"}and time.</Text>
       </View>
@@ -39,7 +39,7 @@ export default function Welcome() {
 const styles = StyleSheet.create({
   screen: {
     alignItems: "center",
-    backgroundColor: colors.background,
+    backgroundColor: colors.appGray,
     flex: 1,
     justifyContent: "space-between",
     padding: spacing.xl,
@@ -51,13 +51,14 @@ const styles = StyleSheet.create({
   },
   title: {
     ...typography.title,
+    color: colors.white,
     fontSize: 25,
     lineHeight: 30,
     textAlign: "center"
   },
   subtitle: {
     ...typography.label,
-    color: colors.black,
+    color: colors.transparentWhite,
     textAlign: "center"
   },
   actions: {

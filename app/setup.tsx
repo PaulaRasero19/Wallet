@@ -147,11 +147,12 @@ export default function Setup() {
 const styles = StyleSheet.create({
   title: {
     ...typography.display,
+    color: colors.white,
     marginTop: spacing.xl
   },
   subtitle: {
     ...typography.body,
-    color: colors.black,
+    color: colors.transparentWhite,
     marginTop: spacing.sm
   },
   form: {
@@ -160,7 +161,7 @@ const styles = StyleSheet.create({
   },
   label: {
     ...typography.label,
-    color: colors.grayDark
+    color: colors.transparentWhite
   },
   currencyRow: {
     flexDirection: "row",
@@ -168,8 +169,8 @@ const styles = StyleSheet.create({
   },
   currency: {
     alignItems: "center",
-    backgroundColor: colors.white,
-    borderColor: colors.grayLight,
+    backgroundColor: colors.appGrayDark,
+    borderColor: colors.appGrayBorder,
     borderRadius: 16,
     borderWidth: 1,
     flex: 1,
@@ -182,7 +183,7 @@ const styles = StyleSheet.create({
     gap: spacing.sm
   },
   choice: {
-    borderColor: colors.grayLight,
+    borderColor: colors.appGrayBorder,
     borderRadius: 16,
     borderWidth: 1,
     minHeight: 38,
@@ -190,16 +191,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md
   },
   currencyActive: {
-    backgroundColor: colors.black,
-    borderColor: colors.black
+    backgroundColor: colors.white,
+    borderColor: colors.white
   },
   currencyText: {
     ...typography.label,
-    color: colors.black,
+    color: colors.white,
     fontWeight: "600"
   },
   currencyTextActive: {
-    color: colors.white
+    color: colors.black
   },
   actions: {
     gap: spacing.sm,
@@ -211,7 +212,7 @@ const styles = StyleSheet.create({
   },
   later: {
     ...typography.label,
-    color: colors.grayDark,
+    color: colors.transparentWhite,
     fontWeight: "600",
     textAlign: "center"
   }

@@ -4,7 +4,7 @@ import { AccentColor, colors } from "../theme";
 import { Dot } from "./Dot";
 
 type DotGridProps = {
-  matrix?: Array<AccentColor | keyof typeof colors | "empty">;
+  matrix?: Array<AccentColor | keyof typeof colors | string | "empty">;
   columns?: number;
   dotSize?: number;
   gap?: number;

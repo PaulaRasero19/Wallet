@@ -10,7 +10,7 @@ export function InputField({ inputRef, ...props }: InputFieldProps) {
   return (
     <TextInput
       ref={inputRef}
-      placeholderTextColor={colors.grayMedium}
+      placeholderTextColor="rgba(255,255,255,0.54)"
       {...props}
       onPressIn={(event) => {
         inputRef?.current?.focus();
@@ -25,11 +25,11 @@ export function InputField({ inputRef, ...props }: InputFieldProps) {
 const styles = StyleSheet.create({
   input: {
     ...typography.body,
-    backgroundColor: colors.white,
-    borderColor: colors.grayLight,
+    backgroundColor: colors.appGrayDark,
+    borderColor: colors.appGrayBorder,
     borderRadius: radii.md,
     borderWidth: 1,
-    color: colors.black,
+    color: colors.white,
     elevation: 0,
     minHeight: 50,
     paddingHorizontal: spacing.md,

@@ -27,7 +27,7 @@ function nearestSnap(value: number, velocityY: number, expandedY: number, collap
 export function HomeTransactionsSheet({ accounts, transactions }: { accounts: Account[]; transactions: Transaction[] }) {
   const { height, width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
-  const expandedY = height * 0.24;
+  const expandedY = height * 0.34;
   const collapsedY = height * 0.785;
   const [expanded, setExpanded] = useState(false);
   const sheetY = useSharedValue(collapsedY);

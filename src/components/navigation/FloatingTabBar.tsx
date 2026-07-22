@@ -8,8 +8,9 @@ import { colors, typography } from "../../theme";
 import { DotGrid } from "../DotGrid";
 
 const routeOrder = ["overview", "transactions", "add", "ai", "settings"];
-const BAR_COLOR = "rgba(83,83,80,0.7)";
-const INACTIVE_COLOR = "#74736E";
+const BAR_COLOR = "rgba(62,62,59,0.84)";
+const ACTIVE_COLOR = "#A44934";
+const INACTIVE_COLOR = "#4F4E49";
 const BAR_HEIGHT = 76;
 const TOUCH_SIZE = 52;
 
@@ -71,7 +72,7 @@ export function FloatingTabBar({ navigation, state }: any) {
                   }}
                   style={styles.action}
                 >
-                  <Icon color={colors.black} size={18} />
+                  <Icon color={colors.white} size={18} />
                   <Text style={styles.actionText}>{action.label}</Text>
                 </Pressable>
               );
@@ -81,13 +82,14 @@ export function FloatingTabBar({ navigation, state }: any) {
       ) : null}
 
       <View style={[styles.wrap, { height: BAR_HEIGHT + Math.max(insets.bottom, 0), paddingBottom: Math.max(insets.bottom, 0) }]}>
-        <BlurView intensity={62} pointerEvents="none" style={StyleSheet.absoluteFill} tint="light" />
+        <BlurView experimentalBlurMethod="dimezisBlurView" intensity={95} pointerEvents="none" style={StyleSheet.absoluteFill} tint="dark" />
         <View pointerEvents="none" style={styles.barTint} />
         <View style={styles.items}>
           {visibleRoutes.map((route: any) => {
             const focused = open ? route.name === "add" : route.name === focusedRoute;
             const Icon = iconMap[route.name as keyof typeof iconMap] || DotGrid;
             const isAdd = route.name === "add";
+            const iconColor = focused ? ACTIVE_COLOR : INACTIVE_COLOR;
             return (
               <Pressable
                 accessibilityLabel={labelMap[route.name] || route.name}
@@ -99,9 +101,9 @@ export function FloatingTabBar({ navigation, state }: any) {
               >
                 <View style={[styles.item, isAdd && styles.addItem]}>
                   {route.name === "overview" ? (
-                    <DotGrid columns={2} dotSize={4} gap={4} matrix={["grayMedium", "grayMedium", "grayMedium", "grayMedium"]} />
+                    <DotGrid columns={2} dotSize={4} gap={4} matrix={[iconColor, iconColor, iconColor, iconColor]} />
                   ) : (
-                    <Icon color={INACTIVE_COLOR} size={isAdd ? 28 : 22} strokeWidth={isAdd ? 2.35 : 2} />
+                    <Icon color={iconColor} size={isAdd ? 28 : 22} strokeWidth={isAdd ? 2.35 : 2} />
                   )}
                 </View>
               </Pressable>
@@ -116,8 +118,8 @@ export function FloatingTabBar({ navigation, state }: any) {
 const styles = StyleSheet.create({
   action: {
     alignItems: "center",
-    backgroundColor: colors.surface,
-    borderColor: colors.grayLight,
+    backgroundColor: colors.appGrayDark,
+    borderColor: colors.appGrayBorder,
     borderRadius: 8,
     borderWidth: 1,
     flexDirection: "row",
@@ -127,8 +129,8 @@ const styles = StyleSheet.create({
   },
   actionSheet: {
     alignSelf: "center",
-    backgroundColor: "rgba(255,255,255,0.96)",
-    borderColor: colors.grayLight,
+    backgroundColor: "rgba(63,64,59,0.96)",
+    borderColor: colors.appGrayBorder,
     borderRadius: 18,
     borderWidth: 1,
     flexDirection: "row",
@@ -140,7 +142,7 @@ const styles = StyleSheet.create({
   },
   actionText: {
     ...typography.label,
-    color: colors.black,
+    color: colors.white,
     fontWeight: "800"
   },
   barTint: {

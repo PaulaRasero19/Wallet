@@ -15,7 +15,7 @@ export default function LanguageSelector() {
   return (
     <ScreenContainer style={styles.content}>
       <View style={styles.header}>
-        <DotLogo />
+        <DotLogo light />
         <Text style={styles.title}>{t("language.title")}</Text>
         <Text style={styles.subtitle}>{t("language.subtitle")}</Text>
       </View>
@@ -52,31 +52,32 @@ const styles = StyleSheet.create({
   },
   title: {
     ...typography.title,
+    color: colors.white,
     textAlign: "center"
   },
   subtitle: {
     ...typography.body,
-    color: colors.black,
+    color: colors.transparentWhite,
     textAlign: "center"
   },
   options: {
     gap: spacing.sm
   },
   option: {
-    backgroundColor: colors.white,
-    borderColor: colors.grayLight,
-    borderRadius: 18,
+    backgroundColor: colors.appGrayDark,
+    borderColor: colors.appGrayBorder,
+    borderRadius: 8,
     borderWidth: 1,
     minHeight: 58,
     justifyContent: "center",
     paddingHorizontal: spacing.lg
   },
   activeOption: {
-    borderColor: colors.black
+    borderColor: colors.white
   },
   optionText: {
     ...typography.body,
-    color: colors.black,
+    color: colors.white,
     fontWeight: "600"
   },
   activeText: {

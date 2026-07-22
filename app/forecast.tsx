@@ -139,6 +139,7 @@ function Line({ label, value }: { label: string; value: number }) {
 const styles = StyleSheet.create({
   question: {
     ...typography.display,
+    color: colors.white,
     fontSize: 30,
     marginTop: spacing.xl
   },
@@ -149,27 +150,28 @@ const styles = StyleSheet.create({
     marginTop: spacing.lg
   },
   metric: {
-    backgroundColor: colors.white,
-    borderColor: colors.grayLight,
-    borderRadius: 18,
+    backgroundColor: colors.appGrayDark,
+    borderColor: colors.appGrayBorder,
+    borderRadius: 8,
     borderWidth: 1,
     minHeight: 86,
     padding: spacing.md,
     width: "48%"
   },
   metricLabel: {
-    ...typography.label
+    ...typography.label,
+    color: colors.transparentWhite
   },
   metricValue: {
     ...typography.body,
-    color: colors.black,
+    color: colors.white,
     fontWeight: "600",
     marginTop: spacing.sm
   },
   panel: {
-    backgroundColor: colors.white,
-    borderColor: colors.grayLight,
-    borderRadius: 20,
+    backgroundColor: colors.appGrayDark,
+    borderColor: colors.appGrayBorder,
+    borderRadius: 8,
     borderWidth: 1,
     gap: spacing.sm,
     marginTop: spacing.lg,
@@ -177,7 +179,7 @@ const styles = StyleSheet.create({
   },
   section: {
     ...typography.body,
-    color: colors.black,
+    color: colors.white,
     fontWeight: "600"
   },
   line: {
@@ -185,11 +187,12 @@ const styles = StyleSheet.create({
     justifyContent: "space-between"
   },
   lineLabel: {
-    ...typography.label
+    ...typography.label,
+    color: colors.transparentWhite
   },
   lineValue: {
     ...typography.label,
-    color: colors.black,
+    color: colors.white,
     fontWeight: "600"
   },
   scenarios: {
@@ -198,19 +201,20 @@ const styles = StyleSheet.create({
   },
   antText: {
     ...typography.body,
-    color: colors.black
+    color: colors.white
   },
   detail: {
     ...typography.label,
-    color: colors.grayDark
+    color: colors.transparentWhite
   },
   goal: {
     ...typography.label,
-    color: colors.black,
+    color: colors.white,
     fontWeight: "600"
   },
   disclaimer: {
     ...typography.label,
+    color: colors.transparentWhite,
     marginTop: spacing.lg
   }
 });

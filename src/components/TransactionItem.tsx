@@ -5,7 +5,7 @@ import { formatMoney } from "../utils/money";
 import { positiveAmount } from "../utils/financeInsights";
 import { Dot } from "./Dot";
 
-export function TransactionItem({ account, transaction, dark = false }: { account?: Account; transaction: Transaction; dark?: boolean }) {
+export function TransactionItem({ account, transaction, dark = true }: { account?: Account; transaction: Transaction; dark?: boolean }) {
   const textColor = dark ? colors.white : colors.black;
   const muted = dark ? colors.transparentWhite : colors.grayMedium;
   const category = String(transaction.category || transaction.title || "Sin categoría");
@@ -35,9 +35,15 @@ export function TransactionItem({ account, transaction, dark = false }: { accoun
 const styles = StyleSheet.create({
   row: {
     alignItems: "center",
+    backgroundColor: colors.appGrayDark,
+    borderColor: colors.appGrayBorder,
+    borderRadius: 8,
+    borderWidth: 1,
     flexDirection: "row",
     gap: spacing.sm,
-    minHeight: 58
+    marginBottom: spacing.sm,
+    minHeight: 66,
+    padding: spacing.sm
   },
   info: {
     flex: 1

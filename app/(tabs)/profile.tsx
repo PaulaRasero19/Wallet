@@ -27,7 +27,7 @@ export default function Profile() {
   return (
     <ScreenContainer>
       <View style={styles.header}>
-        <DotLogo />
+        <DotLogo light />
         <View>
           {profile?.is_demo ? <Text style={styles.demo}>{t("dashboard.demoMode")}</Text> : null}
           <Text style={styles.name}>{profile?.full_name || "FinFlow"}</Text>
@@ -73,11 +73,12 @@ const styles = StyleSheet.create({
   },
   name: {
     ...typography.body,
-    color: colors.black,
+    color: colors.white,
     fontWeight: "600"
   },
   email: {
-    ...typography.label
+    ...typography.label,
+    color: colors.transparentWhite
   },
   demo: {
     ...typography.label,
@@ -86,9 +87,9 @@ const styles = StyleSheet.create({
     marginBottom: 2
   },
   languagePanel: {
-    backgroundColor: colors.white,
-    borderColor: colors.grayLight,
-    borderRadius: 18,
+    backgroundColor: colors.appGrayDark,
+    borderColor: colors.appGrayBorder,
+    borderRadius: 8,
     borderWidth: 1,
     gap: spacing.sm,
     marginTop: spacing.xl,
@@ -96,7 +97,7 @@ const styles = StyleSheet.create({
   },
   languageTitle: {
     ...typography.body,
-    color: colors.black,
+    color: colors.white,
     fontWeight: "600"
   },
   languageRow: {
@@ -104,7 +105,7 @@ const styles = StyleSheet.create({
     gap: spacing.sm
   },
   languageButton: {
-    borderColor: colors.grayLight,
+    borderColor: colors.appGrayBorder,
     borderRadius: 16,
     borderWidth: 1,
     flex: 1,
@@ -113,16 +114,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.sm
   },
   languageButtonActive: {
-    backgroundColor: colors.black,
-    borderColor: colors.black
+    backgroundColor: colors.white,
+    borderColor: colors.white
   },
   languageText: {
     ...typography.label,
-    color: colors.black,
+    color: colors.white,
     textAlign: "center"
   },
   languageTextActive: {
-    color: colors.white
+    color: colors.black
   },
   menu: {
     marginTop: spacing.xl

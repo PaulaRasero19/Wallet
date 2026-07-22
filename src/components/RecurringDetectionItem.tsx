@@ -26,7 +26,7 @@ export function RecurringDetectionItem({
       {payment.status === "pending" ? (
         <View style={styles.actions}>
           <Pressable accessibilityRole="button" onPress={onConfirm} style={styles.icon}>
-            <Check color={colors.black} size={15} />
+            <Check color={colors.white} size={15} />
           </Pressable>
           <Pressable accessibilityRole="button" onPress={onReject} style={styles.icon}>
             <X color={colors.orange} size={15} />
@@ -42,20 +42,26 @@ export function RecurringDetectionItem({
 const styles = StyleSheet.create({
   row: {
     alignItems: "center",
+    backgroundColor: colors.appGrayDark,
+    borderColor: colors.appGrayBorder,
+    borderRadius: 8,
+    borderWidth: 1,
     flexDirection: "row",
     gap: spacing.sm,
-    minHeight: 58
+    minHeight: 62,
+    padding: spacing.sm
   },
   copy: {
     flex: 1
   },
   title: {
     ...typography.body,
-    color: colors.black,
+    color: colors.white,
     fontWeight: "600"
   },
   meta: {
-    ...typography.label
+    ...typography.label,
+    color: colors.transparentWhite
   },
   actions: {
     flexDirection: "row",
@@ -63,7 +69,7 @@ const styles = StyleSheet.create({
   },
   icon: {
     alignItems: "center",
-    backgroundColor: colors.background,
+    backgroundColor: colors.appGraySoft,
     borderRadius: 16,
     height: 32,
     justifyContent: "center",
@@ -71,7 +77,7 @@ const styles = StyleSheet.create({
   },
   status: {
     ...typography.label,
-    color: colors.black,
+    color: colors.white,
     fontWeight: "600"
   }
 });

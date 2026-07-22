@@ -31,19 +31,20 @@ export default function Goals() {
 
 const styles = StyleSheet.create({
   panel: {
-    backgroundColor: colors.surface,
-    borderColor: colors.grayLight,
-    borderRadius: 18,
+    backgroundColor: "transparent",
+    borderColor: "transparent",
+    borderRadius: 8,
     borderWidth: 1,
     gap: spacing.md,
     marginTop: spacing.xl,
     padding: spacing.lg
   },
   title: {
-    ...typography.title
+    ...typography.title,
+    color: colors.white
   },
   body: {
     ...typography.body,
-    color: colors.grayDark
+    color: colors.transparentWhite
   }
 });

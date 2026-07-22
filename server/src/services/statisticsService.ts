@@ -11,8 +11,7 @@ const periodDays: Record<string, number> = {
   "30d": 30,
   "3m": 90,
   "6m": 180,
-  "1y": 365,
-  all: 365
+  "1y": 365
 };
 
 function dayKey(date: Date) {
@@ -20,16 +19,25 @@ function dayKey(date: Date) {
 }
 
 export async function getOverview(userId: Types.ObjectId, period = "30d") {
-  const days = periodDays[period] || 30;
+  let days = periodDays[period] || 30;
   const from = new Date();
   from.setHours(0, 0, 0, 0);
   from.setDate(from.getDate() - (days - 1));
 
-  const [accounts, transactions, periodTransactions] = await Promise.all([
+  const [accounts, transactions] = await Promise.all([
     Account.find({ userId, isActive: true }).sort({ createdAt: 1 }),
-    Transaction.find({ userId }).sort({ date: 1 }),
-    Transaction.find({ userId, date: { $gte: from } }).sort({ date: -1 }).limit(100)
+    Transaction.find({ userId }).sort({ date: 1 })
   ]);
+
+  if (period === "all" && transactions.length) {
+    from.setTime(transactions[0].date.getTime());
+    from.setHours(0, 0, 0, 0);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    days = Math.max(1, Math.round((today.getTime() - from.getTime()) / 86400000) + 1);
+  }
+
+  const periodTransactions = transactions.filter((transaction) => transaction.date >= from).slice(-100).reverse();
 
   const totalByCurrency = accounts.reduce<Record<string, number>>((acc, account) => {
     acc[account.currency] = (acc[account.currency] || 0) + account.currentBalance;

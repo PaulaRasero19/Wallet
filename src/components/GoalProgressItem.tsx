@@ -33,7 +33,13 @@ export function GoalProgressItem({ goal, onAdd, onDelete }: { goal: Goal; onAdd:
 
 const styles = StyleSheet.create({
   wrap: {
+    backgroundColor: colors.appGrayDark,
+    borderColor: colors.appGrayBorder,
+    borderRadius: 8,
+    borderWidth: 1,
     gap: spacing.sm,
+    marginBottom: spacing.sm,
+    paddingHorizontal: spacing.md,
     paddingVertical: spacing.md
   },
   header: {
@@ -43,16 +49,17 @@ const styles = StyleSheet.create({
   },
   name: {
     ...typography.body,
-    color: colors.black,
+    color: colors.white,
     fontWeight: "600"
   },
   meta: {
     ...typography.label,
+    color: colors.transparentWhite,
     marginTop: 2
   },
   percent: {
     ...typography.label,
-    color: colors.black,
+    color: colors.white,
     fontWeight: "600"
   },
   actions: {
@@ -60,7 +67,7 @@ const styles = StyleSheet.create({
     gap: spacing.sm
   },
   actionButton: {
-    borderColor: colors.grayLight,
+    borderColor: colors.appGrayBorder,
     borderRadius: 14,
     borderWidth: 1,
     minHeight: 34,
@@ -69,6 +76,6 @@ const styles = StyleSheet.create({
   },
   actionText: {
     ...typography.label,
-    color: colors.black
+    color: colors.white
   }
 });

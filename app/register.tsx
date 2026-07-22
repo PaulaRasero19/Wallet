@@ -204,6 +204,7 @@ const styles = StyleSheet.create({
   },
   title: {
     ...typography.display,
+    color: colors.white,
     marginBottom: spacing.md
   },
   message: {

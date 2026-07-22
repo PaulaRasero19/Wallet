@@ -43,7 +43,7 @@ export default function Overview() {
 
   return (
     <View style={styles.screen}>
-      <StatusBar style="light" />
+      <StatusBar backgroundColor="transparent" translucent style="light" />
       <LiquidGradientBackground />
       <View style={[styles.content, { paddingTop: insets.top }]}>
         <HomeHeader avatarUrl={profile?.avatar_url || profile?.avatarUrl} firstName={firstName} fullName={profile?.full_name || firstName} />

@@ -32,9 +32,9 @@ export function ForecastScenarioCard({ scenario }: { scenario: ForecastScenario 
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: colors.white,
-    borderColor: colors.grayLight,
-    borderRadius: 20,
+    backgroundColor: colors.appGrayDark,
+    borderColor: colors.appGrayBorder,
+    borderRadius: 8,
     borderWidth: 1,
     gap: spacing.sm,
     padding: spacing.md
@@ -46,7 +46,7 @@ const styles = StyleSheet.create({
   },
   title: {
     ...typography.body,
-    color: colors.black,
+    color: colors.white,
     fontWeight: "600"
   },
   risk: {
@@ -56,21 +56,23 @@ const styles = StyleSheet.create({
   },
   riskText: {
     ...typography.label,
-    color: colors.black
+    color: colors.white
   },
   value: {
     ...typography.title,
-    color: colors.black
+    color: colors.white
   },
   meta: {
-    ...typography.label
+    ...typography.label,
+    color: colors.transparentWhite
   },
   reduce: {
     ...typography.label,
-    color: colors.black
+    color: colors.white
   },
   action: {
     ...typography.label,
+    color: colors.transparentWhite,
     lineHeight: 18
   }
 });

@@ -73,16 +73,16 @@ export default function Transactions() {
 const styles = StyleSheet.create({
   lead: {
     ...typography.body,
-    color: colors.grayDark,
+    color: colors.transparentWhite,
     marginTop: spacing.lg
   },
   search: {
     ...typography.body,
-    backgroundColor: colors.white,
-    borderColor: colors.grayLight,
+    backgroundColor: colors.appGrayDark,
+    borderColor: colors.appGrayBorder,
     borderRadius: 8,
     borderWidth: 1,
-    color: colors.black,
+    color: colors.white,
     marginTop: spacing.lg,
     minHeight: 48,
     paddingHorizontal: spacing.md
@@ -94,7 +94,7 @@ const styles = StyleSheet.create({
     marginTop: spacing.md
   },
   filter: {
-    borderColor: colors.grayLight,
+    borderColor: colors.appGrayBorder,
     borderRadius: 8,
     borderWidth: 1,
     minHeight: 36,
@@ -102,27 +102,27 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md
   },
   activeFilter: {
-    backgroundColor: colors.black,
-    borderColor: colors.black
+    backgroundColor: colors.white,
+    borderColor: colors.white
   },
   filterText: {
     ...typography.label,
-    color: colors.black,
+    color: colors.white,
     fontWeight: "700"
   },
   activeFilterText: {
-    color: colors.white
+    color: colors.black
   },
   list: {
     marginTop: spacing.xl
   },
   count: {
     ...typography.label,
-    color: colors.grayDark,
+    color: colors.transparentWhite,
     marginBottom: spacing.sm
   },
   empty: {
     ...typography.body,
-    color: colors.grayDark
+    color: colors.transparentWhite
   }
 });

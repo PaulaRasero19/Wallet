@@ -15,7 +15,7 @@ export function ScreenContainer({ children, style }: { children: ReactNode; styl
 
 const styles = StyleSheet.create({
   safe: {
-    backgroundColor: colors.background,
+    backgroundColor: colors.appGray,
     flex: 1
   },
   content: {
