@@ -35,7 +35,15 @@ export default function RootLayout() {
         <Stack.Screen name="forecast" />
         <Stack.Screen name="goals" />
         <Stack.Screen name="insights" />
+        <Stack.Screen name="notifications" />
+        <Stack.Screen name="profile" />
+        <Stack.Screen name="settings" />
         <Stack.Screen name="settings/[section]" />
+        <Stack.Screen name="analysis" />
+        <Stack.Screen name="transaction/[id]" />
+        <Stack.Screen name="goal/[id]" />
+        <Stack.Screen name="card/[id]" />
+        <Stack.Screen name="payment/[id]" />
         <Stack.Screen name="(tabs)" />
       </Stack>
     </GestureHandlerRootView>

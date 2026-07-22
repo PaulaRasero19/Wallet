@@ -35,8 +35,9 @@ export default function TabLayout() {
       <Tabs.Screen name="overview" options={{ title: "Inicio" }} />
       <Tabs.Screen name="transactions" options={{ title: "Movimientos" }} />
       <Tabs.Screen name="add" options={{ title: "Agregar" }} />
+      <Tabs.Screen name="plan" options={{ title: "Plan" }} />
       <Tabs.Screen name="ai" options={{ title: "IA" }} />
-      <Tabs.Screen name="settings" options={{ title: "Ajustes" }} />
+      <Tabs.Screen name="settings" options={{ href: null, title: "Ajustes" }} />
       <Tabs.Screen name="planner" options={{ href: null, title: "Plan" }} />
       <Tabs.Screen name="profile" options={{ href: null, title: "Perfil" }} />
     </Tabs>

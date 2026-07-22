@@ -2,12 +2,12 @@ import { useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { BlurView } from "expo-blur";
 import { router } from "expo-router";
-import { ArrowLeftRight, Brain, Camera, CircleDollarSign, Minus, Plus, Settings, Sparkles } from "lucide-react-native";
+import { ArrowLeftRight, Brain, CalendarDays, Camera, CircleDollarSign, Minus, Plus, Sparkles } from "lucide-react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { colors, typography } from "../../theme";
 import { DotGrid } from "../DotGrid";
 
-const routeOrder = ["overview", "transactions", "add", "ai", "settings"];
+const routeOrder = ["overview", "transactions", "add", "plan", "ai"];
 const BAR_COLOR = "rgba(62,62,59,0.84)";
 const ACTIVE_COLOR = "#A44934";
 const INACTIVE_COLOR = "#4F4E49";
@@ -18,15 +18,15 @@ const iconMap = {
   overview: DotGrid,
   transactions: ArrowLeftRight,
   add: Plus,
-  ai: Brain,
-  settings: Settings
+  plan: CalendarDays,
+  ai: Brain
 };
 
 const labelMap: Record<string, string> = {
   add: "Agregar",
   ai: "IA",
   overview: "Inicio",
-  settings: "Ajustes",
+  plan: "Plan",
   transactions: "Movimientos"
 };
 

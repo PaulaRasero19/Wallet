@@ -3,15 +3,31 @@ import { Bell } from "lucide-react-native";
 import { colors, typography } from "../../theme";
 import { UserAvatar } from "../profile/UserAvatar";
 
-export function HomeHeader({ avatarUrl, firstName, fullName }: { avatarUrl?: string | null; firstName: string; fullName?: string | null }) {
+type HomeHeaderProps = {
+  avatarUrl?: string | null;
+  firstName: string;
+  fullName?: string | null;
+  notificationCount?: number;
+  onAvatarPress?: () => void;
+  onNotificationsPress?: () => void;
+};
+
+export function HomeHeader({ avatarUrl, firstName, fullName, notificationCount = 0, onAvatarPress, onNotificationsPress }: HomeHeaderProps) {
+  const badgeLabel = notificationCount > 9 ? "9+" : String(notificationCount);
+
   return (
     <View style={styles.header}>
-      <View style={styles.identity}>
+      <Pressable accessibilityLabel="Abrir perfil y ajustes" accessibilityRole="button" onPress={onAvatarPress} style={styles.identity}>
         <UserAvatar fullName={fullName || firstName} size={40} uri={avatarUrl} />
         <Text style={styles.hello}>Hi {firstName}!</Text>
-      </View>
-      <Pressable accessibilityLabel="Notificaciones" accessibilityRole="button" style={styles.notification}>
+      </Pressable>
+      <Pressable accessibilityLabel="Notificaciones" accessibilityRole="button" onPress={onNotificationsPress} style={styles.notification}>
         <Bell color={colors.white} size={19} strokeWidth={1.8} />
+        {notificationCount > 0 ? (
+          <View style={styles.badge}>
+            <Text style={styles.badgeText}>{badgeLabel}</Text>
+          </View>
+        ) : null}
       </Pressable>
     </View>
   );
@@ -43,5 +59,26 @@ const styles = StyleSheet.create({
     height: 40,
     justifyContent: "center",
     width: 40
+  },
+  badge: {
+    alignItems: "center",
+    backgroundColor: "#E65C50",
+    borderColor: "rgba(255,255,255,0.78)",
+    borderRadius: 8,
+    borderWidth: 1,
+    height: 16,
+    justifyContent: "center",
+    minWidth: 16,
+    paddingHorizontal: 3,
+    position: "absolute",
+    right: -2,
+    top: -2
+  },
+  badgeText: {
+    ...typography.label,
+    color: colors.white,
+    fontSize: 9,
+    fontWeight: "900",
+    lineHeight: 10
   }
 });

@@ -63,6 +63,8 @@ export type Transaction = {
   category_id?: string;
   title?: string;
   note?: string;
+  paymentMethod?: string;
+  payment_method?: string;
   weekday?: string;
   hour?: number;
   isRecurring?: boolean;

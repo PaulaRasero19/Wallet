@@ -52,6 +52,10 @@ export async function fetchTransactions() {
   return (await apiRequest<TransactionsResponse>("/transactions", { requireAuth: true })).transactions;
 }
 
+export async function fetchTransaction(id: string) {
+  return (await apiRequest<TransactionResponse>(`/transactions/${id}`, { requireAuth: true })).transaction;
+}
+
 export async function createTransactionApi(input: {
   accountId: string;
   categoryId: string;
