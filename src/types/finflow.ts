@@ -1,6 +1,6 @@
 import { AccentColor } from "../theme";
 
-export type TransactionType = "income" | "expense" | "transfer";
+export type TransactionType = "income" | "expense" | "transfer" | "refund" | "goal_contribution" | "internal_transfer";
 export type BudgetCategory = "Housing" | "Food" | "Transport" | "Shopping" | "Entertainment" | "Other";
 export type Currency = "UYU" | "USD" | "EUR";
 export type RecurringStatus = "pending" | "confirmed" | "rejected";
@@ -35,6 +35,8 @@ export type Category = {
   translation_key?: string;
   isSystem?: boolean;
   is_system?: boolean;
+  isCustom?: boolean;
+  is_custom?: boolean;
 };
 
 export type Installment = {
@@ -47,6 +49,9 @@ export type Installment = {
 
 export type Transaction = {
   id: string;
+  _id?: string;
+  userId?: string;
+  user_id?: string;
   merchant: string;
   category: BudgetCategory | "Salary" | "Freelance";
   date: string;
@@ -56,6 +61,9 @@ export type Transaction = {
   raw_amount?: number;
   currency: Currency;
   type: TransactionType;
+  status?: "completed" | "received" | "paid" | "pending" | "cancelled" | "deleted";
+  transactionStatus?: "completed" | "received" | "paid" | "pending" | "cancelled" | "deleted";
+  transaction_status?: "completed" | "received" | "paid" | "pending" | "cancelled" | "deleted";
   accent: AccentColor;
   accountId?: string;
   account_id?: string;
@@ -63,6 +71,8 @@ export type Transaction = {
   to_account_id?: string;
   transferGroupId?: string;
   transfer_group_id?: string;
+  relatedTransactionId?: string;
+  related_transaction_id?: string;
   categoryId?: string;
   category_id?: string;
   title?: string;
@@ -76,6 +86,10 @@ export type Transaction = {
   isAntExpense?: boolean;
   is_ant_expense?: boolean;
   installment?: Installment;
+  scheduledPaymentId?: string;
+  scheduled_payment_id?: string;
+  receiptUrl?: string;
+  receipt_url?: string;
 };
 
 export type DailyHistoryPoint = {
@@ -141,6 +155,8 @@ export type RecurringPayment = {
   confidence: number;
   priceChange?: number;
   duplicateGroup?: string;
+  lastTransactionId?: string;
+  last_transaction_id?: string;
 };
 
 export type InstallmentPurchase = {

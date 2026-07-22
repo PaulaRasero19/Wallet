@@ -1,4 +1,5 @@
 import { Account, CreditCard, Currency, DashboardOverview, Goal, PlannerEvent, RecurringPayment, Transaction } from "../types/finflow";
+import { calculateMovementSummary } from "./movementSummary";
 
 export function positiveAmount(transaction: Transaction) {
   return Math.abs(Number(transaction.raw_amount ?? transaction.rawAmount ?? transaction.amount ?? 0));
@@ -36,10 +37,11 @@ export function daysUntilNextPayday(payday?: number | null) {
 
 export function monthlyCommitted(recurringPayments: RecurringPayment[], installments: Transaction[]) {
   const recurring = recurringPayments
-    .filter((payment) => payment.status !== "rejected")
+    .filter((payment) => payment.status === "pending" || payment.status === "confirmed")
     .reduce((total, payment) => total + Number(payment.amount || 0), 0);
-  const installmentTotal = installments.reduce((total, transaction) => total + Number(transaction.installment?.amountPerInstallment || 0), 0);
-  return recurring + installmentTotal;
+  // Transaction installments are already-paid movements; future installments
+  // live in InstallmentPurchase and must not be committed a second time here.
+  return recurring;
 }
 
 export function getInstallments(transactions: Transaction[]) {
@@ -98,15 +100,17 @@ export function overviewMetrics(input: {
   transactions: Transaction[];
   monthlyIncome: number;
 }) {
+  const monthly = calculateMovementSummary({ transactions: input.transactions });
+  const completedMonthlyTransactions = [...monthly.includedExpenses, ...monthly.includedIncome, ...monthly.includedRefunds];
   const installments = getInstallments(input.transactions);
   const committed = monthlyCommitted(input.recurringPayments, installments);
   const grossAvailable = sumAccounts(input.accounts, input.primaryCurrency);
-  const available = grossAvailable - committed;
+  const available = monthly.balance;
   const nextPayday = daysUntilNextPayday(input.payday);
   const dailyLimit = Math.max(0, available / nextPayday.days);
-  const expenses = Number(input.overview?.expenses || sumExpenses(input.transactions));
-  const income = Number(input.overview?.income || sumIncome(input.transactions));
-  const antTotal = Number(input.overview?.ant_expense_total || input.overview?.antExpenseTotal || getAntExpenses(input.transactions).reduce((sum, item) => sum + positiveAmount(item), 0));
+  const expenses = monthly.netExpenses;
+  const income = monthly.actualIncome;
+  const antTotal = getAntExpenses(completedMonthlyTransactions).reduce((sum, item) => sum + positiveAmount(item), 0);
   const salarySpentPercent = percentage(expenses, input.monthlyIncome || income);
   const goal = input.goals[0];
 

@@ -3,15 +3,45 @@ import { Account } from "../models/Account";
 import { Category } from "../models/Category";
 import { FinancialProfile } from "../models/FinancialProfile";
 import { Transaction } from "../models/Transaction";
+import { User } from "../models/User";
 import { AppError } from "../utils/appError";
 import { essentialAntExpenseCategoryKeys } from "./categorySeedService";
 import { accountDTO, transactionDTO } from "./serializers";
 
 type TransactionInput = Record<string, unknown>;
 
-function impact(type: "income" | "expense" | "transfer", amount: number) {
+function monthBounds(date: Date) {
+  return { start: new Date(date.getFullYear(), date.getMonth(), 1), end: new Date(date.getFullYear(), date.getMonth() + 1, 1) };
+}
+
+function uyu(value: number) {
+  return `$U ${value.toLocaleString("es-UY", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+export async function validateExpenseAgainstAvailableBalance({ userId, amount, transactionIdToExclude, date = new Date() }: { userId: Types.ObjectId; amount: number; transactionIdToExclude?: string; date?: Date }) {
+  const user = await User.findById(userId);
+  const sampleEmails: string[] = [String(process.env.SAMPLE_USER_EMAIL || "").trim().toLowerCase(), "usuario@gmail.com", "ejemplo@gmail.com"].filter(Boolean);
+  if (!user || (!user.isDemo && !sampleEmails.includes(String(user.email)))) return { allowed: true, available: Number.POSITIVE_INFINITY, exceedsBy: 0 };
+  const { start, end } = monthBounds(date);
+  const query: Record<string, unknown> = { userId, date: { $gte: start, $lt: end } };
+  if (transactionIdToExclude) query._id = { $ne: new Types.ObjectId(transactionIdToExclude) };
+  const transactions = await Transaction.find(query);
+  const completedIncome = transactions.filter((item) => item.type === "income" && (item.status === "completed" || item.status === "received")).reduce((sum, item) => sum + item.amount, 0);
+  const grossCompletedExpenses = transactions.filter((item) => item.type === "expense" && (item.status === "completed" || item.status === "paid")).reduce((sum, item) => sum + item.amount, 0);
+  const completedRefunds = transactions.filter((item) => item.type === "refund" && (item.status === "completed" || item.status === "received")).reduce((sum, item) => sum + item.amount, 0);
+  const netCompletedExpenses = Math.max(0, grossCompletedExpenses - completedRefunds);
+  const available = completedIncome - netCompletedExpenses;
+  const exceedsBy = amount - available;
+  if (exceedsBy > 0) {
+    throw new AppError(`No tenés saldo suficiente para registrar este gasto. Disponible: ${uyu(available)}. Supera tu disponible por ${uyu(exceedsBy)}.`, 409, "INSUFFICIENT_AVAILABLE_BALANCE");
+  }
+  return { allowed: true, available, exceedsBy: 0 };
+}
+
+function impact(type: "income" | "expense" | "transfer" | "refund" | "goal_contribution" | "internal_transfer", amount: number) {
   if (type === "income") return amount;
-  if (type === "expense") return -amount;
+  if (type === "refund") return amount;
+  if (type === "expense" || type === "goal_contribution") return -amount;
   return 0;
 }
 
@@ -19,13 +49,13 @@ function normalizeTransaction(input: TransactionInput) {
   return {
     accountId: String(input.accountId || input.account_id),
     categoryId: input.categoryId || input.category_id ? String(input.categoryId || input.category_id) : "",
-    type: input.type as "income" | "expense" | "transfer",
+    type: input.type as "income" | "expense" | "transfer" | "refund" | "goal_contribution" | "internal_transfer",
     title: String(input.title || ""),
-    merchant: String(input.merchant || input.title || ""),
+    merchant: String(input.merchant || ""),
     amount: Math.abs(Number(input.amount)),
     currency: input.currency as "UYU" | "USD" | "EUR",
     date: new Date(String(input.date || new Date().toISOString())),
-    note: String(input.note || ""),
+    note: input.note ? String(input.note) : null,
     paymentMethod: String(input.paymentMethod || input.payment_method || ""),
     isRecurring: Boolean(input.isRecurring ?? input.is_recurring ?? false),
     isAntExpense: input.isAntExpense ?? input.is_ant_expense,
@@ -37,7 +67,9 @@ function normalizeTransaction(input: TransactionInput) {
           remainingAmount?: number;
           nextDueDate?: string;
         }
-      | undefined
+      | undefined,
+    scheduledPaymentId: input.scheduledPaymentId || input.scheduled_payment_id ? String(input.scheduledPaymentId || input.scheduled_payment_id) : null,
+    receiptUrl: input.receiptUrl || input.receipt_url ? String(input.receiptUrl || input.receipt_url) : null
   };
 }
 
@@ -49,10 +81,11 @@ async function assertAccount(userId: Types.ObjectId, accountId: string) {
   return account;
 }
 
-async function assertCategory(userId: Types.ObjectId, categoryId: string, type: "income" | "expense") {
+async function assertCategory(userId: Types.ObjectId, categoryId: string, type: "income" | "expense" | "refund" | "goal_contribution" | "internal_transfer" | "transfer") {
+  const categoryType = type === "income" || type === "refund" ? "income" : "expense";
   const category = await Category.findOne({
     _id: categoryId,
-    type,
+    type: categoryType,
     isActive: true,
     $or: [{ isSystem: true, userId: null }, { userId }]
   });
@@ -64,14 +97,24 @@ async function assertCategory(userId: Types.ObjectId, categoryId: string, type: 
   return category;
 }
 
-async function shouldBeAntExpense(userId: Types.ObjectId, categoryId: string, type: "income" | "expense", amount: number) {
+async function shouldBeAntExpense(userId: Types.ObjectId, categoryId: string, type: "income" | "expense" | "refund" | "goal_contribution" | "internal_transfer" | "transfer", amount: number, merchant = "") {
   if (type !== "expense") return false;
 
   const [profile, category] = await Promise.all([FinancialProfile.findOne({ userId }), Category.findById(categoryId)]);
   if (!profile || !category) return false;
   if (essentialAntExpenseCategoryKeys.has(category.translationKey)) return false;
-
-  return amount <= profile.antExpenseThreshold;
+  if (amount > profile.antExpenseThreshold) return false;
+  const since = new Date();
+  since.setDate(since.getDate() - 45);
+  const similarCount = await Transaction.countDocuments({
+    userId,
+    type: "expense",
+    status: { $in: ["completed", "paid"] },
+    date: { $gte: since },
+    $or: [{ categoryId }, ...(merchant ? [{ merchant: { $regex: `^${merchant.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, $options: "i" } }] : [])]
+  });
+  const nonEssential = ["expense.food", "expense.delivery", "expense.entertainment", "expense.shopping", "expense.subscriptions"].includes(category.translationKey);
+  return nonEssential || similarCount >= 2;
 }
 
 export async function listTransactions(userId: Types.ObjectId, filters: Record<string, unknown>) {
@@ -105,6 +148,7 @@ export async function listTransactions(userId: Types.ObjectId, filters: Record<s
 
   const [items, total] = await Promise.all([
     Transaction.find(query)
+      .populate("categoryId")
       .sort(sortMap[String(filters.sort || "date_desc")])
       .skip((page - 1) * limit)
       .limit(limit),
@@ -112,7 +156,7 @@ export async function listTransactions(userId: Types.ObjectId, filters: Record<s
   ]);
 
   return {
-    transactions: items.map(transactionDTO),
+    transactions: items.map((transaction) => transactionDTO(transaction, { category: transaction.categoryId as unknown as InstanceType<typeof Category> })),
     pagination: { page, limit, total, pages: Math.ceil(total / limit) }
   };
 }
@@ -124,12 +168,13 @@ export async function createTransaction(userId: Types.ObjectId, input: Transacti
   }
   const account = await assertAccount(userId, data.accountId);
   const category = await assertCategory(userId, data.categoryId, data.type);
+  if (data.type === "expense") await validateExpenseAgainstAvailableBalance({ userId, amount: data.amount, date: data.date });
 
   if (account.currency !== data.currency) {
     throw new AppError("La moneda del movimiento debe coincidir con la cuenta.", 400, "CURRENCY_MISMATCH");
   }
 
-  const isAntExpense = typeof data.isAntExpense === "boolean" ? data.isAntExpense : await shouldBeAntExpense(userId, data.categoryId, data.type, data.amount);
+  const isAntExpense = typeof data.isAntExpense === "boolean" ? data.isAntExpense : await shouldBeAntExpense(userId, data.categoryId, data.type, data.amount, data.merchant || data.title);
 
   const session = await mongoose.startSession();
   let transaction;
@@ -151,7 +196,9 @@ export async function createTransaction(userId: Types.ObjectId, input: Transacti
             paymentMethod: data.paymentMethod,
             isRecurring: data.isRecurring,
             isAntExpense,
-            installment: data.installment
+            installment: data.installment,
+            scheduledPaymentId: data.scheduledPaymentId,
+            receiptUrl: data.receiptUrl
           }
         ],
         { session }
@@ -163,7 +210,7 @@ export async function createTransaction(userId: Types.ObjectId, input: Transacti
     await session.endSession();
   }
 
-  return { transaction: transactionDTO(transaction!), account: accountDTO(account) };
+  return { transaction: transactionDTO(transaction!, { category }), account: accountDTO(account) };
 }
 
 export async function createTransfer(userId: Types.ObjectId, input: TransactionInput) {
@@ -227,9 +274,9 @@ export async function createTransfer(userId: Types.ObjectId, input: TransactionI
 }
 
 export async function getTransaction(userId: Types.ObjectId, id: string) {
-  const transaction = await Transaction.findOne({ _id: id, userId });
+  const transaction = await Transaction.findOne({ _id: id, userId }).populate("categoryId");
   if (!transaction) throw new AppError("Movimiento no encontrado.", 404, "TRANSACTION_NOT_FOUND");
-  return transactionDTO(transaction);
+  return transactionDTO(transaction, { category: transaction.categoryId as unknown as InstanceType<typeof Category> });
 }
 
 export async function updateTransaction(userId: Types.ObjectId, id: string, input: TransactionInput) {
@@ -243,6 +290,7 @@ export async function updateTransaction(userId: Types.ObjectId, id: string, inpu
     throw new AppError("Las transferencias se editan desde el flujo de transferencia.", 400, "TRANSFER_EDIT_UNSUPPORTED");
   }
   const category = await assertCategory(userId, String(next.categoryId), next.type);
+  if (next.type === "expense") await validateExpenseAgainstAvailableBalance({ userId, amount: next.amount, transactionIdToExclude: id, date: next.date });
 
   if (newAccount.currency !== next.currency) {
     throw new AppError("La moneda del movimiento debe coincidir con la cuenta.", 400, "CURRENCY_MISMATCH");
@@ -251,7 +299,7 @@ export async function updateTransaction(userId: Types.ObjectId, id: string, inpu
   const isAntExpense =
     typeof input.isAntExpense === "boolean" || typeof input.is_ant_expense === "boolean"
       ? Boolean(input.isAntExpense ?? input.is_ant_expense)
-      : await shouldBeAntExpense(userId, String(next.categoryId), next.type, next.amount);
+      : await shouldBeAntExpense(userId, String(next.categoryId), next.type, next.amount, next.merchant || next.title);
 
   const session = await mongoose.startSession();
   try {
@@ -274,13 +322,15 @@ export async function updateTransaction(userId: Types.ObjectId, id: string, inpu
       existing.isRecurring = next.isRecurring;
       existing.isAntExpense = isAntExpense;
       existing.installment = next.installment || null;
+      existing.scheduledPaymentId = next.scheduledPaymentId ? new Types.ObjectId(next.scheduledPaymentId) : null;
+      existing.receiptUrl = next.receiptUrl || null;
       await existing.save({ session });
     });
   } finally {
     await session.endSession();
   }
 
-  return { transaction: transactionDTO(existing), account: accountDTO(newAccount) };
+  return { transaction: transactionDTO(existing, { category }), account: accountDTO(newAccount) };
 }
 
 export async function deleteTransaction(userId: Types.ObjectId, id: string) {

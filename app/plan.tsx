@@ -9,6 +9,7 @@ import { useSessionStore } from "../src/store/useSessionStore";
 import { colors, spacing, typography } from "../src/theme";
 import { Currency, Goal, InstallmentPurchase, PlannerEvent, RecurringPayment, Transaction } from "../src/types/finflow";
 import { categorySummary, positiveAmount } from "../src/utils/financeInsights";
+import { calculateMovementSummary } from "../src/utils/movementSummary";
 import { formatMoney, percentage } from "../src/utils/money";
 
 const tabs = ["Resumen", "Metas", "Calendario"] as const;
@@ -44,10 +45,10 @@ export default function Plan() {
   const profile = useSessionStore((state) => state.profile);
   const currency: Currency = profile?.primary_currency || "UYU";
   const monthlyIncome = Number(profile?.monthly_income || 0);
-  const categories = useMemo(() => categorySummary(transactions).slice(0, 6), [transactions]);
   const currentMonth = new Date();
-  const additionalIncome = transactions.filter((transaction) => transaction.type === "income" && isSameMonth(transaction.date, currentMonth)).reduce((sum, transaction) => sum + positiveAmount(transaction), 0);
-  const expectedIncome = monthlyIncome + additionalIncome;
+  const monthlySummary = calculateMovementSummary({ selectedMonth: currentMonth, transactions });
+  const categories = useMemo(() => categorySummary(monthlySummary.includedExpenses).slice(0, 6), [monthlySummary.includedExpenses]);
+  const expectedIncome = monthlySummary.actualIncome || monthlyIncome;
   const fixedExpenses = recurringPayments.filter((payment) => payment.status !== "rejected" && payment.active !== false && isSameMonth(payment.nextChargeDate, currentMonth)).reduce((sum, payment) => sum + Number(payment.amount || 0), 0);
   const installmentMonthly = installmentPurchases.reduce((sum, purchase) => sum + purchase.installments.filter((installment) => installment.status === "pending" && isSameMonth(installment.dueDate, currentMonth)).reduce((total, installment) => total + Number(installment.amount || 0), 0), 0);
   const savingsTarget = goals.filter((goal) => (goal as any).status !== "completed").reduce((sum, goal) => sum + Number(goal.monthlyContribution || (goal as any).monthly_contribution || 0), 0);

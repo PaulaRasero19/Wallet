@@ -24,6 +24,12 @@ function balanceImpact(type: string, amount: number) {
   return 0;
 }
 
+function isCompletedFinancialTransaction(transaction: InstanceType<typeof Transaction>) {
+  if (transaction.type === "income") return transaction.status === "completed" || transaction.status === "received";
+  if (transaction.type === "expense") return transaction.status === "completed" || transaction.status === "paid";
+  return false;
+}
+
 export async function getOverview(userId: Types.ObjectId, period = "30d") {
   let days = periodDays[period] || 30;
   const from = new Date();
@@ -43,7 +49,7 @@ export async function getOverview(userId: Types.ObjectId, period = "30d") {
     days = Math.max(1, Math.round((today.getTime() - from.getTime()) / 86400000) + 1);
   }
 
-  const periodTransactions = transactions.filter((transaction) => transaction.date >= from);
+  const periodTransactions = transactions.filter((transaction) => transaction.date >= from && isCompletedFinancialTransaction(transaction));
   const recentTransactions = [...periodTransactions].slice(-100).reverse();
 
   const totalByCurrency = accounts.reduce<Record<string, number>>((acc, account) => {
@@ -68,11 +74,11 @@ export async function getOverview(userId: Types.ObjectId, period = "30d") {
     const date = new Date(from);
     date.setDate(from.getDate() + index);
     const key = dayKey(date);
-    const daily = transactions.filter((item) => dayKey(item.date) === key);
+    const daily = transactions.filter((item) => isCompletedFinancialTransaction(item) && dayKey(item.date) === key);
     const dailyIncome = daily.filter((item) => item.type === "income").reduce((total, item) => total + item.amount, 0);
     const dailyExpenses = daily.filter((item) => item.type === "expense").reduce((total, item) => total + item.amount, 0);
     const closingBalance = transactions
-      .filter((item) => item.date <= date)
+      .filter((item) => isCompletedFinancialTransaction(item) && item.date <= date)
       .reduce((total, item) => total + balanceImpact(item.type, item.amount), 0);
 
     return { date: key, income: dailyIncome, expenses: dailyExpenses, closingBalance };

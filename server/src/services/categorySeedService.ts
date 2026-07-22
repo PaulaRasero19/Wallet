@@ -21,6 +21,8 @@ const systemCategories = [
   ["expense.health", "salud", "expense", "heart", "lime"],
   ["expense.education", "educación", "expense", "book", "black"],
   ["expense.shopping", "compras", "expense", "bag", "orange"],
+  ["expense.pet", "mascota", "expense", "paw-print", "lime"],
+  ["expense.sport", "deporte", "expense", "dumbbell", "blue"],
   ["expense.entertainment", "entretenimiento", "expense", "ticket", "purple"],
   ["expense.subscriptions", "suscripciones", "expense", "refresh-cw", "purple"],
   ["expense.savings", "ahorro", "expense", "piggy-bank", "lime"],

@@ -12,13 +12,15 @@ export const createTransactionSchema = z.object({
   amount: z.coerce.number().positive("El importe debe ser mayor a cero."),
   currency: currencySchema,
   date: z.coerce.date(),
-  note: z.string().trim().optional().default(""),
+  note: z.string().trim().min(1).optional(),
   paymentMethod: z.string().trim().optional().default(""),
   payment_method: z.string().trim().optional(),
   isRecurring: z.boolean().optional().default(false),
   is_recurring: z.boolean().optional(),
   isAntExpense: z.boolean().optional(),
   is_ant_expense: z.boolean().optional(),
+  scheduledPaymentId: objectIdSchema.optional(),
+  receiptUrl: z.string().trim().optional(),
   installment: z
     .object({
       current: z.coerce.number().int().min(1).optional(),

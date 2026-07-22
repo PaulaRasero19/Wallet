@@ -9,6 +9,7 @@ import { PlannerEvent } from "../models/PlannerEvent";
 import { RecurringPayment } from "../models/RecurringPayment";
 import { Transaction } from "../models/Transaction";
 import { AppError } from "../utils/appError";
+import { validateExpenseAgainstAvailableBalance } from "./transactionService";
 
 function idOf(value: unknown) {
   return value && typeof value === "object" && "toString" in value ? value.toString() : String(value || "");
@@ -44,6 +45,8 @@ function paymentDTO(payment: InstanceType<typeof RecurringPayment>) {
     reminder_days_before: payment.reminderDaysBefore,
     active: payment.active,
     status: payment.status,
+    lastTransactionId: idOf(payment.lastTransactionId),
+    last_transaction_id: idOf(payment.lastTransactionId),
     kind: payment.kind,
     confidence: payment.confidence,
     priceChange: payment.priceChange,
@@ -208,6 +211,7 @@ export async function createRecurringPayment(userId: Types.ObjectId, input: Reco
     nextChargeDate: input.nextChargeDate,
     reminderDaysBefore: input.reminderDaysBefore ?? 3,
     accountId: input.accountId || null,
+    categoryId: input.categoryId || null,
     active: true,
     status: "pending",
     kind: input.kind || "service",
@@ -216,7 +220,7 @@ export async function createRecurringPayment(userId: Types.ObjectId, input: Reco
     duplicateGroup: null
   });
 
-  await createReminderNotification({
+  if (input.notificationsEnabled !== false) await createReminderNotification({
     dueDate: payment.nextChargeDate,
     message: `${payment.merchant} por ${payment.amount.toLocaleString("es-UY")} vence el ${payment.nextChargeDate.toLocaleDateString("es-UY")}.`,
     relatedEntityId: payment._id,
@@ -289,10 +293,10 @@ export async function createInstallmentPurchase(userId: Types.ObjectId, input: R
   return installmentPurchaseDTO(purchase);
 }
 
-async function accountAndCategory(userId: Types.ObjectId, accountId: Types.ObjectId | null, categoryName: string) {
+async function accountAndCategory(userId: Types.ObjectId, accountId: Types.ObjectId | null, categoryName: string, categoryId?: Types.ObjectId | null) {
   const account = accountId ? await Account.findOne({ _id: accountId, userId, isActive: true }) : await Account.findOne({ userId, isActive: true });
   if (!account) throw new AppError("Necesitás una cuenta para registrar el gasto.", 400, "ACCOUNT_REQUIRED");
-  const category = await Category.findOne({ type: "expense", isActive: true, $or: [{ userId }, { isSystem: true, userId: null }], name: { $regex: categoryName, $options: "i" } })
+  const category = categoryId ? await Category.findOne({ _id: categoryId, type: "expense", isActive: true, $or: [{ userId }, { isSystem: true, userId: null }] }) : await Category.findOne({ type: "expense", isActive: true, $or: [{ userId }, { isSystem: true, userId: null }], name: { $regex: categoryName, $options: "i" } })
     || await Category.findOne({ type: "expense", isActive: true, $or: [{ userId }, { isSystem: true, userId: null }] });
   if (!category) throw new AppError("No hay categoría de gasto disponible.", 400, "CATEGORY_REQUIRED");
   return { account, category };
@@ -301,7 +305,24 @@ async function accountAndCategory(userId: Types.ObjectId, accountId: Types.Objec
 export async function markRecurringPaymentPaid(userId: Types.ObjectId, id: string) {
   const payment = await RecurringPayment.findOne({ _id: id, userId });
   if (!payment) throw new AppError("Pago programado no encontrado.", 404, "PAYMENT_NOT_FOUND");
-  const { account, category } = await accountAndCategory(userId, payment.accountId as Types.ObjectId | null, payment.category);
+  if (payment.lastTransactionId && payment.lastPaidAt && Date.now() - payment.lastPaidAt.getTime() < 60_000) {
+    return { payment: paymentDTO(payment), transactionId: idOf(payment.lastTransactionId) };
+  }
+  const { account, category } = await accountAndCategory(userId, payment.accountId as Types.ObjectId | null, payment.category, payment.categoryId as Types.ObjectId | null);
+  await validateExpenseAgainstAvailableBalance({ userId, amount: payment.amount, date: payment.nextChargeDate });
+  const existingTransaction = await Transaction.findOne({
+    userId,
+    accountId: account._id,
+    type: "expense",
+    merchant: payment.merchant,
+    amount: payment.amount,
+    currency: payment.currency,
+    date: payment.nextChargeDate,
+    note: "Pago programado marcado como pagado."
+  });
+  if (existingTransaction) {
+    return { payment: paymentDTO(payment), transactionId: idOf(existingTransaction._id) };
+  }
   const transaction = await Transaction.create({
     userId,
     accountId: account._id,
@@ -315,11 +336,13 @@ export async function markRecurringPaymentPaid(userId: Types.ObjectId, id: strin
     note: "Pago programado marcado como pagado.",
     paymentMethod: account.type,
     isRecurring: payment.frequency !== "once",
-    isAntExpense: false
+    isAntExpense: false,
+    scheduledPaymentId: payment._id
   });
   account.currentBalance -= payment.amount;
   await account.save();
   payment.lastPaidAt = new Date();
+  payment.lastTransactionId = transaction._id;
   payment.status = payment.frequency === "once" ? "paid" : "pending";
   payment.active = payment.frequency !== "once";
   if (payment.frequency === "monthly") payment.nextChargeDate = addMonths(payment.nextChargeDate, 1);
@@ -351,8 +374,10 @@ export async function markInstallmentPaid(userId: Types.ObjectId, purchaseId: st
   if (!purchase) throw new AppError("Compra en cuotas no encontrada.", 404, "INSTALLMENT_PURCHASE_NOT_FOUND");
   const installment = purchase.installments.id(installmentId);
   if (!installment) throw new AppError("Cuota no encontrada.", 404, "INSTALLMENT_NOT_FOUND");
+  if (installment.transactionId) return installmentPurchaseDTO(purchase);
   if (installment.status === "paid") return installmentPurchaseDTO(purchase);
   const { account, category } = await accountAndCategory(userId, purchase.accountId as Types.ObjectId | null, purchase.category);
+  await validateExpenseAgainstAvailableBalance({ userId, amount: installment.amount, date: installment.dueDate });
   const transaction = await Transaction.create({
     userId,
     accountId: account._id,

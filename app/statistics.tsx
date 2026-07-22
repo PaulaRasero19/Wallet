@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
+import { BookOpen, Circle, Heart, Home, PawPrint, ShoppingBag, Ticket, TramFront, Utensils, Zap } from "lucide-react-native";
 import { Header } from "../src/components/Header";
 import { InsightMetric } from "../src/components/InsightMetric";
 import { ScreenContainer } from "../src/components/ScreenContainer";
@@ -9,13 +10,14 @@ import { useSessionStore } from "../src/store/useSessionStore";
 import { colors, spacing, typography } from "../src/theme";
 import { categorySummary, getInstallments, overviewMetrics, percentage, positiveAmount } from "../src/utils/financeInsights";
 import { formatMoney } from "../src/utils/money";
+import { calculateMovementSummary } from "../src/utils/movementSummary";
 
 const tabs = ["Resumen", "Categorías", "Tendencias", "Tarjetas"] as const;
 type Tab = (typeof tabs)[number];
 
 export default function Statistics() {
   const [tab, setTab] = useState<Tab>("Resumen");
-  const { accounts, creditCards, events, goals, loadOverview, overview, recurringPayments, transactions } = useFinFlowStore();
+  const { accounts, categories: availableCategories, creditCards, events, goals, loadCategories, loadOverview, overview, recurringPayments, transactions } = useFinFlowStore();
   const profile = useSessionStore((state) => state.profile);
   const primaryCurrency = profile?.primary_currency || "UYU";
   const metrics = overviewMetrics({
@@ -30,15 +32,17 @@ export default function Statistics() {
     transactions,
     monthlyIncome: Number(profile?.monthly_income || 0)
   });
-  const categories = useMemo(() => categorySummary(transactions), [transactions]);
+  const monthlySummary = calculateMovementSummary({ transactions });
+  const categories = useMemo(() => categorySummary(monthlySummary.includedExpenses), [monthlySummary.includedExpenses]);
   const fixed = recurringPayments.reduce((sum, payment) => sum + Number(payment.amount || 0), 0);
   const variable = Math.max(0, metrics.expenses - fixed);
   const savedPercent = metrics.goal ? percentage(metrics.goal.saved, metrics.goal.target) : 0;
   const installments = getInstallments(transactions);
 
   useEffect(() => {
+    void loadCategories();
     void loadOverview("6m");
-  }, [loadOverview]);
+  }, [loadCategories, loadOverview]);
 
   return (
     <ScreenContainer>
@@ -65,7 +69,8 @@ export default function Statistics() {
         <View style={styles.section}>
           {categories.length === 0 ? <Text style={styles.empty}>No hay gastos para distribuir todavía.</Text> : null}
           {categories.slice(0, 8).map((category) => (
-            <View key={category.name} style={styles.row}>
+              <View key={category.name} style={styles.row}>
+              <CategoryMark category={availableCategories.find((item) => item.name.toLocaleLowerCase("es-UY") === category.name.toLocaleLowerCase("es-UY"))} />
               <View style={styles.rowMain}>
                 <Text style={styles.rowTitle}>{category.name}</Text>
                 <Text style={styles.rowMeta}>{category.count} movimientos · {category.percent}% del gasto</Text>
@@ -106,6 +111,13 @@ export default function Statistics() {
       ) : null}
     </ScreenContainer>
   );
+}
+
+function CategoryMark({ category }: { category?: { icon?: string; color?: string } }) {
+  const icons: Record<string, typeof Circle> = { book: BookOpen, heart: Heart, home: Home, paw: PawPrint, "paw-print": PawPrint, "shopping-bag": ShoppingBag, bag: ShoppingBag, ticket: Ticket, "tram-front": TramFront, bus: TramFront, "bus-front": TramFront, utensils: Utensils, zap: Zap };
+  const palette: Record<string, string> = { lime: colors.lime, blue: colors.blue, orange: colors.orange, purple: colors.lavender, gray: colors.grayMedium, black: colors.white };
+  const Icon = icons[String(category?.icon || "")] || Circle;
+  return <Icon color={palette[String(category?.color || "")] || colors.white} size={18} />;
 }
 
 const styles = StyleSheet.create({

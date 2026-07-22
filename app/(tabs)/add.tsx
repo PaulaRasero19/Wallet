@@ -1,13 +1,14 @@
 import { useEffect, useMemo, useState } from "react";
-import { Alert, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { Alert, Modal, Pressable, StyleSheet, Switch, Text, TextInput, View } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
-import { Bell, Brain, CreditCard, Minus, PiggyBank, Plus } from "lucide-react-native";
+import * as DocumentPicker from "expo-document-picker";
+import { Bell, BookOpen, Brain, Circle, CreditCard, Heart, Home, Minus, PawPrint, PiggyBank, Plus, Receipt, ShoppingBag, Ticket, TramFront, Utensils, Zap } from "lucide-react-native";
 import { Header } from "../../src/components/Header";
 import { PrimaryButton } from "../../src/components/PrimaryButton";
 import { ScreenContainer } from "../../src/components/ScreenContainer";
 import { useFinFlowStore } from "../../src/store/useFinFlowStore";
 import { useSessionStore } from "../../src/store/useSessionStore";
-import { scheduleLocalPaymentNotifications } from "../../src/services/notificationsService";
+import { requestPaymentNotificationPermission, scheduleLocalPaymentNotifications } from "../../src/services/notificationsService";
 import { colors, spacing, typography } from "../../src/theme";
 import { Category, Currency } from "../../src/types/finflow";
 import { formatMoney } from "../../src/utils/money";
@@ -17,6 +18,9 @@ const frequentExpenseLabels = ["Comida", "Transporte", "Compras", "Servicios"];
 const incomeSources = ["Sueldo", "Freelance", "Devolución", "Transferencia recibida", "Otro"];
 const frequencies = ["once", "monthly", "annual"] as const;
 const reminders = [0, 1, 3, 7] as const;
+const recurrenceFrequencies = ["weekly", "monthly", "annual"] as const;
+const categoryIcons = ["utensils", "shopping-bag", "tram-front", "home", "zap", "heart", "ticket", "book", "paw"] as const;
+const categoryColors = ["lime", "blue", "orange", "purple", "gray"] as const;
 
 function todayInput() {
   return new Date().toISOString().slice(0, 10);
@@ -26,13 +30,21 @@ function toIsoDate(value: string) {
   return value ? new Date(`${value}T12:00:00`).toISOString() : new Date().toISOString();
 }
 
-function dateOptions(days = 35) {
+function dateOptions(daysBefore = 90, daysAfter = 35) {
   const today = new Date();
-  return Array.from({ length: days }, (_, index) => {
+  return Array.from({ length: daysBefore + daysAfter + 1 }, (_, index) => {
     const date = new Date(today);
-    date.setDate(today.getDate() + index);
+    date.setDate(today.getDate() + index - daysBefore);
     return date.toISOString().slice(0, 10);
   });
+}
+
+function nextDate(value: string, frequency: (typeof recurrenceFrequencies)[number]) {
+  const next = new Date(`${value}T12:00:00`);
+  if (frequency === "weekly") next.setDate(next.getDate() + 7);
+  if (frequency === "monthly") next.setMonth(next.getMonth() + 1);
+  if (frequency === "annual") next.setFullYear(next.getFullYear() + 1);
+  return next.toISOString().slice(0, 10);
 }
 
 function amountValue(value: string) {
@@ -52,7 +64,7 @@ function chooseCategory(categories: Category[], type: "income" | "expense", labe
 export default function Add() {
   const params = useLocalSearchParams<{ type?: "income" | "expense"; mode?: string }>();
   const profile = useSessionStore((state) => state.profile);
-  const { accounts, categories, createGoal, createInstallmentPurchase, createRecurringPayment, createTransaction, loadAccounts, loadCategories, loading } = useFinFlowStore();
+  const { accounts, categories, createCategory, createGoal, createInstallmentPurchase, createRecurringPayment, createTransaction, loadAccounts, loadCategories, loading, updateTransaction } = useFinFlowStore();
   const [mode, setMode] = useState<Mode>(
     params.mode === "installment" || params.mode === "ai" ? params.mode : params.type === "income" ? "income" : params.type === "expense" ? "expense" : "menu"
   );
@@ -60,13 +72,21 @@ export default function Add() {
   const [merchant, setMerchant] = useState("");
   const [note, setNote] = useState("");
   const [date, setDate] = useState(todayInput());
-  const [time, setTime] = useState("");
   const [accountId, setAccountId] = useState("");
   const [categoryId, setCategoryId] = useState("");
   const [showAllCategories, setShowAllCategories] = useState(false);
-  const [moreOpen, setMoreOpen] = useState(false);
   const [recurring, setRecurring] = useState(false);
-  const [antExpense, setAntExpense] = useState(false);
+  const [recurrenceFrequency, setRecurrenceFrequency] = useState<(typeof recurrenceFrequencies)[number]>("monthly");
+  const [nextDueDate, setNextDueDate] = useState(nextDate(todayInput(), "monthly"));
+  const [reminderEnabled, setReminderEnabled] = useState(true);
+  const [receiptUrl, setReceiptUrl] = useState("");
+  const [receiptName, setReceiptName] = useState("");
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [submitting, setSubmitting] = useState(false);
+  const [categoryModalOpen, setCategoryModalOpen] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState("");
+  const [newCategoryIcon, setNewCategoryIcon] = useState<(typeof categoryIcons)[number]>("utensils");
+  const [newCategoryColor, setNewCategoryColor] = useState<(typeof categoryColors)[number]>("lime");
   const [installments, setInstallments] = useState("3");
   const [firstInstallmentDate, setFirstInstallmentDate] = useState(todayInput());
   const [frequency, setFrequency] = useState<(typeof frequencies)[number]>("monthly");
@@ -106,44 +126,108 @@ export default function Add() {
     setMerchant("");
     setNote("");
     setDate(todayInput());
-    setTime("");
-    setMoreOpen(false);
+    setErrors({});
+    setRecurring(false);
+    setReceiptUrl("");
+    setReceiptName("");
     setProposal(null);
   }
 
   async function saveMovement(type: "income" | "expense") {
+    if (loading || submitting) return;
     const category = categories.find((item) => item.id === categoryId) || chooseCategory(categories, type, merchant);
     const value = amountValue(amount);
-    if (!value || value < 0) {
-      Alert.alert("FinFlow", "Ingresá un monto válido.");
-      return;
-    }
-    if (!accountId || !category) {
-      Alert.alert("FinFlow", "Necesitás seleccionar cuenta y categoría.");
-      return;
-    }
+    const validationErrors: Record<string, string> = {};
+    if (!Number.isFinite(value) || value <= 0) validationErrors.amount = "Ingresá un monto mayor a cero.";
+    if (!merchant.trim()) validationErrors.merchant = "Ingresá un comercio o concepto.";
+    if (!category) validationErrors.category = "Seleccioná una categoría.";
+    if (!accountId) validationErrors.account = "Seleccioná un medio de pago.";
+    if (!date || !Number.isFinite(new Date(`${date}T12:00:00`).getTime())) validationErrors.date = "Seleccioná una fecha válida.";
+    if (type === "expense" && recurring && !nextDueDate) validationErrors.nextDueDate = "Seleccioná el próximo vencimiento.";
+    setErrors(validationErrors);
+    if (Object.keys(validationErrors).length) return;
+    setSubmitting(true);
     try {
-      await createTransaction({
+      const transaction = await createTransaction({
         accountId,
-        categoryId: category.id,
+        categoryId: category!.id,
         type,
-        title: merchant.trim() || (type === "income" ? "Ingreso" : "Gasto"),
-        merchant: merchant.trim(),
+        title: merchant.trim(),
         amount: value,
         currency,
         date: toIsoDate(date),
-        note: [note.trim(), time ? `Hora: ${time}` : ""].filter(Boolean).join(" · "),
-        isAntExpense: type === "expense" ? antExpense : false,
+        note: note.trim() || undefined,
         isRecurring: recurring,
-        paymentMethod: accounts.find((account) => account.id === accountId)?.type
+        receiptUrl: receiptUrl || undefined
       });
-      router.replace("/(tabs)/overview");
+      if (type === "expense" && recurring) {
+        const payment = await createRecurringPayment({
+          merchant: merchant.trim(),
+          amount: value,
+          currency,
+          frequency: recurrenceFrequency,
+          category: category!.name,
+          categoryId: category!.id,
+          nextChargeDate: toIsoDate(nextDueDate),
+          reminderDaysBefore: reminderEnabled ? 1 : 0,
+          kind: "service",
+          accountId,
+          notificationsEnabled: reminderEnabled
+        });
+        await updateTransaction(transaction.id, { scheduledPaymentId: payment.id });
+        if (reminderEnabled) {
+          await scheduleLocalPaymentNotifications({
+            body: `${merchant.trim()} por ${formatMoney(value, currency, false)} vence el ${new Date(`${nextDueDate}T12:00:00`).toLocaleDateString("es-UY")}.`,
+            data: { id: payment.id, type: "payment" },
+            dueDate: toIsoDate(nextDueDate),
+            reminderDaysBefore: 1,
+            requestPermission: false,
+            title: `${merchant.trim()} vence mañana`
+          });
+        }
+      }
+      Alert.alert("FinFlow", type === "expense" ? "Gasto guardado." : "Ingreso guardado.", [{ text: "Aceptar", onPress: () => router.back() }]);
     } catch (error) {
-      Alert.alert("FinFlow", error instanceof Error ? error.message : "No se pudo guardar.");
+      const message = error instanceof Error ? error.message : "No se pudo guardar.";
+      if (message.includes("No tenés saldo suficiente")) {
+        setErrors((current) => ({ ...current, amount: message.replace(". Disponible:", ".\nDisponible:").replace(". Supera", ".\nSupera") }));
+      } else {
+        Alert.alert("FinFlow", message);
+      }
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function toggleRecurring(value: boolean) {
+    setRecurring(value);
+    if (!value) return;
+    setNextDueDate(nextDate(date, recurrenceFrequency));
+    Alert.alert("FinFlow puede avisarte antes de este pago.");
+    await requestPaymentNotificationPermission();
+  }
+
+  async function attachReceipt() {
+    const result = await DocumentPicker.getDocumentAsync({ copyToCacheDirectory: true, type: ["image/*", "application/pdf"] });
+    if (result.canceled) return;
+    setReceiptUrl(result.assets[0].uri);
+    setReceiptName(result.assets[0].name);
+  }
+
+  async function saveCustomCategory() {
+    if (!newCategoryName.trim() || loading) return;
+    try {
+      const category = await createCategory({ name: newCategoryName.trim(), type: "expense", icon: newCategoryIcon, color: newCategoryColor });
+      setCategoryId(category.id);
+      setCategoryModalOpen(false);
+      setNewCategoryName("");
+    } catch (error) {
+      Alert.alert("FinFlow", error instanceof Error ? error.message : "No se pudo crear la categoría.");
     }
   }
 
   async function saveInstallment() {
+    if (loading) return;
     const total = Math.max(1, Number(installments || 1));
     const totalAmount = amountValue(amount);
     const category = categories.find((item) => item.id === categoryId) || chooseCategory(categories, "expense", merchant);
@@ -176,6 +260,7 @@ export default function Add() {
   }
 
   async function savePayment() {
+    if (loading) return;
     try {
       const payment = await createRecurringPayment({
         merchant: merchant.trim() || "Pago programado",
@@ -203,6 +288,7 @@ export default function Add() {
   }
 
   async function saveGoal() {
+    if (loading) return;
     const target = amountValue(amount);
     if (!target) {
       Alert.alert("FinFlow", "Ingresá el monto total de la meta.");
@@ -280,31 +366,46 @@ export default function Add() {
 
       {mode === "expense" ? (
         <View style={styles.form}>
-          <AmountInput value={amount} onChangeText={setAmount} />
-          <Input label="Comercio o descripción" value={merchant} onChangeText={setMerchant} />
-          <Text style={styles.label}>Categoría</Text>
+          <AmountInput currency={currency} error={errors.amount} value={amount} onChangeText={(value) => { setAmount(value); setErrors((current) => ({ ...current, amount: "" })); }} />
+          <Input error={errors.merchant} label="Comercio o concepto *" value={merchant} onChangeText={(value) => { setMerchant(value); setErrors((current) => ({ ...current, merchant: "" })); }} />
+          <Text style={styles.label}>Categoría *</Text>
           <View style={styles.wrap}>
-            {visibleExpenseCategories.map((category) => <Chip key={category.id} active={categoryId === category.id} label={category.name} onPress={() => setCategoryId(category.id)} />)}
+            {visibleExpenseCategories.map((category) => <CategoryChip category={category} key={category.id} active={categoryId === category.id} onPress={() => { setCategoryId(category.id); setErrors((current) => ({ ...current, category: "" })); }} />)}
             <Chip active={showAllCategories} label="Más" onPress={() => setShowAllCategories(!showAllCategories)} />
+            <Chip active={false} label="+ Nueva" onPress={() => setCategoryModalOpen(true)} />
           </View>
-          <AccountPicker accounts={accounts} selected={accountId} onSelect={setAccountId} title="Cuenta o tarjeta" />
-          <MoreInfo
-            antExpense={antExpense}
-            date={date}
-            moreOpen={moreOpen}
-            note={note}
-            recurring={recurring}
-            setAntExpense={setAntExpense}
-            setDate={setDate}
-            setMoreOpen={setMoreOpen}
-            setNote={setNote}
-            setRecurring={setRecurring}
-            setTime={setTime}
-            time={time}
-          />
-          <PrimaryButton onPress={() => saveMovement("expense")}>{loading ? "Guardando..." : "Guardar gasto"}</PrimaryButton>
+          {errors.category ? <Text style={styles.errorText}>{errors.category}</Text> : null}
+          <AccountPicker accounts={accounts} error={errors.account} selected={accountId} onSelect={(value) => { setAccountId(value); setErrors((current) => ({ ...current, account: "" })); }} title="Medio de pago *" />
+          <DatePicker error={errors.date} label="Fecha *" value={date} onChange={(value) => { setDate(value); setErrors((current) => ({ ...current, date: "" })); if (recurring) setNextDueDate(nextDate(value, recurrenceFrequency)); }} />
+          <Input label="Nota (opcional)" value={note} onChangeText={setNote} />
+          <SwitchField active={recurring} label="Este gasto se repite" meta="FinFlow te recordará el próximo pago." onChange={toggleRecurring} />
+          {recurring ? (
+            <View style={styles.morePanel}>
+              <Text style={styles.label}>Frecuencia *</Text>
+              <View style={styles.wrap}>{recurrenceFrequencies.map((item) => <Chip active={recurrenceFrequency === item} key={item} label={item === "weekly" ? "Semanal" : item === "monthly" ? "Mensual" : "Anual"} onPress={() => { setRecurrenceFrequency(item); setNextDueDate(nextDate(date, item)); }} />)}</View>
+              <DatePicker error={errors.nextDueDate} label="Próximo vencimiento *" value={nextDueDate} onChange={setNextDueDate} />
+              <SwitchField active={reminderEnabled} label="Recordarme 24 horas antes" onChange={async (value) => { setReminderEnabled(value); if (value) { Alert.alert("FinFlow puede avisarte antes de este pago."); await requestPaymentNotificationPermission(); } }} />
+            </View>
+          ) : null}
+          <View>
+            <Text style={styles.label}>Adjuntar comprobante (opcional)</Text>
+            <Chip active={Boolean(receiptUrl)} label={receiptName || "Seleccionar imagen o archivo"} onPress={attachReceipt} />
+          </View>
+          <PrimaryButton disabled={loading || submitting} onPress={() => saveMovement("expense")}>{loading || submitting ? "Guardando..." : "Guardar gasto"}</PrimaryButton>
         </View>
       ) : null}
+
+      <CategoryModal
+        color={newCategoryColor}
+        icon={newCategoryIcon}
+        name={newCategoryName}
+        onClose={() => setCategoryModalOpen(false)}
+        onColor={setNewCategoryColor}
+        onIcon={setNewCategoryIcon}
+        onName={setNewCategoryName}
+        onSave={saveCustomCategory}
+        visible={categoryModalOpen}
+      />
 
       {mode === "income" ? (
         <View style={styles.form}>
@@ -315,7 +416,7 @@ export default function Add() {
           <DatePicker label="Fecha" value={date} onChange={setDate} />
           <Toggle active={recurring} label="Recurrente" onPress={() => setRecurring(!recurring)} />
           <Input label="Nota" value={note} onChangeText={setNote} />
-          <PrimaryButton onPress={() => saveMovement("income")}>{loading ? "Guardando..." : "Guardar ingreso"}</PrimaryButton>
+          <PrimaryButton disabled={loading} onPress={() => saveMovement("income")}>{loading ? "Guardando..." : "Guardar ingreso"}</PrimaryButton>
         </View>
       ) : null}
 
@@ -331,7 +432,7 @@ export default function Add() {
           <Text style={styles.label}>Recordatorio</Text>
           <View style={styles.wrap}>{reminders.map((item) => <Chip key={item} active={reminderDaysBefore === item} label={item === 0 ? "El mismo día" : `${item} días antes`} onPress={() => setReminderDaysBefore(item)} />)}</View>
           {amountValue(amount) && Number(installments) ? <Text style={styles.lead}>Cuota aproximada: {formatMoney(amountValue(amount) / Number(installments), currency, false)}</Text> : null}
-          <PrimaryButton onPress={saveInstallment}>{loading ? "Guardando..." : "Guardar compra en cuotas"}</PrimaryButton>
+          <PrimaryButton disabled={loading} onPress={saveInstallment}>{loading ? "Guardando..." : "Guardar compra en cuotas"}</PrimaryButton>
         </View>
       ) : null}
 
@@ -346,7 +447,7 @@ export default function Add() {
           <View style={styles.wrap}>{reminders.map((item) => <Chip key={item} active={reminderDaysBefore === item} label={item === 0 ? "El mismo día" : `${item} días antes`} onPress={() => setReminderDaysBefore(item)} />)}</View>
           <Input label="Categoría" value={paymentCategory} onChangeText={setPaymentCategory} />
           <AccountPicker accounts={accounts} selected={accountId} onSelect={setAccountId} title="Cuenta" />
-          <PrimaryButton onPress={savePayment}>{loading ? "Guardando..." : "Guardar pago programado"}</PrimaryButton>
+          <PrimaryButton disabled={loading} onPress={savePayment}>{loading ? "Guardando..." : "Guardar pago programado"}</PrimaryButton>
         </View>
       ) : null}
 
@@ -357,7 +458,7 @@ export default function Add() {
           <Input label="Monto ahorrado actualmente" value={goalSaved} onChangeText={(value) => setGoalSaved(cleanAmount(value))} />
           <Input label="Aporte mensual deseado" value={goalMonthlyContribution} onChangeText={(value) => setGoalMonthlyContribution(cleanAmount(value))} />
           <DatePicker label="Fecha objetivo" optional value={goalTargetDate} onChange={setGoalTargetDate} />
-          <PrimaryButton onPress={saveGoal}>{loading ? "Guardando..." : "Guardar meta"}</PrimaryButton>
+          <PrimaryButton disabled={loading} onPress={saveGoal}>{loading ? "Guardando..." : "Guardar meta"}</PrimaryButton>
         </View>
       ) : null}
 
@@ -372,7 +473,6 @@ export default function Add() {
               <Text style={styles.proposalLine}>Tipo: {proposal.type === "income" ? "Ingreso" : "Gasto"}</Text>
               <Text style={styles.proposalLine}>Importe: {formatMoney(proposal.amount, currency, false)}</Text>
               <Text style={styles.proposalLine}>Comercio: {proposal.merchant}</Text>
-              <Text style={styles.proposalLine}>Gasto hormiga: {proposal.antExpense ? "posible" : "no"}</Text>
               <PrimaryButton onPress={confirmProposal}>Confirmar</PrimaryButton>
               <Pressable accessibilityRole="button" onPress={() => setProposal(null)} style={styles.secondaryButton}>
                 <Text style={styles.secondaryText}>Corregir</Text>
@@ -394,17 +494,19 @@ function Action({ icon, onPress, title }: { icon: React.ReactNode; onPress: () =
   );
 }
 
-function AccountPicker({ accounts, onSelect, selected, title }: { accounts: Array<{ id: string; name: string }>; onSelect: (value: string) => void; selected: string; title: string }) {
+function AccountPicker({ accounts, error, onSelect, selected, title }: { accounts: Array<{ id: string; name: string }>; error?: string; onSelect: (value: string) => void; selected: string; title: string }) {
   return (
     <View>
       <Text style={styles.label}>{title}</Text>
       <View style={styles.wrap}>{accounts.map((account) => <Chip key={account.id} active={selected === account.id} label={account.name} onPress={() => onSelect(account.id)} />)}</View>
+      {error ? <Text style={styles.errorText}>{error}</Text> : null}
     </View>
   );
 }
 
-function AmountInput({ onChangeText, value }: { onChangeText: (value: string) => void; value: string }) {
-  return <TextInput onChangeText={(text) => onChangeText(cleanAmount(text))} placeholder="$U 0" placeholderTextColor={colors.transparentWhite} style={styles.amountInput} value={value} />;
+function AmountInput({ currency = "UYU", error, onChangeText, value }: { currency?: Currency; error?: string; onChangeText: (value: string) => void; value: string }) {
+  const symbol = currency === "UYU" ? "$U" : currency === "USD" ? "US$" : "€";
+  return <View><Text style={styles.label}>Monto *</Text><TextInput keyboardType="decimal-pad" onChangeText={(text) => onChangeText(cleanAmount(text))} placeholder={`${symbol} 0,00`} placeholderTextColor={colors.transparentWhite} style={styles.amountInput} value={value} />{error ? <Text style={styles.errorText}>{error}</Text> : null}</View>;
 }
 
 function Chip({ active, label, onPress }: { active: boolean; label: string; onPress: () => void }) {
@@ -415,23 +517,43 @@ function Chip({ active, label, onPress }: { active: boolean; label: string; onPr
   );
 }
 
-function Input({ label, ...props }: { label: string } & React.ComponentProps<typeof TextInput>) {
+function iconFor(name?: string) {
+  const icons: Record<string, typeof Circle> = { "book": BookOpen, "heart": Heart, "home": Home, "paw": PawPrint, "paw-print": PawPrint, "shopping-bag": ShoppingBag, "bag": ShoppingBag, "ticket": Ticket, "tram-front": TramFront, "bus": TramFront, "bus-front": TramFront, "utensils": Utensils, "zap": Zap, "receipt": Receipt };
+  return icons[String(name || "")] || Circle;
+}
+
+function categoryColor(value?: string) {
+  const palette: Record<string, string> = { lime: colors.lime, blue: "#5A8DEE", orange: "#F29F67", purple: "#A789E8", gray: colors.grayMedium, black: colors.white };
+  return palette[String(value || "")] || colors.white;
+}
+
+function normalizedCategoryName(value: string) {
+  return value ? value.charAt(0).toLocaleUpperCase("es-UY") + value.slice(1) : value;
+}
+
+function CategoryChip({ active, category, onPress }: { active: boolean; category: Category; onPress: () => void }) {
+  const Icon = iconFor(category.icon);
+  return <Pressable accessibilityRole="button" onPress={onPress} style={[styles.chip, styles.categoryChip, active && styles.active]}><Icon color={active ? colors.black : categoryColor(category.color)} size={16} /><Text style={[styles.chipText, active && styles.activeText]}>{normalizedCategoryName(category.name)}</Text></Pressable>;
+}
+
+function Input({ error, label, ...props }: { error?: string; label: string } & React.ComponentProps<typeof TextInput>) {
   return (
     <View>
       <Text style={styles.label}>{label}</Text>
       <TextInput placeholderTextColor={colors.grayMedium} style={styles.input} {...props} />
+      {error ? <Text style={styles.errorText}>{error}</Text> : null}
     </View>
   );
 }
 
-function DatePicker({ label, onChange, optional = false, value }: { label: string; onChange: (value: string) => void; optional?: boolean; value: string }) {
+function DatePicker({ error, label, onChange, optional = false, value }: { error?: string; label: string; onChange: (value: string) => void; optional?: boolean; value: string }) {
   const [open, setOpen] = useState(false);
   const options = dateOptions();
   return (
     <View>
       <Text style={styles.label}>{label}</Text>
       <Pressable accessibilityRole="button" onPress={() => setOpen(!open)} style={styles.input}>
-        <Text style={styles.inputText}>{value || (optional ? "Sin fecha" : todayInput())}</Text>
+        <Text style={styles.inputText}>{value ? new Date(`${value}T12:00:00`).toLocaleDateString("es-UY") : optional ? "Sin fecha" : new Date().toLocaleDateString("es-UY")}</Text>
       </Pressable>
       {open ? (
         <View style={styles.wrap}>
@@ -449,6 +571,7 @@ function DatePicker({ label, onChange, optional = false, value }: { label: strin
           ))}
         </View>
       ) : null}
+      {error ? <Text style={styles.errorText}>{error}</Text> : null}
     </View>
   );
 }
@@ -457,52 +580,12 @@ function Toggle({ active, label, onPress }: { active: boolean; label: string; on
   return <Chip active={active} label={label} onPress={onPress} />;
 }
 
-function MoreInfo({
-  antExpense,
-  date,
-  moreOpen,
-  note,
-  recurring,
-  setAntExpense,
-  setDate,
-  setMoreOpen,
-  setNote,
-  setRecurring,
-  setTime,
-  time
-}: {
-  antExpense: boolean;
-  date: string;
-  moreOpen: boolean;
-  note: string;
-  recurring: boolean;
-  setAntExpense: (value: boolean) => void;
-  setDate: (value: string) => void;
-  setMoreOpen: (value: boolean) => void;
-  setNote: (value: string) => void;
-  setRecurring: (value: boolean) => void;
-  setTime: (value: string) => void;
-  time: string;
-}) {
-  return (
-    <View>
-      <Pressable accessibilityRole="button" onPress={() => setMoreOpen(!moreOpen)} style={styles.moreButton}>
-        <Text style={styles.moreText}>Agregar más información</Text>
-      </Pressable>
-      {moreOpen ? (
-        <View style={styles.morePanel}>
-          <DatePicker label="Fecha" value={date} onChange={setDate} />
-          <Input label="Hora" placeholder="HH:mm" value={time} onChangeText={setTime} />
-          <Input label="Nota" value={note} onChangeText={setNote} />
-          <View style={styles.wrap}>
-            <Toggle active={recurring} label="Recurrente" onPress={() => setRecurring(!recurring)} />
-            <Toggle active={antExpense} label="Gasto hormiga" onPress={() => setAntExpense(!antExpense)} />
-            <Chip active={false} label="Adjuntar comprobante" onPress={() => Alert.alert("FinFlow", "Adjuntos quedan preparados para la siguiente versión de archivos.")} />
-          </View>
-        </View>
-      ) : null}
-    </View>
-  );
+function SwitchField({ active, label, meta, onChange }: { active: boolean; label: string; meta?: string; onChange: (value: boolean) => void | Promise<void> }) {
+  return <View style={styles.switchRow}><View style={styles.switchCopy}><Text style={styles.switchLabel}>{label}</Text>{meta ? <Text style={styles.switchMeta}>{meta}</Text> : null}</View><Switch onValueChange={onChange} value={active} /></View>;
+}
+
+function CategoryModal({ color, icon, name, onClose, onColor, onIcon, onName, onSave, visible }: { color: typeof categoryColors[number]; icon: typeof categoryIcons[number]; name: string; onClose: () => void; onColor: (value: typeof categoryColors[number]) => void; onIcon: (value: typeof categoryIcons[number]) => void; onName: (value: string) => void; onSave: () => void; visible: boolean }) {
+  return <Modal animationType="fade" onRequestClose={onClose} transparent visible={visible}><View style={styles.modalBackdrop}><View style={styles.modalPanel}><Text style={styles.proposalTitle}>Nueva categoría</Text><Input label="Nombre de la categoría" value={name} onChangeText={onName} /><Text style={styles.label}>Ícono</Text><View style={styles.wrap}>{categoryIcons.map((item) => { const Icon = iconFor(item); return <Pressable key={item} onPress={() => onIcon(item)} style={[styles.iconChoice, icon === item && styles.active]}><Icon color={icon === item ? colors.black : colors.white} size={18} /></Pressable>; })}</View><Text style={styles.label}>Color</Text><View style={styles.wrap}>{categoryColors.map((item) => <Pressable accessibilityLabel={item} key={item} onPress={() => onColor(item)} style={[styles.colorChoice, { backgroundColor: categoryColor(item) }, color === item && styles.colorChoiceActive]} />)}</View><PrimaryButton disabled={!name.trim()} onPress={onSave}>Guardar categoría</PrimaryButton><Pressable onPress={onClose} style={styles.secondaryButton}><Text style={styles.secondaryText}>Cancelar</Text></Pressable></View></View></Modal>;
 }
 
 const styles = StyleSheet.create({
@@ -553,6 +636,11 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     paddingHorizontal: spacing.md
   },
+  categoryChip: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: spacing.xs
+  },
   chipText: {
     ...typography.label,
     color: colors.white,
@@ -561,6 +649,29 @@ const styles = StyleSheet.create({
   form: {
     gap: spacing.md,
     marginTop: spacing.xl
+  },
+  errorText: {
+    ...typography.label,
+    color: "#E65C50",
+    marginTop: spacing.xs
+  },
+  colorChoice: {
+    borderRadius: 14,
+    height: 28,
+    width: 28
+  },
+  colorChoiceActive: {
+    borderColor: colors.white,
+    borderWidth: 3
+  },
+  iconChoice: {
+    alignItems: "center",
+    borderColor: colors.appGrayBorder,
+    borderRadius: 8,
+    borderWidth: 1,
+    height: 38,
+    justifyContent: "center",
+    width: 42
   },
   input: {
     ...typography.body,
@@ -598,6 +709,20 @@ const styles = StyleSheet.create({
     gap: spacing.md,
     marginTop: spacing.md
   },
+  modalBackdrop: {
+    backgroundColor: "rgba(0,0,0,0.7)",
+    flex: 1,
+    justifyContent: "center",
+    padding: spacing.xl
+  },
+  modalPanel: {
+    backgroundColor: colors.appGrayDark,
+    borderColor: colors.appGrayBorder,
+    borderRadius: 8,
+    borderWidth: 1,
+    gap: spacing.md,
+    padding: spacing.lg
+  },
   moreText: {
     ...typography.body,
     color: colors.white,
@@ -629,6 +754,25 @@ const styles = StyleSheet.create({
     ...typography.body,
     color: colors.white,
     fontWeight: "800"
+  },
+  switchCopy: {
+    flex: 1
+  },
+  switchLabel: {
+    ...typography.body,
+    color: colors.white,
+    fontWeight: "800"
+  },
+  switchMeta: {
+    ...typography.label,
+    color: colors.transparentWhite,
+    marginTop: spacing.xs
+  },
+  switchRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: spacing.md,
+    minHeight: 48
   },
   wrap: {
     flexDirection: "row",

@@ -16,16 +16,19 @@ export async function listCategories(userId: Types.ObjectId, type?: string) {
 }
 
 export async function createCategory(userId: Types.ObjectId, input: Record<string, unknown>) {
-  const category = await Category.create({
-    userId,
-    translationKey: `custom.${userId.toString()}.${String(input.name).toLowerCase().replace(/\s+/g, "_")}`,
-    name: String(input.name),
-    type: input.type as "income" | "expense",
-    icon: String(input.icon || "circle"),
-    color: String(input.color || "black"),
-    isSystem: false,
-    isActive: true
-  });
+  const name = String(input.name).trim();
+  const type = input.type as "income" | "expense";
+  const translationKey = `custom.${userId.toString()}.${name.toLowerCase().replace(/[^a-z0-9áéíóúüñ]+/gi, "_")}`;
+  let category = await Category.findOne({ userId, translationKey, type });
+  if (category) {
+    category.name = name;
+    category.icon = String(input.icon || "circle");
+    category.color = String(input.color || "black");
+    category.isActive = true;
+    await category.save();
+  } else {
+    category = await Category.create({ userId, translationKey, name, type, icon: String(input.icon || "circle"), color: String(input.color || "black"), isSystem: false, isActive: true });
+  }
   return categoryDTO(category);
 }
 

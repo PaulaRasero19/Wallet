@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import { Alert, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { Alert, Linking, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { BookOpen, Circle, Heart, Home, PawPrint, Receipt, ShoppingBag, Ticket, TramFront, Utensils, Zap } from "lucide-react-native";
 import { router, useLocalSearchParams } from "expo-router";
 import { Header } from "../../src/components/Header";
 import { PrimaryButton } from "../../src/components/PrimaryButton";
@@ -22,14 +23,18 @@ function valueOf(transaction: Transaction) {
   return Math.abs(Number(transaction.rawAmount ?? transaction.raw_amount ?? transaction.amount ?? 0));
 }
 
+function firstText(...values: Array<unknown>) {
+  const value = values.find((item) => typeof item === "string" && item.trim().length > 0);
+  return typeof value === "string" ? value.trim() : "";
+}
+
 export default function TransactionDetail() {
   const params = useLocalSearchParams<{ id?: string | string[] }>();
   const id = normalizeId(params.id);
-  const { accounts, categories, deleteTransaction, loadAccounts, loadCategories, transactions, updateTransaction } = useFinFlowStore();
+  const { accounts, categories, deleteTransaction, loadAccounts, loadCategories, loadOverview, recurringPayments, transactions, updateTransaction } = useFinFlowStore();
   const [transaction, setTransaction] = useState<Transaction | null>(null);
   const [editing, setEditing] = useState(false);
   const [title, setTitle] = useState("");
-  const [merchant, setMerchant] = useState("");
   const [amount, setAmount] = useState("");
   const [note, setNote] = useState("");
   const [loading, setLoading] = useState(true);
@@ -38,25 +43,32 @@ export default function TransactionDetail() {
   useEffect(() => {
     void loadAccounts();
     void loadCategories();
-  }, [loadAccounts, loadCategories]);
+    void loadOverview();
+  }, [loadAccounts, loadCategories, loadOverview]);
 
   useEffect(() => {
     let alive = true;
     async function load() {
-      if (!id || !isValidObjectId(id)) {
+      if (!id) {
         setLoading(false);
         setLoadError("No pude abrir este movimiento porque no tiene un identificador válido.");
         return;
       }
       setLoading(true);
       setLoadError("");
-      const cached = transactions.find((item) => item.id === id);
+      const cached = transactions.find((item) => item.id === id || item._id === id);
       try {
-        const next = cached || (await fetchTransaction(id));
+        let next: Transaction | null = null;
+        try {
+          next = isValidObjectId(id) ? await fetchTransaction(id) : null;
+        } catch (error) {
+          if (!cached) throw error;
+        }
+        next = next || cached || null;
+        if (!next) throw new Error("No encontré este movimiento para tu usuario.");
         if (!alive) return;
         setTransaction(next);
-        setTitle(next.title || next.merchant || "");
-        setMerchant(next.merchant || next.title || "");
+        setTitle(firstText(next.title, (next as any).description, next.note, next.merchant));
         setAmount(String(valueOf(next)));
         setNote(next.note || "");
       } catch (error) {
@@ -84,7 +96,7 @@ export default function TransactionDetail() {
         date: transaction.date,
         type: transaction.type,
         title: title.trim() || transaction.title,
-        merchant: merchant.trim() || title.trim(),
+        merchant: "",
         amount: Number(amount.replace(",", ".")),
         note: note.trim()
       });
@@ -138,8 +150,13 @@ export default function TransactionDetail() {
     );
   }
 
-  const typeLabel = transaction.type === "income" ? "Ingreso" : transaction.type === "transfer" ? "Transferencia" : "Gasto";
-  const amountValue = transaction.type === "expense" ? -valueOf(transaction) : valueOf(transaction);
+  const typeLabel = transaction.type === "income" ? "Ingreso" : transaction.type === "refund" ? "Reintegro" : transaction.type === "goal_contribution" ? "Aporte a meta" : transaction.type === "transfer" || transaction.type === "internal_transfer" ? "Transferencia" : "Gasto";
+  const amountValue = transaction.type === "expense" || transaction.type === "goal_contribution" ? -valueOf(transaction) : valueOf(transaction);
+  const transactionConcept = firstText(transaction.title, transaction.merchant, (transaction as any).description);
+  const transactionNote = firstText(transaction.note, (transaction as any).notes);
+  const categoryName = firstText(category?.name, transaction.category, (transaction as any).category_name);
+  const scheduledPayment = recurringPayments.find((payment) => payment.id === (transaction.scheduledPaymentId || transaction.scheduled_payment_id));
+  const recurrenceLabel = scheduledPayment?.frequency === "weekly" ? "Semanalmente" : scheduledPayment?.frequency === "monthly" ? "Mensualmente" : scheduledPayment?.frequency === "annual" ? "Anualmente" : "";
 
   return (
     <ScreenContainer>
@@ -147,13 +164,12 @@ export default function TransactionDetail() {
       <View style={styles.hero}>
         <Text style={styles.type}>{typeLabel}</Text>
         <Text style={styles.amount}>{formatMoney(amountValue, transaction.currency as Currency)}</Text>
-        <Text style={styles.heroMeta}>{transaction.merchant || transaction.title}</Text>
+        <Text style={styles.heroMeta}>{transactionConcept || "Movimiento"}</Text>
       </View>
 
       {editing ? (
         <View style={styles.form}>
-          <Field label="Comercio" value={merchant} onChangeText={setMerchant} />
-          <Field label="Descripción" value={title} onChangeText={setTitle} />
+          <Field label="Comercio o concepto" value={title} onChangeText={setTitle} />
           <Field keyboardType="decimal-pad" label="Importe" value={amount} onChangeText={setAmount} />
           <Field label="Nota" value={note} onChangeText={setNote} />
           <PrimaryButton onPress={save}>Guardar cambios</PrimaryButton>
@@ -165,17 +181,15 @@ export default function TransactionDetail() {
         <>
           <View style={styles.details}>
             <Detail label="Tipo" value={typeLabel} />
-            <Detail label="Comercio" value={transaction.merchant || "-"} />
-            <Detail label="Descripción" value={transaction.title || "-"} />
-            <Detail label="Categoría" value={category?.name || String(transaction.category || "-")} />
-            <Detail label="Cuenta" value={account?.name || "-"} />
+            <CategoryDetail color={category?.color} icon={category?.icon} value={categoryName || "Sin categoría"} />
+            <Detail label="Medio de pago" value={account?.name || paymentSourceLabel(account?.type)} />
             <Detail label="Fecha" value={new Date(transaction.date).toLocaleDateString("es-UY", { day: "2-digit", month: "long", year: "numeric" })} />
-            <Detail label="Hora" value={transaction.time || "-"} />
-            <Detail label="Medio de pago" value={transaction.paymentMethod || transaction.payment_method || account?.type || "-"} />
-            <Detail label="Cuota" value={transaction.installment ? `${transaction.installment.current} de ${transaction.installment.total}` : "No"} />
-            <Detail label="Recurrente" value={transaction.isRecurring || transaction.is_recurring ? "Sí" : "No"} />
-            <Detail label="Gasto hormiga" value={transaction.isAntExpense || transaction.is_ant_expense ? "Sí" : "No"} />
-            <Detail label="Nota" value={transaction.note || "-"} />
+            {transactionNote ? <Detail label="Nota" value={transactionNote} /> : null}
+            {scheduledPayment && recurrenceLabel ? <Detail label="Se repite" value={recurrenceLabel} /> : null}
+            {scheduledPayment ? <Detail label="Próximo vencimiento" value={new Date(`${scheduledPayment.nextChargeDate}T12:00:00`).toLocaleDateString("es-UY", { day: "2-digit", month: "long", year: "numeric" })} /> : null}
+            {scheduledPayment && Number(scheduledPayment.reminderDaysBefore ?? scheduledPayment.reminder_days_before) === 1 ? <Detail label="Recordatorio" value="24 horas antes" /> : null}
+            {transaction.installment ? <Detail label="Cuota" value={`${transaction.installment.current} de ${transaction.installment.total}`} /> : null}
+            {transaction.receiptUrl || transaction.receipt_url ? <Pressable onPress={() => Linking.openURL(transaction.receiptUrl || transaction.receipt_url || "")}><Detail label="Comprobante" value="Ver comprobante" /></Pressable> : null}
           </View>
           <View style={styles.actions}>
             <PrimaryButton onPress={() => setEditing(true)}>Editar</PrimaryButton>
@@ -198,6 +212,29 @@ function Detail({ label, value }: { label: string; value: string }) {
   );
 }
 
+function paymentSourceLabel(type?: string) {
+  if (type === "cash") return "Efectivo";
+  if (type === "credit") return "Tarjeta de crédito";
+  if (type === "bank") return "Cuenta bancaria";
+  if (type === "savings") return "Cuenta de ahorro";
+  return "Medio de pago";
+}
+
+function CategoryDetail({ color, icon, value }: { color?: string; icon?: string; value: string }) {
+  const Icon = categoryIcon(icon);
+  return <View style={styles.detailRow}><Text style={styles.detailLabel}>Categoría</Text><View style={styles.categoryValue}><Icon color={categoryColor(color)} size={16} /><Text style={styles.detailValueCompact}>{value.charAt(0).toLocaleUpperCase("es-UY") + value.slice(1)}</Text></View></View>;
+}
+
+function categoryIcon(name?: string) {
+  const icons: Record<string, typeof Circle> = { book: BookOpen, heart: Heart, home: Home, paw: PawPrint, "paw-print": PawPrint, "shopping-bag": ShoppingBag, bag: ShoppingBag, ticket: Ticket, "tram-front": TramFront, bus: TramFront, "bus-front": TramFront, utensils: Utensils, zap: Zap, receipt: Receipt };
+  return icons[String(name || "")] || Circle;
+}
+
+function categoryColor(value?: string) {
+  const palette: Record<string, string> = { lime: colors.lime, blue: colors.blue, orange: colors.orange, purple: colors.lavender, gray: colors.grayMedium, black: colors.white };
+  return palette[String(value || "")] || colors.white;
+}
+
 function Field({ label, ...props }: { label: string } & React.ComponentProps<typeof TextInput>) {
   return (
     <View>
@@ -216,6 +253,13 @@ const styles = StyleSheet.create({
     ...typography.display,
     color: colors.white,
     fontSize: 46
+  },
+  categoryValue: {
+    alignItems: "center",
+    flex: 1.2,
+    flexDirection: "row",
+    gap: spacing.sm,
+    justifyContent: "flex-end"
   },
   deleteButton: {
     alignItems: "center",
@@ -246,6 +290,11 @@ const styles = StyleSheet.create({
     ...typography.body,
     color: colors.white,
     flex: 1.2,
+    textAlign: "right"
+  },
+  detailValueCompact: {
+    ...typography.body,
+    color: colors.white,
     textAlign: "right"
   },
   details: {

@@ -2,7 +2,7 @@ import { StyleSheet, Text, View } from "react-native";
 import { ArrowDown, ArrowUp } from "lucide-react-native";
 import { colors, typography } from "../../theme";
 import { Currency } from "../../types/finflow";
-import { HomeFinancialInsights, InsightTone } from "../../utils/homeFinancialInsights";
+import { clampPercentage, HomeFinancialInsights, InsightTone } from "../../utils/homeFinancialInsights";
 import { formatCompactMoney, formatMoney } from "../../utils/money";
 
 export function HomeMetricCards({
@@ -28,7 +28,7 @@ export function HomeMetricCards({
     : insights.savings.goalProgress !== null
       ? `${formatPercent(insights.savings.goalProgress)}`
       : `${formatPercent(insights.savings.rate)}`;
-  const incomeUsedValue = !insights.hasMovements || insights.incomeUsed.percentage === null ? "0 %" : formatPercent(insights.incomeUsed.percentage);
+  const incomeUsedValue = insights.incomeUsed.percentage === null ? "Sin datos" : formatPercent(insights.incomeUsed.percentage);
 
   return (
     <View pointerEvents="none" style={styles.wrap}>
@@ -65,7 +65,8 @@ export function HomeMetricCards({
 }
 
 function formatPercent(value: number) {
-  return `${Number(value.toFixed(1)).toLocaleString("es-UY", { maximumFractionDigits: 1 })} %`;
+  const safeValue = clampPercentage(value) ?? 0;
+  return `${Number(safeValue.toFixed(1)).toLocaleString("es-UY", { maximumFractionDigits: 1 })} %`;
 }
 
 function colorForTone(tone: InsightTone) {

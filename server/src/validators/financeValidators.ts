@@ -11,6 +11,7 @@ export const recurringPaymentSchema = z.object({
   reminderDaysBefore: z.coerce.number().int().min(0).max(30).default(3),
   kind: z.enum(["fixed", "subscription", "service"]).default("service"),
   accountId: objectIdSchema.optional(),
+  categoryId: objectIdSchema.optional(),
   notificationsEnabled: z.boolean().optional().default(true)
 });
 

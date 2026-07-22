@@ -5,6 +5,9 @@ import type { Transaction } from "../models/Transaction";
 import type { User } from "../models/User";
 
 function idOf(value: unknown) {
+  if (value && typeof value === "object" && "_id" in value && (value as { _id: unknown })._id !== value) {
+    return idOf((value as { _id: unknown })._id);
+  }
   return value && typeof value === "object" && "toString" in value ? value.toString() : String(value || "");
 }
 
@@ -133,12 +136,18 @@ export function categoryDTO(category: InstanceType<typeof Category>) {
     color: category.color,
     isSystem: category.isSystem,
     is_system: category.isSystem,
+    isCustom: !category.isSystem,
+    is_custom: !category.isSystem,
     isActive: category.isActive,
     is_active: category.isActive
   };
 }
 
-export function transactionDTO(transaction: InstanceType<typeof Transaction>) {
+export function transactionDTO(transaction: InstanceType<typeof Transaction>, options?: unknown) {
+  const category =
+    options && typeof options === "object" && "category" in options
+      ? (options as { category?: InstanceType<typeof Category> | null }).category
+      : null;
   return {
     id: idOf(transaction._id),
     userId: idOf(transaction.userId),
@@ -149,12 +158,22 @@ export function transactionDTO(transaction: InstanceType<typeof Transaction>) {
     to_account_id: idOf(transaction.toAccountId),
     transferGroupId: transaction.transferGroupId,
     transfer_group_id: transaction.transferGroupId,
+    scheduledPaymentId: idOf(transaction.scheduledPaymentId),
+    scheduled_payment_id: idOf(transaction.scheduledPaymentId),
+    receiptUrl: transaction.receiptUrl,
+    receipt_url: transaction.receiptUrl,
     categoryId: idOf(transaction.categoryId),
     category_id: idOf(transaction.categoryId),
+    category: category?.name,
+    categoryName: category?.name,
+    category_name: category?.name,
     type: transaction.type,
+    status: transaction.status,
+    transactionStatus: transaction.status,
+    transaction_status: transaction.status,
     title: transaction.title,
     merchant: transaction.merchant || transaction.title,
-    amount: transaction.type === "expense" ? -Math.abs(transaction.amount) : Math.abs(transaction.amount),
+    amount: transaction.type === "expense" || transaction.type === "goal_contribution" ? -Math.abs(transaction.amount) : Math.abs(transaction.amount),
     rawAmount: transaction.amount,
     raw_amount: transaction.amount,
     currency: transaction.currency,

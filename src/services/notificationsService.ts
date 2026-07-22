@@ -69,8 +69,9 @@ export async function scheduleLocalPaymentNotifications(input: {
   dueDate: string;
   reminderDaysBefore: number;
   data?: Record<string, unknown>;
+  requestPermission?: boolean;
 }) {
-  const permission = await requestPaymentNotificationPermission();
+  const permission = input.requestPermission === false ? await Notifications.getPermissionsAsync() : await requestPaymentNotificationPermission();
   if (permission.status !== "granted") return { scheduled: false };
   const due = new Date(input.dueDate);
   due.setHours(9, 0, 0, 0);

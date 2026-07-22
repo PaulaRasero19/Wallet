@@ -8,6 +8,7 @@ import { useSessionStore } from "../src/store/useSessionStore";
 import { colors, spacing, typography } from "../src/theme";
 import { categorySummary, overviewMetrics } from "../src/utils/financeInsights";
 import { formatMoney } from "../src/utils/money";
+import { calculateMovementSummary } from "../src/utils/movementSummary";
 
 export default function Analysis() {
   const { accounts, creditCards, events, goals, loadOverview, overview, recurringPayments, transactions } = useFinFlowStore();
@@ -30,19 +31,20 @@ export default function Analysis() {
     recurringPayments,
     transactions
   });
-  const categories = useMemo(() => categorySummary(transactions).slice(0, 6), [transactions]);
+  const monthlySummary = calculateMovementSummary({ transactions });
+  const categories = useMemo(() => categorySummary(monthlySummary.includedExpenses).slice(0, 6), [monthlySummary.includedExpenses]);
   const fixed = recurringPayments.reduce((sum, payment) => sum + Number(payment.amount || 0), 0);
-  const variable = Math.max(0, Number(overview?.expenses || 0) - fixed);
-  const antExpenses = transactions.filter((transaction) => transaction.isAntExpense || transaction.is_ant_expense);
+  const variable = Math.max(0, monthlySummary.netExpenses - fixed);
+  const antExpenses = monthlySummary.includedExpenses.filter((transaction) => transaction.isAntExpense || transaction.is_ant_expense);
   const antTotal = antExpenses.reduce((sum, transaction) => sum + Math.abs(Number(transaction.rawAmount ?? transaction.raw_amount ?? transaction.amount ?? 0)), 0);
 
   return (
     <ScreenContainer>
       <Header title="Análisis financiero" back />
       <View style={styles.grid}>
-        <InsightMetric label="Ingresos" value={formatMoney(Number(overview?.income || 0), currency, false)} />
-        <InsightMetric label="Gastos" value={formatMoney(Number(overview?.expenses || 0), currency, false)} />
-        <InsightMetric label="Saldo" value={formatMoney(Number(overview?.net || 0), currency, true)} />
+        <InsightMetric label="Ingresos" value={formatMoney(monthlySummary.actualIncome, currency, false)} />
+        <InsightMetric label="Gastos" value={formatMoney(monthlySummary.netExpenses, currency, false)} />
+        <InsightMetric label="Saldo" value={formatMoney(monthlySummary.balance, currency, true)} />
         <InsightMetric label="Ahorro estimado" value={formatMoney(Math.max(0, metrics.available), currency, false)} />
       </View>
 

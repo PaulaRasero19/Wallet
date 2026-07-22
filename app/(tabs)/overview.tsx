@@ -15,6 +15,7 @@ import { useSessionStore } from "../../src/store/useSessionStore";
 import { colors } from "../../src/theme";
 import { overviewMetrics } from "../../src/utils/financeInsights";
 import { calculateFinancialInsights } from "../../src/utils/homeFinancialInsights";
+import { calculateCompletedMonthlyTransactions } from "../../src/utils/movementSummary";
 
 function insightDateRange() {
   const today = new Date();
@@ -68,6 +69,7 @@ export default function Overview() {
     savingsGoal: metrics.goal,
     transactions
   });
+  const monthlyTotals = calculateCompletedMonthlyTransactions({ transactions });
 
   return (
     <View style={styles.screen}>
@@ -79,10 +81,10 @@ export default function Overview() {
           firstName={firstName}
           fullName={profile?.full_name || firstName}
           notificationCount={pendingNotifications}
-          onNotificationsPress={() => router.push("/notifications")}
+          onNotificationsPress={() => router.push({ pathname: "/notifications" })}
           onProfilePress={() => router.push("/profile")}
         />
-        <AvailableMoney amount={profileMonthlyIncome} currency={primaryCurrency} />
+        <AvailableMoney amount={monthlyTotals.balance} currency={primaryCurrency} />
         <HomeBalanceChart currency={primaryCurrency} history={overview?.history || []} period={period} />
         <PeriodSelector onChange={setPeriod} value={period} />
       </View>

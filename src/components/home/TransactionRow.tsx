@@ -1,4 +1,5 @@
-import { StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
+import { router } from "expo-router";
 import { Account, Transaction } from "../../types/finflow";
 import { colors, typography } from "../../theme";
 import { positiveAmount } from "../../utils/financeInsights";
@@ -14,9 +15,17 @@ export function TransactionRow({ account, transaction }: { account?: Account; tr
   const installment = transaction.installment ? `Cuota ${transaction.installment.current}/${transaction.installment.total}` : null;
   const paymentLabel = installment || account?.name || "Cuenta";
   const title = transaction.merchant || transaction.title || transaction.category || "Movimiento";
+  const id = String(transaction.id || transaction._id || "");
 
   return (
-    <View style={styles.row}>
+    <Pressable
+      accessibilityRole="button"
+      disabled={!id}
+      onPress={() => {
+        if (id) router.push({ pathname: "/transaction/[id]", params: { id } });
+      }}
+      style={styles.row}
+    >
       <MerchantLogo category={transaction.category} merchant={transaction.merchant} title={transaction.title} />
       <View style={styles.main}>
         <Text numberOfLines={1} style={styles.merchant}>{title}</Text>
@@ -33,7 +42,7 @@ export function TransactionRow({ account, transaction }: { account?: Account; tr
           </Text>
         ) : null}
       </View>
-    </View>
+    </Pressable>
   );
 }
 

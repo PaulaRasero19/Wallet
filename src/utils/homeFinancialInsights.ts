@@ -22,6 +22,7 @@ export type HomeFinancialInsights = {
     amount: number;
     rate: number | null;
     goalProgress: number | null;
+    meta: string;
     title: string;
     trend: InsightTrend;
     trendState: InsightTrendState;
@@ -29,6 +30,8 @@ export type HomeFinancialInsights = {
   incomeUsed: {
     percentage: number | null;
     differenceFromPreviousMonth: number | null;
+    meta: string;
+    overspentAmount: number;
     trend: InsightTrend;
     trendState: InsightTrendState;
   };
@@ -123,8 +126,39 @@ function isSmallExpense(transaction: Transaction, monthlyIncome: number) {
   return amount <= threshold && isNonEssentialExpense(transaction);
 }
 
+function isRefund(transaction: Transaction) {
+  if (transaction.type === "refund") return true;
+  if (transaction.type !== "income") return false;
+  const text = textFor(transaction);
+  return ["reintegro", "devolucion", "devolución", "refund"].some((keyword) => text.includes(keyword));
+}
+
+function isCompletedForTotals(transaction: Transaction) {
+  const status = transaction.status || transaction.transactionStatus || transaction.transaction_status;
+  if (transaction.type === "income" || transaction.type === "refund") return status === "completed" || status === "received";
+  if (transaction.type === "expense") return status === "completed" || status === "paid";
+  return false;
+}
+
+function sumByType(transactions: Transaction[], type: Transaction["type"]) {
+  return transactions.filter((transaction) => transaction.type === type).reduce((sum, transaction) => sum + positiveAmount(transaction), 0);
+}
+
+function sumRefunds(transactions: Transaction[]) {
+  return transactions.filter(isRefund).reduce((sum, transaction) => sum + positiveAmount(transaction), 0);
+}
+
+function sumAdditionalIncome(transactions: Transaction[]) {
+  return transactions.filter((transaction) => transaction.type === "income" && !isRefund(transaction)).reduce((sum, transaction) => sum + positiveAmount(transaction), 0);
+}
+
 function sumExpenses(transactions: Transaction[]) {
-  return transactions.filter((transaction) => transaction.type === "expense").reduce((sum, transaction) => sum + positiveAmount(transaction), 0);
+  return sumByType(transactions, "expense");
+}
+
+export function clampPercentage(value: number | null | undefined) {
+  if (value === null || value === undefined || !Number.isFinite(value)) return null;
+  return Math.min(100, Math.max(0, value));
 }
 
 function compareNumber(current: number, previous: number): InsightTrend {
@@ -136,12 +170,69 @@ function compareNumber(current: number, previous: number): InsightTrend {
 function trendStateFor(trend: InsightTrend, upIsPositive: boolean): InsightTrendState {
   if (trend === "neutral") return { direction: "down", tone: "neutral" };
   const tone = trend === "up" ? (upIsPositive ? "positive" : "negative") : upIsPositive ? "negative" : "positive";
-  return { direction: trend, tone };
+  return { direction: tone === "positive" ? "up" : "down", tone };
 }
 
 function safePercentage(part: number, total: number) {
   if (total <= 0) return null;
   return (part / total) * 100;
+}
+
+export function calculateMonthlyFinancialSummary({
+  baseMonthlyIncome,
+  currentMonthTransactions,
+  previousMonthTransactions,
+  savingsGoal
+}: {
+  baseMonthlyIncome: number;
+  currentMonthTransactions: Transaction[];
+  previousMonthTransactions: Transaction[];
+  savingsGoal?: Goal;
+}) {
+  const currentGrossExpenses = sumExpenses(currentMonthTransactions);
+  const previousGrossExpenses = sumExpenses(previousMonthTransactions);
+  const currentRefunds = sumRefunds(currentMonthTransactions);
+  const previousRefunds = sumRefunds(previousMonthTransactions);
+  const currentAdditionalIncome = sumAdditionalIncome(currentMonthTransactions);
+  const previousAdditionalIncome = sumAdditionalIncome(previousMonthTransactions);
+  // A configured salary is a fallback for months without an income movement,
+  // never an additional amount on top of the received salary transaction.
+  const currentIncome = currentAdditionalIncome > 0 ? currentAdditionalIncome : Math.max(0, baseMonthlyIncome);
+  const previousIncome = previousAdditionalIncome > 0 ? previousAdditionalIncome : Math.max(0, baseMonthlyIncome);
+  const currentNetExpenses = Math.max(0, currentGrossExpenses - currentRefunds);
+  const previousNetExpenses = Math.max(0, previousGrossExpenses - previousRefunds);
+  const currentSavings = currentIncome - currentNetExpenses;
+  const previousSavings = previousIncome - previousNetExpenses;
+  const safeCurrentSavings = Math.max(0, currentSavings);
+  const safePreviousSavings = Math.max(0, previousSavings);
+  const monthlyGoalAmount = Number(savingsGoal?.monthlyContribution || 0);
+  const rawIncomeUsedPercentage = safePercentage(currentNetExpenses, currentIncome);
+  const previousIncomeUsedPercentage = safePercentage(previousNetExpenses, previousIncome);
+  const incomeUsedPercentage = clampPercentage(rawIncomeUsedPercentage);
+  const savingsRate = clampPercentage(safePercentage(safeCurrentSavings, currentIncome));
+  const previousSavingsRate = clampPercentage(safePercentage(safePreviousSavings, previousIncome));
+  const goalProgress = monthlyGoalAmount > 0 ? clampPercentage(safePercentage(safeCurrentSavings, monthlyGoalAmount)) : null;
+  const previousGoalProgress = monthlyGoalAmount > 0 ? clampPercentage(safePercentage(safePreviousSavings, monthlyGoalAmount)) : null;
+  const overspentAmount = Math.max(0, currentNetExpenses - currentIncome);
+
+  return {
+    additionalIncome: currentAdditionalIncome,
+    baseMonthlyIncome,
+    currentSavings,
+    goalProgress,
+    grossExpenses: currentGrossExpenses,
+    incomeUsedPercentage,
+    netExpenses: currentNetExpenses,
+    overspentAmount,
+    previousGoalProgress,
+    previousIncomeUsedPercentage: clampPercentage(previousIncomeUsedPercentage),
+    previousSavings,
+    previousSavingsRate,
+    refunds: currentRefunds,
+    safeCurrentSavings,
+    savingsRate,
+    totalAvailableIncome: currentIncome
+  };
 }
 
 export function calculateFinancialInsights({
@@ -155,25 +246,34 @@ export function calculateFinancialInsights({
   transactions: Transaction[];
 }): HomeFinancialInsights {
   const { currentStart, nextStart, previousStart } = monthBounds();
-  const currentMonthTransactions = transactions.filter((transaction) => isWithin(transaction.date, currentStart, nextStart));
-  const previousMonthTransactions = transactions.filter((transaction) => isWithin(transaction.date, previousStart, currentStart));
-  const currentMonthExpenses = sumExpenses(currentMonthTransactions);
-  const previousMonthExpenses = sumExpenses(previousMonthTransactions);
+  const completedTransactions = transactions.filter(isCompletedForTotals);
+  const currentMonthTransactions = completedTransactions.filter((transaction) => isWithin(transaction.date, currentStart, nextStart));
+  const previousMonthTransactions = completedTransactions.filter((transaction) => isWithin(transaction.date, previousStart, currentStart));
+  const summary = calculateMonthlyFinancialSummary({
+    baseMonthlyIncome: monthlyIncome,
+    currentMonthTransactions,
+    previousMonthTransactions,
+    savingsGoal
+  });
   const currentSmallExpenses = currentMonthTransactions.filter((transaction) => isSmallExpense(transaction, monthlyIncome));
   const previousSmallExpenses = previousMonthTransactions.filter((transaction) => isSmallExpense(transaction, monthlyIncome));
-  const smallExpenseTotal = currentSmallExpenses.reduce((sum, transaction) => sum + positiveAmount(transaction), 0);
-  const previousSmallExpenseTotal = previousSmallExpenses.reduce((sum, transaction) => sum + positiveAmount(transaction), 0);
+  const smallExpenseRefunds = currentMonthTransactions.filter((transaction) => isRefund(transaction) && isNonEssentialExpense(transaction)).reduce((sum, transaction) => sum + positiveAmount(transaction), 0);
+  const previousSmallExpenseRefunds = previousMonthTransactions.filter((transaction) => isRefund(transaction) && isNonEssentialExpense(transaction)).reduce((sum, transaction) => sum + positiveAmount(transaction), 0);
+  const smallExpenseTotal = Math.max(0, currentSmallExpenses.reduce((sum, transaction) => sum + positiveAmount(transaction), 0) - smallExpenseRefunds);
+  const previousSmallExpenseTotal = Math.max(0, previousSmallExpenses.reduce((sum, transaction) => sum + positiveAmount(transaction), 0) - previousSmallExpenseRefunds);
   const smallExpenseTrend = compareNumber(smallExpenseTotal, previousSmallExpenseTotal);
-  const currentMonthSavings = monthlyIncome > 0 ? monthlyIncome - currentMonthExpenses : 0;
-  const previousMonthSavings = monthlyIncome > 0 ? monthlyIncome - previousMonthExpenses : 0;
-  const savingsRate = safePercentage(currentMonthSavings, monthlyIncome);
-  const previousSavingsRate = safePercentage(previousMonthSavings, monthlyIncome);
   const monthlyGoalAmount = Number(savingsGoal?.monthlyContribution || 0);
-  const goalProgress = monthlyGoalAmount > 0 ? safePercentage(currentMonthSavings, monthlyGoalAmount) : null;
-  const savingsTrend = previousSavingsRate === null || savingsRate === null ? "neutral" : compareNumber(savingsRate, previousSavingsRate);
-  const incomeUsedPercentage = safePercentage(currentMonthExpenses, monthlyIncome);
-  const previousIncomeUsedPercentage = safePercentage(previousMonthExpenses, monthlyIncome);
-  const incomeUsedTrend = previousIncomeUsedPercentage === null || incomeUsedPercentage === null ? "neutral" : compareNumber(incomeUsedPercentage, previousIncomeUsedPercentage);
+  const savingsComparisonCurrent = monthlyGoalAmount > 0 ? summary.goalProgress : summary.savingsRate;
+  const savingsComparisonPrevious = monthlyGoalAmount > 0 ? summary.previousGoalProgress : summary.previousSavingsRate;
+  const savingsTrend = summary.overspentAmount > 0
+    ? "down"
+    : savingsComparisonPrevious === null || savingsComparisonCurrent === null
+      ? "neutral"
+      : compareNumber(savingsComparisonCurrent, savingsComparisonPrevious);
+  const incomeUsedTrend = summary.previousIncomeUsedPercentage === null || summary.incomeUsedPercentage === null
+    ? "neutral"
+    : compareNumber(summary.incomeUsedPercentage, summary.previousIncomeUsedPercentage);
+  const hasIncomeConfigured = monthlyIncome > 0;
 
   return {
     hasMovements: currentMonthTransactions.length > 0,
@@ -185,18 +285,33 @@ export function calculateFinancialInsights({
       trendState: trendStateFor(smallExpenseTrend, false)
     },
     savings: {
-      amount: currentMonthSavings,
-      goalProgress,
-      rate: savingsRate,
+      amount: summary.currentSavings,
+      goalProgress: summary.goalProgress,
+      meta: summary.overspentAmount > 0
+        ? `Excediste tus ingresos por ${summary.overspentAmount}`
+        : summary.goalProgress === 100
+          ? "Meta alcanzada"
+          : "",
+      rate: summary.savingsRate,
       title: monthlyGoalAmount > 0 ? "Objetivo de ahorro\nmensual" : "Ahorro del mes",
       trend: savingsTrend,
-      trendState: trendStateFor(savingsTrend, true)
+      trendState: summary.overspentAmount > 0 || summary.currentSavings < 0
+        ? { direction: "down", tone: "negative" }
+        : summary.goalProgress === 100
+          ? { direction: "up", tone: "positive" }
+          : trendStateFor(savingsTrend, true)
     },
     incomeUsed: {
-      differenceFromPreviousMonth: incomeUsedPercentage !== null && previousIncomeUsedPercentage !== null ? incomeUsedPercentage - previousIncomeUsedPercentage : null,
-      percentage: incomeUsedPercentage,
+      differenceFromPreviousMonth: summary.incomeUsedPercentage !== null && summary.previousIncomeUsedPercentage !== null ? summary.incomeUsedPercentage - summary.previousIncomeUsedPercentage : null,
+      meta: !hasIncomeConfigured
+        ? "Configurá tus ingresos para calcularlo"
+        : summary.overspentAmount > 0
+          ? `Excediste tus ingresos por ${summary.overspentAmount}`
+          : "",
+      overspentAmount: summary.overspentAmount,
+      percentage: hasIncomeConfigured ? summary.incomeUsedPercentage : null,
       trend: incomeUsedTrend,
-      trendState: trendStateFor(incomeUsedTrend, false)
+      trendState: summary.overspentAmount > 0 ? { direction: "down", tone: "negative" } : trendStateFor(incomeUsedTrend, false)
     }
   };
 }

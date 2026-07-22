@@ -8,6 +8,7 @@ import {
 } from "../services/notificationsService";
 import {
   createAccountApi,
+  createCategoryApi,
   createRecurringPaymentApi,
   createGoalApi,
   createInstallmentPurchaseApi,
@@ -61,6 +62,8 @@ type TransactionInput = {
     remainingAmount?: number;
     nextDueDate?: string;
   };
+  scheduledPaymentId?: string;
+  receiptUrl?: string;
 };
 
 type TransferInput = {
@@ -84,6 +87,7 @@ type RecurringPaymentInput = {
   accountId?: string;
   notificationsEnabled?: boolean;
   reminderDaysBefore?: number;
+  categoryId?: string;
 };
 
 type GoalInput = {
@@ -139,6 +143,7 @@ type FinFlowState = {
   loadAccounts: () => Promise<void>;
   loadCategories: (type?: "income" | "expense") => Promise<void>;
   createAccount: (input: AccountInput) => Promise<Account>;
+  createCategory: (input: { name: string; type: "income" | "expense"; icon: string; color: string }) => Promise<Category>;
   loadTransactions: (filters?: { dateFrom?: string; dateTo?: string; limit?: number }) => Promise<void>;
   createTransaction: (input: TransactionInput) => Promise<Transaction>;
   createTransfer: (input: TransferInput) => Promise<Transaction>;
@@ -266,6 +271,16 @@ export const useFinFlowStore = create<FinFlowState>()((set, get) => {
         fail(error);
       }
     },
+    createCategory: async (input) => {
+      set({ loading: true, error: null, errors: null });
+      try {
+        const category = await createCategoryApi(input);
+        set({ categories: [...get().categories, category], loading: false });
+        return category;
+      } catch (error) {
+        fail(error);
+      }
+    },
     loadTransactions: async (filters = {}) => {
       set({ loading: true, error: null, errors: null });
       try {
@@ -343,6 +358,7 @@ export const useFinFlowStore = create<FinFlowState>()((set, get) => {
           loading: false
         });
         await get().loadOverview();
+        await get().loadTransactions({ limit: 500 });
       } catch (error) {
         fail(error);
       }
@@ -353,6 +369,7 @@ export const useFinFlowStore = create<FinFlowState>()((set, get) => {
         const purchase = await markInstallmentPaidApi(purchaseId, installmentId);
         set({ installmentPurchases: get().installmentPurchases.map((item) => (item.id === purchaseId ? purchase : item)), loading: false });
         await get().loadOverview();
+        await get().loadTransactions({ limit: 500 });
       } catch (error) {
         fail(error);
       }

@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import { router } from "expo-router";
 import { Header } from "../src/components/Header";
 import { ScreenContainer } from "../src/components/ScreenContainer";
+import { fetchNotifications } from "../src/services/notificationsService";
 import { useFinFlowStore } from "../src/store/useFinFlowStore";
 import { colors, spacing, typography } from "../src/theme";
 import { FinFlowNotification } from "../src/types/finflow";
@@ -25,20 +26,43 @@ function openRelated(notification: FinFlowNotification) {
   const type = notification.relatedEntityType || notification.related_entity_type;
   const id = notification.relatedEntityId || notification.related_entity_id;
   if (!id) return;
-  if (type === "payment") router.push(`/payment/${id}`);
-  if (type === "installment") router.push("/(tabs)/plan?tab=Calendario");
-  if (type === "card") router.push(`/card/${id}`);
-  if (type === "transaction") router.push(`/transaction/${id}`);
-  if (type === "goal") router.push(`/goal/${id}`);
+  if (type === "payment") router.push({ pathname: "/payment/[id]", params: { id } });
+  if (type === "installment") router.push({ pathname: "/(tabs)/plan", params: { tab: "Calendario" } });
+  if (type === "card") router.push({ pathname: "/card/[id]", params: { id } });
+  if (type === "transaction") router.push({ pathname: "/transaction/[id]", params: { id } });
+  if (type === "goal") router.push({ pathname: "/goal/[id]", params: { id } });
 }
 
 export default function Notifications() {
-  const { completeNotification, loadNotifications, markAllNotificationsRead, markInstallmentPaid, markNotificationRead, markPaymentPaid, notifications, snoozeNotification } = useFinFlowStore();
+  const { completeNotification, markAllNotificationsRead, markInstallmentPaid, markNotificationRead, markPaymentPaid, snoozeNotification } = useFinFlowStore();
+  const [notifications, setNotifications] = useState<FinFlowNotification[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
   const [filter, setFilter] = useState<Filter>("Todas");
 
   useEffect(() => {
-    void loadNotifications(filter === "Pendientes" ? "pending" : filter === "Leídas" ? "read" : undefined);
-  }, [filter, loadNotifications]);
+    let alive = true;
+    async function load() {
+      setLoading(true);
+      setLoadError("");
+      try {
+        const status = filter === "Pendientes" ? "pending" : filter === "Leídas" ? "read" : undefined;
+        const next = await fetchNotifications(status);
+        if (alive) setNotifications(Array.isArray(next) ? next : []);
+      } catch (error) {
+        if (alive) {
+          setLoadError(error instanceof Error ? error.message : "No se pudieron cargar las notificaciones.");
+          setNotifications([]);
+        }
+      } finally {
+        if (alive) setLoading(false);
+      }
+    }
+    void load();
+    return () => {
+      alive = false;
+    };
+  }, [filter]);
 
   const visible = useMemo(() => {
     if (filter === "Pendientes") return notifications.filter((item) => item.status === "pending");
@@ -64,7 +88,13 @@ export default function Notifications() {
         back
         right={
           notifications.some((item) => item.status === "pending") ? (
-            <Pressable accessibilityRole="button" onPress={() => void markAllNotificationsRead()}>
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => {
+                void markAllNotificationsRead();
+                setNotifications((items) => items.map((item) => (item.status === "pending" ? { ...item, status: "read" } : item)));
+              }}
+            >
               <Text style={styles.readAll}>Leer todo</Text>
             </Pressable>
           ) : null
@@ -77,7 +107,17 @@ export default function Notifications() {
           </Pressable>
         ))}
       </View>
-      {groups.length ? (
+      {loading ? (
+        <View style={styles.emptyPanel}>
+          <Text style={styles.emptyTitle}>Cargando notificaciones...</Text>
+          <Text style={styles.emptyText}>Estamos buscando tus avisos pendientes.</Text>
+        </View>
+      ) : loadError ? (
+        <View style={styles.emptyPanel}>
+          <Text style={styles.emptyTitle}>No se pudieron cargar</Text>
+          <Text style={styles.emptyText}>{loadError}</Text>
+        </View>
+      ) : groups.length ? (
         groups.map((group) => (
           <View key={group.title} style={styles.group}>
             <Text style={styles.groupTitle}>{group.title}</Text>
@@ -92,13 +132,21 @@ export default function Notifications() {
                   if (type === "payment" && id) void markPaymentPaid(id).then(() => completeNotification(notification.id));
                   else if (type === "installment" && id && installmentId) void markInstallmentPaid(id, installmentId).then(() => completeNotification(notification.id));
                   else void completeNotification(notification.id);
+                  setNotifications((items) => items.map((item) => (item.id === notification.id ? { ...item, status: "completed" } : item)));
                 }}
                 onOpen={() => {
                   void markNotificationRead(notification.id);
+                  setNotifications((items) => items.map((item) => (item.id === notification.id ? { ...item, status: "read" } : item)));
                   openRelated(notification);
                 }}
-                onRead={() => void markNotificationRead(notification.id)}
-                onSnooze={() => void snoozeNotification(notification.id)}
+                onRead={() => {
+                  void markNotificationRead(notification.id);
+                  setNotifications((items) => items.map((item) => (item.id === notification.id ? { ...item, status: "read" } : item)));
+                }}
+                onSnooze={() => {
+                  void snoozeNotification(notification.id);
+                  setNotifications((items) => items.map((item) => (item.id === notification.id ? { ...item, status: "snoozed" } : item)));
+                }}
               />
             ))}
           </View>

@@ -63,6 +63,10 @@ export async function fetchCategories(type?: "income" | "expense") {
   return (await apiRequest<CategoriesResponse>(`/categories${query}`, { requireAuth: true })).categories;
 }
 
+export async function createCategoryApi(input: { name: string; type: "income" | "expense"; icon: string; color: string }) {
+  return (await apiRequest<{ category: Category }>("/categories", { body: input, method: "POST", requireAuth: true })).category;
+}
+
 export async function fetchTransactions(filters: { dateFrom?: string; dateTo?: string; limit?: number } = {}) {
   const params = new URLSearchParams();
   if (filters.dateFrom) params.set("dateFrom", filters.dateFrom);
@@ -95,6 +99,8 @@ export async function createTransactionApi(input: {
     remainingAmount?: number;
     nextDueDate?: string;
   };
+  scheduledPaymentId?: string;
+  receiptUrl?: string;
 }) {
   return apiRequest<TransactionResponse>("/transactions", { body: input, method: "POST", requireAuth: true });
 }
@@ -130,6 +136,7 @@ export async function createRecurringPaymentApi(input: {
   kind?: "fixed" | "subscription" | "service";
   accountId?: string;
   notificationsEnabled?: boolean;
+  categoryId?: string;
 }) {
   return (await apiRequest<RecurringPaymentResponse>("/finance/recurring-payments", { body: input, method: "POST", requireAuth: true })).payment;
 }

@@ -1,12 +1,14 @@
 import { useEffect, useMemo, useState } from "react";
 import { Modal, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { router } from "expo-router";
-import { Filter, Search } from "lucide-react-native";
+import { BookOpen, Circle, Filter, Heart, Home, PawPrint, Search, ShoppingBag, Ticket, TramFront, Utensils, Zap } from "lucide-react-native";
 import { Header } from "../../src/components/Header";
 import { ScreenContainer } from "../../src/components/ScreenContainer";
 import { useFinFlowStore } from "../../src/store/useFinFlowStore";
+import { useSessionStore } from "../../src/store/useSessionStore";
 import { colors, spacing, typography } from "../../src/theme";
-import { Account, Transaction, TransactionType } from "../../src/types/finflow";
+import { Account, Category, Transaction, TransactionType } from "../../src/types/finflow";
+import { calculateMovementSummary } from "../../src/utils/movementSummary";
 import { formatMoney } from "../../src/utils/money";
 
 const mainFilters = ["Todos", "Gastos", "Ingresos", "Transferencias"] as const;
@@ -42,6 +44,9 @@ function positiveAmount(transaction: Transaction) {
 
 function transactionTypeLabel(type: TransactionType) {
   if (type === "income") return "Ingreso";
+  if (type === "refund") return "Reintegro";
+  if (type === "goal_contribution") return "Aporte a meta";
+  if (type === "internal_transfer") return "Transferencia";
   if (type === "transfer") return "Transferencia";
   return "Gasto";
 }
@@ -75,12 +80,17 @@ function isWithinDate(value: string, from: string, to: string) {
   return true;
 }
 
+function transactionId(transaction: Transaction) {
+  return String(transaction.id || transaction._id || "");
+}
+
 function canOpenTransaction(transaction: Transaction) {
-  return /^[a-f\d]{24}$/i.test(String(transaction.id || ""));
+  return Boolean(transactionId(transaction));
 }
 
 export default function Transactions() {
-  const { accounts, loadAccounts, loadTransactions, transactions } = useFinFlowStore();
+  const { accounts, categories, loadAccounts, loadCategories, loadTransactions, transactions } = useFinFlowStore();
+  const { authUser, profile } = useSessionStore();
   const [filter, setFilter] = useState<MainFilter>("Todos");
   const [query, setQuery] = useState("");
   const [advancedOpen, setAdvancedOpen] = useState(false);
@@ -88,21 +98,22 @@ export default function Transactions() {
 
   useEffect(() => {
     void loadAccounts();
+    void loadCategories();
     void loadTransactions();
-  }, [loadAccounts, loadTransactions]);
+  }, [loadAccounts, loadCategories, loadTransactions]);
 
   const accountById = useMemo(() => new Map(accounts.map((account) => [account.id, account])), [accounts]);
+  const categoryById = useMemo(() => new Map(categories.map((category) => [category.id, category])), [categories]);
   const now = new Date();
-  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
-  const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59).getTime();
-  const monthTransactions = transactions.filter((transaction) => {
-    const time = new Date(transaction.date).getTime();
-    return time >= monthStart && time <= monthEnd;
+  const currency = profile?.primary_currency || "UYU";
+  const monthSummary = calculateMovementSummary({
+    selectedMonth: now,
+    transactions,
+    userId: authUser?.id
   });
-  const currency = accounts[0]?.currency || transactions[0]?.currency || "UYU";
-  const monthlyExpenses = monthTransactions.filter((transaction) => transaction.type === "expense").reduce((sum, transaction) => sum + positiveAmount(transaction), 0);
-  const monthlyIncome = monthTransactions.filter((transaction) => transaction.type === "income").reduce((sum, transaction) => sum + positiveAmount(transaction), 0);
-  const monthlyBalance = monthlyIncome - monthlyExpenses;
+  const monthlyExpenses = monthSummary.netExpenses;
+  const monthlyIncome = monthSummary.actualIncome;
+  const monthlyBalance = monthSummary.balance;
 
   const visible = useMemo(() => {
     const normalized = query.trim().toLowerCase();
@@ -196,9 +207,11 @@ export default function Transactions() {
               {group.data.map((transaction) => (
                 <TransactionRow
                   account={accountById.get(transaction.account_id || transaction.accountId || "")}
+                  category={categoryById.get(transaction.category_id || transaction.categoryId || "")}
                   key={transaction.id}
                   onPress={() => {
-                    if (canOpenTransaction(transaction)) router.push(`/transaction/${transaction.id}`);
+                    const id = transactionId(transaction);
+                    if (id) router.push({ pathname: "/transaction/[id]", params: { id } });
                   }}
                   transaction={transaction}
                 />
@@ -231,7 +244,7 @@ function Summary({ label, tone, value }: { label: string; tone: "income" | "expe
   );
 }
 
-function TransactionRow({ account, onPress, transaction }: { account?: Account; onPress: () => void; transaction: Transaction }) {
+function TransactionRow({ account, category, onPress, transaction }: { account?: Account; category?: Category; onPress: () => void; transaction: Transaction }) {
   const title = transaction.merchant || transaction.title || "Movimiento";
   const amount = positiveAmount(transaction);
   const isIncome = transaction.type === "income";
@@ -240,11 +253,12 @@ function TransactionRow({ account, onPress, transaction }: { account?: Account; 
   const date = new Date(transaction.date).toLocaleDateString("es-UY", { day: "2-digit", month: "short" });
   const meta = [String(transaction.category || transactionTypeLabel(transaction.type)), date, account?.name || account?.type].filter(Boolean).join(" · ");
   const disabled = !canOpenTransaction(transaction);
+  const CategoryIcon = categoryIcon(category?.icon);
 
   return (
     <Pressable accessibilityRole="button" disabled={disabled} onPress={onPress} style={[styles.transactionRow, disabled && styles.disabledRow]}>
       <View style={styles.initials}>
-        <Text style={styles.initialsText}>{initials(title)}</Text>
+        <CategoryIcon color={categoryColor(category?.color)} size={19} />
       </View>
       <View style={styles.rowCopy}>
         <Text numberOfLines={1} style={styles.rowTitle}>{title}</Text>
@@ -255,6 +269,16 @@ function TransactionRow({ account, onPress, transaction }: { account?: Account; 
       </Text>
     </Pressable>
   );
+}
+
+function categoryIcon(name?: string) {
+  const icons: Record<string, typeof Circle> = { book: BookOpen, heart: Heart, home: Home, paw: PawPrint, "paw-print": PawPrint, "shopping-bag": ShoppingBag, bag: ShoppingBag, ticket: Ticket, "tram-front": TramFront, bus: TramFront, "bus-front": TramFront, utensils: Utensils, zap: Zap };
+  return icons[String(name || "")] || Circle;
+}
+
+function categoryColor(value?: string) {
+  const palette: Record<string, string> = { lime: colors.lime, blue: colors.blue, orange: colors.orange, purple: colors.lavender, gray: colors.grayMedium, black: colors.white };
+  return palette[String(value || "")] || colors.white;
 }
 
 function AdvancedSheet({

@@ -9,19 +9,21 @@ import { useSessionStore } from "../src/store/useSessionStore";
 import { colors, spacing, typography } from "../src/theme";
 import { getAntExpenses, percentage, positiveAmount } from "../src/utils/financeInsights";
 import { formatMoney } from "../src/utils/money";
+import { calculateMovementSummary } from "../src/utils/movementSummary";
 
 export default function AntExpenses() {
   const { goals, loadOverview, overview, transactions } = useFinFlowStore();
   const profile = useSessionStore((state) => state.profile);
   const currency = profile?.primary_currency || "UYU";
-  const ant = useMemo(() => getAntExpenses(transactions), [transactions]);
+  const monthlySummary = calculateMovementSummary({ transactions });
+  const ant = useMemo(() => getAntExpenses(monthlySummary.includedExpenses), [monthlySummary.includedExpenses]);
   const total = ant.reduce((sum, transaction) => sum + positiveAmount(transaction), 0);
   const average = ant.length ? total / ant.length : 0;
   const merchant = top(ant.map((transaction) => transaction.merchant));
   const category = top(ant.map((transaction) => String(transaction.category || transaction.title || "Otros")));
   const day = top(ant.map((transaction) => transaction.weekday || "sin día"));
   const hour = top(ant.map((transaction) => (transaction.hour == null ? "sin hora" : `${transaction.hour}:00`)));
-  const monthlyPercent = percentage(total, overview?.expenses || 0);
+  const monthlyPercent = percentage(total, monthlySummary.netExpenses);
   const goal = goals[0];
 
   useEffect(() => {
