@@ -18,6 +18,8 @@ const installmentPurchaseSchema = new Schema(
     accountId: { type: Types.ObjectId, ref: "Account", default: null },
     name: { type: String, required: true, trim: true },
     category: { type: String, required: true, trim: true },
+    cardName: { type: String, required: true, trim: true },
+    note: { type: String, default: null, trim: true },
     totalAmount: { type: Number, required: true, min: 0 },
     installmentAmount: { type: Number, required: true, min: 0 },
     totalInstallments: { type: Number, required: true, min: 1 },

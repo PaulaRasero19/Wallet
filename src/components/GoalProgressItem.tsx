@@ -1,11 +1,12 @@
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { Goal } from "../types/finflow";
 import { colors, spacing, typography } from "../theme";
-import { formatMoney, percentage } from "../utils/money";
+import { formatMoney } from "../utils/money";
+import { cappedGoalProgress } from "../utils/goals";
 import { DotProgress } from "./DotProgress";
 
 export function GoalProgressItem({ goal, onAdd, onDelete }: { goal: Goal; onAdd: () => void; onDelete: () => void }) {
-  const progress = percentage(goal.saved, goal.target);
+  const progress = cappedGoalProgress(goal.saved, goal.target);
 
   return (
     <View style={styles.wrap}>

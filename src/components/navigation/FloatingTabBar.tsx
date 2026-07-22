@@ -2,6 +2,7 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import { BlurView } from "expo-blur";
 import { ArrowLeftRight, Brain, CalendarDays, Plus } from "lucide-react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { router } from "expo-router";
 import { colors, typography } from "../../theme";
 import { DotGrid } from "../DotGrid";
 
@@ -31,9 +32,14 @@ const labelMap: Record<string, string> = {
 export function FloatingTabBar({ navigation, state }: any) {
   const insets = useSafeAreaInsets();
   const visibleRoutes = state.routes.filter((route: any) => routeOrder.includes(route.name)).sort((a: any, b: any) => routeOrder.indexOf(a.name) - routeOrder.indexOf(b.name));
-  const focusedRoute = state.routes[state.index]?.name;
+  const actualFocusedRoute = state.routes[state.index]?.name;
+  const focusedRoute = actualFocusedRoute?.startsWith("add-") ? "add" : actualFocusedRoute;
 
   function goTo(routeName: string) {
+    if (routeName === "add") {
+      router.replace("/(tabs)/add");
+      return;
+    }
     if (focusedRoute !== routeName) navigation.navigate(routeName);
   }
 

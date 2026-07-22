@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
 import { router } from "expo-router";
+import { CalendarClock, CircleDollarSign, CreditCard, Landmark } from "lucide-react-native";
 import { Header } from "../src/components/Header";
 import { ScreenContainer } from "../src/components/ScreenContainer";
 import { fetchNotifications } from "../src/services/notificationsService";
@@ -22,12 +23,28 @@ function dateLabel(value?: string | null) {
   return "Próximas";
 }
 
+function timeRemaining(notification: FinFlowNotification) {
+  const raw = typeof notification.metadata?.dueDate === "string" ? notification.metadata.dueDate : notification.scheduledFor || notification.scheduled_for;
+  if (!raw) return "Hoy";
+  const due = new Date(raw);
+  const today = new Date();
+  due.setHours(0, 0, 0, 0);
+  today.setHours(0, 0, 0, 0);
+  const days = Math.round((due.getTime() - today.getTime()) / 86_400_000);
+  if (days < -1) return `Venció hace ${Math.abs(days)} días`;
+  if (days === -1) return "Venció ayer";
+  if (days === 0) return "Vence hoy";
+  if (days === 1) return "Vence mañana";
+  if (days === 7) return "Vence en una semana";
+  return `Vence en ${days} días`;
+}
+
 function openRelated(notification: FinFlowNotification) {
   const type = notification.relatedEntityType || notification.related_entity_type;
   const id = notification.relatedEntityId || notification.related_entity_id;
   if (!id) return;
   if (type === "payment") router.push({ pathname: "/payment/[id]", params: { id } });
-  if (type === "installment") router.push({ pathname: "/(tabs)/plan", params: { tab: "Calendario" } });
+  if (type === "installment") router.push({ pathname: "/installment/[id]", params: { id, installmentId: String(notification.metadata?.installmentId || "") } });
   if (type === "card") router.push({ pathname: "/card/[id]", params: { id } });
   if (type === "transaction") router.push({ pathname: "/transaction/[id]", params: { id } });
   if (type === "goal") router.push({ pathname: "/goal/[id]", params: { id } });
@@ -39,6 +56,7 @@ export default function Notifications() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
   const [filter, setFilter] = useState<Filter>("Todas");
+  const markedOnOpen = useRef(false);
 
   useEffect(() => {
     let alive = true;
@@ -48,7 +66,16 @@ export default function Notifications() {
       try {
         const status = filter === "Pendientes" ? "pending" : filter === "Leídas" ? "read" : undefined;
         const next = await fetchNotifications(status);
-        if (alive) setNotifications(Array.isArray(next) ? next : []);
+        if (alive) {
+          const rows = Array.isArray(next) ? next : [];
+          if (!markedOnOpen.current) {
+            markedOnOpen.current = true;
+            if (rows.some((item) => item.status === "pending")) {
+              await markAllNotificationsRead();
+              setNotifications(rows.map((item) => item.status === "pending" ? { ...item, status: "read" } : item));
+            } else setNotifications(rows);
+          } else setNotifications(rows);
+        }
       } catch (error) {
         if (alive) {
           setLoadError(error instanceof Error ? error.message : "No se pudieron cargar las notificaciones.");
@@ -62,7 +89,7 @@ export default function Notifications() {
     return () => {
       alive = false;
     };
-  }, [filter]);
+  }, [filter, markAllNotificationsRead]);
 
   const visible = useMemo(() => {
     if (filter === "Pendientes") return notifications.filter((item) => item.status === "pending");
@@ -129,10 +156,15 @@ export default function Notifications() {
                   const type = notification.relatedEntityType || notification.related_entity_type;
                   const id = notification.relatedEntityId || notification.related_entity_id;
                   const installmentId = typeof notification.metadata?.installmentId === "string" ? notification.metadata.installmentId : "";
-                  if (type === "payment" && id) void markPaymentPaid(id).then(() => completeNotification(notification.id));
-                  else if (type === "installment" && id && installmentId) void markInstallmentPaid(id, installmentId).then(() => completeNotification(notification.id));
-                  else void completeNotification(notification.id);
-                  setNotifications((items) => items.map((item) => (item.id === notification.id ? { ...item, status: "completed" } : item)));
+                  Alert.alert("FinFlow", type === "installment" ? "¿Marcar esta cuota como pagada?" : "¿Marcar este pago como realizado?", [
+                    { style: "cancel", text: "Cancelar" },
+                    { text: "Confirmar", onPress: () => void (async () => {
+                      if (type === "payment" && id) await markPaymentPaid(id);
+                      else if (type === "installment" && id && installmentId) await markInstallmentPaid(id, installmentId);
+                      await completeNotification(notification.id);
+                      setNotifications((items) => items.map((item) => (item.id === notification.id ? { ...item, status: "completed" } : item)));
+                    })() }
+                  ]);
                 }}
                 onOpen={() => {
                   void markNotificationRead(notification.id);
@@ -153,8 +185,7 @@ export default function Notifications() {
         ))
       ) : (
         <View style={styles.emptyPanel}>
-          <Text style={styles.emptyTitle}>Sin notificaciones</Text>
-          <Text style={styles.emptyText}>Cuando haya vencimientos, cierres de tarjeta o recordatorios reales, van a aparecer acá.</Text>
+          <Text style={styles.emptyTitle}>No tenés recordatorios pendientes.</Text>
         </View>
       )}
     </ScreenContainer>
@@ -175,12 +206,17 @@ function NotificationRow({
   onSnooze: () => void;
 }) {
   const unread = notification.status === "pending";
+  const relatedType = notification.relatedEntityType || notification.related_entity_type;
+  const Icon = relatedType === "installment" ? CreditCard : notification.type === "income_reminder" ? Landmark : relatedType === "payment" ? CircleDollarSign : CalendarClock;
+  const canMarkPaid = relatedType === "payment" || relatedType === "installment";
+  const isIncome = notification.type === "income_reminder" || notification.metadata?.kind === "income";
   return (
     <Pressable accessibilityRole="button" onPress={onOpen} style={styles.row}>
-      <View style={[styles.dot, unread && styles.unreadDot]} />
+      <View style={[styles.notificationIcon, unread && styles.unreadIcon]}><Icon color={colors.white} size={17} /></View>
       <View style={styles.copy}>
         <Text style={styles.title}>{notification.title}</Text>
         <Text style={styles.message}>{notification.message}</Text>
+        <Text style={styles.time}>{timeRemaining(notification)} · {unread ? "Sin leer" : notification.status === "completed" ? "Resuelta" : "Leída"}</Text>
         <View style={styles.actions}>
           {unread ? (
             <Pressable accessibilityRole="button" onPress={onRead}>
@@ -190,9 +226,9 @@ function NotificationRow({
           <Pressable accessibilityRole="button" onPress={onSnooze}>
             <Text style={styles.actionText}>Posponer</Text>
           </Pressable>
-          <Pressable accessibilityRole="button" onPress={onComplete}>
-            <Text style={styles.actionText}>Marcar como pagado</Text>
-          </Pressable>
+          {canMarkPaid ? <Pressable accessibilityRole="button" onPress={onComplete}>
+            <Text style={styles.actionText}>{isIncome ? "Marcar como recibido" : "Marcar como pagado"}</Text>
+          </Pressable> : null}
         </View>
       </View>
     </Pressable>
@@ -279,6 +315,22 @@ const styles = StyleSheet.create({
     ...typography.body,
     color: colors.transparentWhite,
     marginTop: 3
+  },
+  notificationIcon: {
+    alignItems: "center",
+    backgroundColor: "rgba(255,255,255,0.12)",
+    borderRadius: 18,
+    height: 36,
+    justifyContent: "center",
+    width: 36
+  },
+  unreadIcon: {
+    backgroundColor: "#E65C50"
+  },
+  time: {
+    ...typography.label,
+    color: colors.transparentWhite,
+    marginTop: spacing.xs
   },
   readAll: {
     ...typography.label,

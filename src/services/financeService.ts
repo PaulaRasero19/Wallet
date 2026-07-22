@@ -130,10 +130,10 @@ export async function createRecurringPaymentApi(input: {
   category: string;
   amount: number;
   currency: Currency;
-  frequency: "once" | "weekly" | "monthly" | "annual";
+  frequency: "once" | "weekly" | "fortnightly" | "monthly" | "annual";
   reminderDaysBefore?: number;
   nextChargeDate: string;
-  kind?: "fixed" | "subscription" | "service";
+  kind?: "fixed" | "subscription" | "service" | "income";
   accountId?: string;
   notificationsEnabled?: boolean;
   categoryId?: string;
@@ -141,8 +141,12 @@ export async function createRecurringPaymentApi(input: {
   return (await apiRequest<RecurringPaymentResponse>("/finance/recurring-payments", { body: input, method: "POST", requireAuth: true })).payment;
 }
 
-export async function createGoalApi(input: { name: string; target: number; saved?: number; currency: Currency; monthlyContribution?: number; targetDate?: string | null }) {
+export async function createGoalApi(input: { name: string; target: number; saved?: number; currency: Currency; targetDate?: string | null }) {
   return (await apiRequest<GoalResponse>("/finance/goals", { body: input, method: "POST", requireAuth: true })).goal;
+}
+
+export async function addGoalMoneyApi(id: string, amount: number) {
+  return (await apiRequest<GoalResponse>(`/finance/goals/${id}/contributions`, { body: { amount }, method: "POST", requireAuth: true })).goal;
 }
 
 export async function createInstallmentPurchaseApi(input: {
@@ -152,6 +156,8 @@ export async function createInstallmentPurchaseApi(input: {
   totalInstallments: number;
   firstDueDate: string;
   category: string;
+  cardName: string;
+  note?: string;
   currency: Currency;
   reminderDaysBefore?: number;
 }) {

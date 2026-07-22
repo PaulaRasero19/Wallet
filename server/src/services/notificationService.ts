@@ -1,6 +1,7 @@
 import { Types } from "mongoose";
 import { CreditCard } from "../models/CreditCard";
 import { DeviceToken } from "../models/DeviceToken";
+import { InstallmentPurchase } from "../models/InstallmentPurchase";
 import { Notification } from "../models/Notification";
 import { RecurringPayment } from "../models/RecurringPayment";
 import { ExpoPushProvider, InAppNotificationProvider } from "./notificationProviders";
@@ -22,6 +23,69 @@ function addDays(date: Date, days: number) {
   next.setDate(next.getDate() + days);
   next.setHours(9, 0, 0, 0);
   return next;
+}
+
+function startOfDay(value: Date) {
+  const date = new Date(value);
+  date.setHours(0, 0, 0, 0);
+  return date;
+}
+
+function daysUntil(value: Date) {
+  return Math.round((startOfDay(value).getTime() - startOfDay(new Date()).getTime()) / 86_400_000);
+}
+
+function money(amount: number, currency = "UYU") {
+  const symbol = currency === "USD" ? "US$" : currency === "EUR" ? "€" : "$U";
+  return `${symbol} ${amount.toLocaleString("es-UY", { maximumFractionDigits: 2 })}`;
+}
+
+function naturalReminder(input: { amount: number; currency?: string; dueDate: Date; income?: boolean; installmentNumber?: number; name: string; totalInstallments?: number }) {
+  const days = daysUntil(input.dueDate);
+  const date = input.dueDate.toLocaleDateString("es-UY", { day: "numeric", month: "long" });
+  const subject = input.installmentNumber
+    ? `Cuota ${input.installmentNumber} de ${input.totalInstallments} · ${input.name}`
+    : input.name;
+  const timing = days < 0 ? "está vencido" : days === 0 ? (input.income ? "se espera hoy" : "vence hoy") : days === 1 ? (input.income ? "se espera mañana" : "vence mañana") : days === 7 ? (input.income ? "se espera en una semana" : "vence en una semana") : input.income ? `se espera en ${days} días` : `vence en ${days} días`;
+  const title = `${subject} ${timing}`;
+  const message = input.income
+    ? `Esperás recibir ${money(input.amount, input.currency)} el ${date}.`
+    : input.installmentNumber
+      ? `${days < 0 ? "Venció" : "Vence"} el ${date} por ${money(input.amount, input.currency)}.`
+      : `${days < 0 ? "El pago de" : "Tenés que pagar"} ${money(input.amount, input.currency)} ${days < 0 ? `venció el ${date}` : `el ${date}`}.`;
+  return { message, priority: days < 0 ? "urgent" as const : days <= 1 ? "high" as const : days <= 3 ? "normal" as const : "low" as const, title };
+}
+
+function reminderKey(input: { dueDate: Date; income?: boolean; offset: number; relatedEntityId: Types.ObjectId; relatedEntityType: "payment" | "installment" }) {
+  const type = input.relatedEntityType === "installment" ? "installment_due" : input.income ? "income_reminder" : "payment_reminder";
+  return `${type}:${input.relatedEntityType}:${input.relatedEntityId}:${dayKey(input.dueDate)}:reminder-${input.offset}`;
+}
+
+async function ensureInternalReminder(input: { amount: number; currency: string; dueDate: Date; income?: boolean; installmentNumber?: number; name: string; offset: number; relatedEntityId: Types.ObjectId; relatedEntityType: "payment" | "installment"; totalInstallments?: number; installmentId?: string; userId: Types.ObjectId }) {
+  const due = new Date(input.dueDate);
+  due.setHours(9, 0, 0, 0);
+  const scheduledFor = addDays(due, -input.offset);
+  const copy = naturalReminder({ ...input, dueDate: due });
+  const type = input.relatedEntityType === "installment" ? "installment_due" : input.income ? "income_reminder" : "payment_reminder";
+  const dedupeKey = reminderKey({ ...input, dueDate: due });
+  await Notification.findOneAndUpdate(
+    { userId: input.userId, dedupeKey },
+    {
+      $set: {
+        actionType: `open_${input.relatedEntityType}`,
+        message: copy.message,
+        metadata: { amount: input.amount, currency: input.currency, dueDate: due.toISOString(), installmentId: input.installmentId, installmentNumber: input.installmentNumber, kind: input.income ? "income" : "payment", name: input.name, reminderDaysBefore: input.offset, totalInstallments: input.totalInstallments },
+        priority: copy.priority,
+        relatedEntityId: input.relatedEntityId,
+        relatedEntityType: input.relatedEntityType,
+        scheduledFor,
+        title: copy.title,
+        type
+      },
+      $setOnInsert: { dedupeKey, status: "pending", userId: input.userId }
+    },
+    { upsert: true }
+  );
 }
 
 function notificationDTO(notification: InstanceType<typeof Notification>) {
@@ -87,7 +151,7 @@ async function createIfMissing(input: {
   );
   if (notification.createdAt.getTime() === notification.updatedAt.getTime()) {
     await new InAppNotificationProvider().send({ message: input.message, metadata: input.metadata, title: input.title, userId: idOf(input.userId) });
-    if (input.priority === "urgent" || input.priority === "high") {
+    if (input.relatedEntityType !== "payment" && (input.priority === "urgent" || input.priority === "high")) {
       await new ExpoPushProvider().send({ message: input.message, metadata: input.metadata, title: input.title, userId: idOf(input.userId) });
     }
   }
@@ -99,49 +163,31 @@ export async function generateNotificationsForUser(userId: Types.ObjectId) {
   today.setHours(0, 0, 0, 0);
   const tomorrow = addDays(today, 1);
   const threeDays = addDays(today, 3);
-  const [payments, cards] = await Promise.all([RecurringPayment.find({ userId, status: { $ne: "rejected" } }), CreditCard.find({ userId })]);
+  const [payments, cards, purchases] = await Promise.all([
+    RecurringPayment.find({ userId, status: { $ne: "rejected" }, active: { $ne: false }, notificationsEnabled: { $ne: false } }),
+    CreditCard.find({ userId }),
+    InstallmentPurchase.find({ userId, status: "active" })
+  ]);
+  const validReminderKeys: string[] = [];
 
   for (const payment of payments) {
     const due = new Date(payment.nextChargeDate);
     due.setHours(9, 0, 0, 0);
-    if (dayKey(due) === dayKey(tomorrow)) {
-      await createIfMissing({
-        actionType: "open_payment",
-        message: `Te queda 1 día para pagar $U ${payment.amount.toLocaleString("es-UY")} · Vence el ${due.toLocaleDateString("es-UY", { day: "numeric", month: "long" })}`,
-        priority: "high",
-        relatedEntityId: payment._id,
-        relatedEntityType: "payment",
-        scheduledFor: due,
-        title: `Mañana vence ${payment.merchant}`,
-        type: "bill_due_tomorrow",
-        userId
-      });
-    } else if (dayKey(due) === dayKey(threeDays)) {
-      await createIfMissing({
-        actionType: "open_payment",
-        message: `Te quedan 3 días para pagar $U ${payment.amount.toLocaleString("es-UY")} · Vence el ${due.toLocaleDateString("es-UY", { day: "numeric", month: "long" })}`,
-        priority: "normal",
-        relatedEntityId: payment._id,
-        relatedEntityType: "payment",
-        scheduledFor: due,
-        title: `En 3 días vence ${payment.merchant}`,
-        type: "bill_due_soon",
-        userId
-      });
-    } else if (due < today) {
-      await createIfMissing({
-        actionType: "open_payment",
-        message: `Venció el ${due.toLocaleDateString("es-UY", { day: "numeric", month: "long" })}. Podés registrarlo como pagado o posponerlo.`,
-        priority: "urgent",
-        relatedEntityId: payment._id,
-        relatedEntityType: "payment",
-        scheduledFor: due,
-        title: `Todavía no pagaste ${payment.merchant}`,
-        type: "bill_overdue",
-        userId
-      });
+    validReminderKeys.push(reminderKey({ dueDate: due, income: payment.kind === "income", offset: payment.reminderDaysBefore, relatedEntityId: payment._id, relatedEntityType: "payment" }));
+    await ensureInternalReminder({ amount: payment.amount, currency: payment.currency, dueDate: due, income: payment.kind === "income", name: payment.merchant, offset: payment.reminderDaysBefore, relatedEntityId: payment._id, relatedEntityType: "payment", userId });
+  }
+
+  for (const purchase of purchases) {
+    for (const installment of purchase.installments.filter((item) => item.status === "pending")) {
+      validReminderKeys.push(reminderKey({ dueDate: new Date(installment.dueDate), offset: purchase.reminderDaysBefore, relatedEntityId: purchase._id, relatedEntityType: "installment" }));
+      await ensureInternalReminder({ amount: installment.amount, currency: purchase.currency, dueDate: installment.dueDate, installmentId: idOf(installment._id), installmentNumber: installment.number, name: purchase.name, offset: purchase.reminderDaysBefore, relatedEntityId: purchase._id, relatedEntityType: "installment", totalInstallments: purchase.totalInstallments, userId });
     }
   }
+
+  await Notification.updateMany(
+    { userId, relatedEntityType: { $in: ["payment", "installment"] }, dedupeKey: { $nin: validReminderKeys }, status: { $in: ["pending", "read", "snoozed"] } },
+    { $set: { status: "completed" } }
+  );
 
   for (const card of cards) {
     const closing = new Date(card.closingDate);
@@ -178,9 +224,14 @@ export async function generateNotificationsForUser(userId: Types.ObjectId) {
 export async function listNotifications(userId: Types.ObjectId, status?: string) {
   await generateNotificationsForUser(userId);
   const query: Record<string, unknown> = { userId };
-  if (status === "pending" || status === "read") query.status = status;
-  const notifications = await Notification.find(query).sort({ status: 1, scheduledFor: 1, createdAt: -1 }).limit(80);
-  return notifications.map(notificationDTO);
+  if (status === "pending") {
+    query.status = status;
+    query.scheduledFor = { $lte: new Date() };
+  } else if (status === "read") query.status = status;
+  else query.$or = [{ status: { $ne: "pending" } }, { scheduledFor: { $lte: new Date() } }];
+  const notifications = await Notification.find(query).limit(80);
+  const priority = { urgent: 0, high: 1, normal: 2, low: 3 } as const;
+  return notifications.sort((a, b) => priority[a.priority] - priority[b.priority] || Number(a.scheduledFor) - Number(b.scheduledFor)).map(notificationDTO);
 }
 
 export async function markNotificationRead(userId: Types.ObjectId, id: string) {
@@ -189,7 +240,7 @@ export async function markNotificationRead(userId: Types.ObjectId, id: string) {
 }
 
 export async function markAllNotificationsRead(userId: Types.ObjectId) {
-  await Notification.updateMany({ userId, status: "pending" }, { readAt: new Date(), status: "read" });
+  await Notification.updateMany({ userId, status: "pending", scheduledFor: { $lte: new Date() } }, { readAt: new Date(), status: "read" });
 }
 
 export async function snoozeNotification(userId: Types.ObjectId, id: string) {

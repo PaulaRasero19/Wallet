@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { useLocalSearchParams } from "expo-router";
 import { Header } from "../../src/components/Header";
+import { PrimaryButton } from "../../src/components/PrimaryButton";
 import { ScreenContainer } from "../../src/components/ScreenContainer";
 import { useFinFlowStore } from "../../src/store/useFinFlowStore";
 import { colors, spacing, typography } from "../../src/theme";
@@ -9,8 +10,9 @@ import { formatMoney } from "../../src/utils/money";
 
 export default function PaymentDetail() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { loadOverview, recurringPayments } = useFinFlowStore();
+  const { loadOverview, markPaymentPaid, recurringPayments } = useFinFlowStore();
   const payment = recurringPayments.find((item) => item.id === id);
+  const isIncome = payment?.kind === "income";
 
   useEffect(() => {
     void loadOverview("30d");
@@ -18,15 +20,16 @@ export default function PaymentDetail() {
 
   return (
     <ScreenContainer>
-      <Header title="Detalle de pago" back />
+      <Header title={isIncome ? "Ingreso previsto" : "Detalle de pago"} back />
       {payment ? (
         <View style={styles.panel}>
           <Text style={styles.title}>{payment.merchant}</Text>
-          <Row label="Importe estimado" value={formatMoney(payment.amount, payment.currency, false)} />
-          <Row label="Categoría" value={payment.category} />
+          <Row label={isIncome ? "Importe esperado" : "Importe estimado"} value={formatMoney(payment.amount, payment.currency, false)} />
+          <Row label={isIncome ? "Fuente" : "Categoría"} value={payment.category} />
           <Row label="Frecuencia" value={payment.frequency} />
-          <Row label="Próximo vencimiento" value={new Date(payment.nextChargeDate).toLocaleDateString("es-UY", { day: "2-digit", month: "long", year: "numeric" })} />
+          <Row label={isIncome ? "Próxima fecha esperada" : "Próximo vencimiento"} value={new Date(payment.nextChargeDate).toLocaleDateString("es-UY", { day: "2-digit", month: "long", year: "numeric" })} />
           <Row label="Estado" value={payment.status} />
+          {payment.status !== "paid" ? <View style={styles.payButton}><PrimaryButton onPress={() => void markPaymentPaid(payment.id)}>{isIncome ? "Marcar como recibido" : "Marcar como pagado"}</PrimaryButton></View> : null}
         </View>
       ) : (
         <Text style={styles.empty}>No encontré este pago para tu usuario.</Text>
@@ -61,6 +64,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     marginTop: spacing.xl,
     padding: spacing.lg
+  },
+  payButton: {
+    marginTop: spacing.lg
   },
   row: {
     borderBottomColor: colors.appGrayBorder,

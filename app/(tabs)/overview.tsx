@@ -1,7 +1,8 @@
-import { useEffect, useState } from "react";
-import { StyleSheet, useWindowDimensions, View } from "react-native";
+import { useCallback, useEffect, useState } from "react";
+import { AppState, StyleSheet, useWindowDimensions, View } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { router } from "expo-router";
+import { useFocusEffect } from "@react-navigation/native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AvailableMoney } from "../../src/components/home/AvailableMoney";
 import { HomeBalanceChart } from "../../src/components/home/HomeBalanceChart";
@@ -41,15 +42,18 @@ export default function Overview() {
   const pendingNotifications = notifications.filter((item) => item.status === "pending").length;
 
   useEffect(() => {
-    void (async () => {
-      await loadOverview(periodToApi(period));
-      await loadTransactions({ ...insightDateRange(), limit: 500 });
-    })();
-  }, [loadOverview, loadTransactions, period]);
-
-  useEffect(() => {
     void loadNotifications("pending");
+    const subscription = AppState.addEventListener("change", (state) => {
+      if (state === "active") void loadNotifications("pending");
+    });
+    return () => subscription.remove();
   }, [loadNotifications]);
+
+  useFocusEffect(useCallback(() => {
+    void loadNotifications("pending");
+    void loadOverview(periodToApi(period));
+    void loadTransactions({ ...insightDateRange(), limit: 500 });
+  }, [loadNotifications, loadOverview, loadTransactions, period]));
 
   const metrics = overviewMetrics({
     accounts,

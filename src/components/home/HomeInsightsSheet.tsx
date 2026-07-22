@@ -6,6 +6,7 @@ import { colors, spacing, typography } from "../../theme";
 import { Account, Currency, Goal, PlannerEvent, Transaction } from "../../types/finflow";
 import { getAntExpenses, percentage } from "../../utils/financeInsights";
 import { formatCompactMoney, formatMoney } from "../../utils/money";
+import { cappedGoalProgress } from "../../utils/goals";
 import { FinancialInsightCard } from "./FinancialInsightCard";
 import { RecentTransactionsList } from "./RecentTransactionsList";
 
@@ -39,7 +40,7 @@ export function HomeInsightsSheet({
   const sheetHeight = useRef(new Animated.Value(collapsed)).current;
   const antExpenses = useMemo(() => getAntExpenses(transactions), [transactions]);
   const antTotal = antExpenses.reduce((sum, transaction) => sum + Math.abs(transaction.raw_amount ?? transaction.rawAmount ?? transaction.amount), 0);
-  const goalPercent = goal ? percentage(goal.saved, goal.target) : 0;
+  const goalPercent = goal ? cappedGoalProgress(goal.saved, goal.target) : 0;
 
   useEffect(() => {
     Animated.spring(sheetHeight, {

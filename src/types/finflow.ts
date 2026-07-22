@@ -136,6 +136,10 @@ export type Goal = {
   target: number;
   currency: Currency;
   monthlyContribution: number;
+  monthly_contribution?: number;
+  targetDate?: string | null;
+  target_date?: string | null;
+  status?: "active" | "completed" | "paused";
   accent: AccentColor;
 };
 
@@ -145,12 +149,14 @@ export type RecurringPayment = {
   category: BudgetCategory | "Other";
   amount: number;
   currency: Currency;
-  frequency: "once" | "weekly" | "monthly" | "annual";
+  frequency: "once" | "weekly" | "fortnightly" | "monthly" | "annual";
   nextChargeDate: string;
   status: RecurringStatus | "paid";
-  kind: "fixed" | "subscription" | "service";
+  kind: "fixed" | "subscription" | "service" | "income";
   reminderDaysBefore?: number;
   reminder_days_before?: number;
+  notificationsEnabled?: boolean;
+  notifications_enabled?: boolean;
   active?: boolean;
   confidence: number;
   priceChange?: number;
@@ -164,6 +170,9 @@ export type InstallmentPurchase = {
   accountId?: string;
   account_id?: string;
   name: string;
+  cardName?: string;
+  card_name?: string;
+  note?: string;
   category: string;
   totalAmount: number;
   total_amount?: number;

@@ -44,6 +44,7 @@ export default function RootLayout() {
         <Stack.Screen name="goal/[id]" />
         <Stack.Screen name="card/[id]" />
         <Stack.Screen name="payment/[id]" />
+        <Stack.Screen name="installment/[id]" />
         <Stack.Screen name="(tabs)" />
       </Stack>
     </GestureHandlerRootView>

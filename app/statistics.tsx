@@ -11,6 +11,7 @@ import { colors, spacing, typography } from "../src/theme";
 import { categorySummary, getInstallments, overviewMetrics, percentage, positiveAmount } from "../src/utils/financeInsights";
 import { formatMoney } from "../src/utils/money";
 import { calculateMovementSummary } from "../src/utils/movementSummary";
+import { cappedGoalProgress } from "../src/utils/goals";
 
 const tabs = ["Resumen", "Categorías", "Tendencias", "Tarjetas"] as const;
 type Tab = (typeof tabs)[number];
@@ -36,7 +37,7 @@ export default function Statistics() {
   const categories = useMemo(() => categorySummary(monthlySummary.includedExpenses), [monthlySummary.includedExpenses]);
   const fixed = recurringPayments.reduce((sum, payment) => sum + Number(payment.amount || 0), 0);
   const variable = Math.max(0, metrics.expenses - fixed);
-  const savedPercent = metrics.goal ? percentage(metrics.goal.saved, metrics.goal.target) : 0;
+  const savedPercent = metrics.goal ? cappedGoalProgress(metrics.goal.saved, metrics.goal.target) : 0;
   const installments = getInstallments(transactions);
 
   useEffect(() => {

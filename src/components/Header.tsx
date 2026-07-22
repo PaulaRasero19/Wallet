@@ -11,9 +11,10 @@ type HeaderProps = {
   back?: boolean;
   actions?: Array<"search" | "filter" | "bell" | "logo">;
   right?: ReactNode;
+  onBack?: () => void;
 };
 
-export function Header({ title, dark = true, back = false, actions = [], right }: HeaderProps) {
+export function Header({ title, dark = true, back = false, actions = [], right, onBack }: HeaderProps) {
   const tint = dark ? colors.white : colors.black;
   const muted = dark ? colors.transparentWhite : colors.grayMedium;
 
@@ -21,7 +22,7 @@ export function Header({ title, dark = true, back = false, actions = [], right }
     <View style={styles.header}>
       <View style={styles.left}>
         {back ? (
-          <Pressable accessibilityRole="button" onPress={() => router.back()} style={styles.iconButton}>
+          <Pressable accessibilityRole="button" onPress={onBack || (() => router.back())} style={styles.iconButton}>
             <ArrowLeft color={tint} size={20} />
           </Pressable>
         ) : null}

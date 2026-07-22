@@ -7,6 +7,7 @@ import {
   snoozeNotificationApi
 } from "../services/notificationsService";
 import {
+  addGoalMoneyApi,
   createAccountApi,
   createCategoryApi,
   createRecurringPaymentApi,
@@ -81,9 +82,9 @@ type RecurringPaymentInput = {
   category: string;
   amount: number;
   currency: Currency;
-  frequency: "once" | "weekly" | "monthly" | "annual";
+  frequency: "once" | "weekly" | "fortnightly" | "monthly" | "annual";
   nextChargeDate: string;
-  kind?: "fixed" | "subscription" | "service";
+  kind?: "fixed" | "subscription" | "service" | "income";
   accountId?: string;
   notificationsEnabled?: boolean;
   reminderDaysBefore?: number;
@@ -95,7 +96,6 @@ type GoalInput = {
   target: number;
   saved?: number;
   currency: Currency;
-  monthlyContribution?: number;
   targetDate?: string | null;
 };
 
@@ -106,6 +106,8 @@ type InstallmentPurchaseInput = {
   totalInstallments: number;
   firstDueDate: string;
   category: string;
+  cardName: string;
+  note?: string;
   currency: Currency;
   reminderDaysBefore?: number;
 };
@@ -166,7 +168,7 @@ type FinFlowState = {
   updateExchangeRate: (currency: keyof ExchangeRates, value: number) => void;
   addTask: (task: Omit<Task, "id">) => void;
   addGoal: (goal: Omit<Goal, "id">) => void;
-  addGoalMoney: (goalId: string, amount: number) => void;
+  addGoalMoney: (goalId: string, amount: number) => Promise<void>;
   deleteGoal: (goalId: string) => void;
   addEvent: (event: Omit<PlannerEvent, "id">) => void;
   toggleEventDone: (eventId: string) => void;
@@ -324,6 +326,7 @@ export const useFinFlowStore = create<FinFlowState>()((set, get) => {
       try {
         const payment = await createRecurringPaymentApi(input);
         set({ recurringPayments: [...get().recurringPayments, payment], loading: false });
+        await get().loadNotifications("pending");
         return payment;
       } catch (error) {
         fail(error);
@@ -344,6 +347,7 @@ export const useFinFlowStore = create<FinFlowState>()((set, get) => {
       try {
         const purchase = await createInstallmentPurchaseApi(input);
         set({ installmentPurchases: [...get().installmentPurchases, purchase], loading: false });
+        await get().loadNotifications("pending");
         return purchase;
       } catch (error) {
         fail(error);
@@ -359,6 +363,7 @@ export const useFinFlowStore = create<FinFlowState>()((set, get) => {
         });
         await get().loadOverview();
         await get().loadTransactions({ limit: 500 });
+        await get().loadNotifications("pending");
       } catch (error) {
         fail(error);
       }
@@ -370,6 +375,7 @@ export const useFinFlowStore = create<FinFlowState>()((set, get) => {
         set({ installmentPurchases: get().installmentPurchases.map((item) => (item.id === purchaseId ? purchase : item)), loading: false });
         await get().loadOverview();
         await get().loadTransactions({ limit: 500 });
+        await get().loadNotifications("pending");
       } catch (error) {
         fail(error);
       }
@@ -462,7 +468,15 @@ export const useFinFlowStore = create<FinFlowState>()((set, get) => {
     updateExchangeRate: (currency, value) => set((state) => ({ exchangeRates: { ...state.exchangeRates, [currency]: value } })),
     addTask: () => set({ error: "Planner queda para el siguiente bloque.", errors: "Planner queda para el siguiente bloque." }),
     addGoal: () => set({ error: "Metas queda para el siguiente bloque.", errors: "Metas queda para el siguiente bloque." }),
-    addGoalMoney: () => set({ error: "Metas queda para el siguiente bloque.", errors: "Metas queda para el siguiente bloque." }),
+    addGoalMoney: async (goalId, amount) => {
+      set({ loading: true, error: null, errors: null });
+      try {
+        const goal = await addGoalMoneyApi(goalId, amount);
+        set({ goals: get().goals.map((item) => item.id === goalId ? goal : item), loading: false });
+      } catch (error) {
+        fail(error);
+      }
+    },
     deleteGoal: () => set({ error: "Metas queda para el siguiente bloque.", errors: "Metas queda para el siguiente bloque." }),
     addEvent: () => set({ error: "Planner queda para el siguiente bloque.", errors: "Planner queda para el siguiente bloque." }),
     toggleEventDone: (eventId) => set((state) => ({ events: state.events.map((event) => (event.id === eventId ? { ...event, done: !event.done } : event)) })),

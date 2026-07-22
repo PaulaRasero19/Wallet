@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Alert, Linking, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
-import { BookOpen, Circle, Heart, Home, PawPrint, Receipt, ShoppingBag, Ticket, TramFront, Utensils, Zap } from "lucide-react-native";
+import { BookOpen, Circle, Gift, Grid2X2, Heart, HeartPulse, Home, PawPrint, Receipt, RefreshCw, ShoppingBag, Ticket, TramFront, Utensils, Zap } from "lucide-react-native";
 import { router, useLocalSearchParams } from "expo-router";
 import { Header } from "../../src/components/Header";
 import { PrimaryButton } from "../../src/components/PrimaryButton";
@@ -156,7 +156,8 @@ export default function TransactionDetail() {
   const transactionNote = firstText(transaction.note, (transaction as any).notes);
   const categoryName = firstText(category?.name, transaction.category, (transaction as any).category_name);
   const scheduledPayment = recurringPayments.find((payment) => payment.id === (transaction.scheduledPaymentId || transaction.scheduled_payment_id));
-  const recurrenceLabel = scheduledPayment?.frequency === "weekly" ? "Semanalmente" : scheduledPayment?.frequency === "monthly" ? "Mensualmente" : scheduledPayment?.frequency === "annual" ? "Anualmente" : "";
+  const recurrenceLabel = scheduledPayment?.frequency === "weekly" ? "Semanalmente" : scheduledPayment?.frequency === "fortnightly" ? "Quincenalmente" : scheduledPayment?.frequency === "monthly" ? "Mensualmente" : scheduledPayment?.frequency === "annual" ? "Anualmente" : "";
+  const isIncome = transaction.type === "income";
 
   return (
     <ScreenContainer>
@@ -181,12 +182,12 @@ export default function TransactionDetail() {
         <>
           <View style={styles.details}>
             <Detail label="Tipo" value={typeLabel} />
-            <CategoryDetail color={category?.color} icon={category?.icon} value={categoryName || "Sin categoría"} />
-            <Detail label="Medio de pago" value={account?.name || paymentSourceLabel(account?.type)} />
+            {isIncome ? <Detail label="Fuente" value={transactionConcept || categoryName || "Ingreso"} /> : <CategoryDetail color={category?.color} icon={category?.icon} value={categoryName || "Sin categoría"} />}
+            <Detail label={isIncome ? "Dónde se recibió" : "Medio de pago"} value={isIncome ? incomeDestinationLabel(transaction.paymentMethod || transaction.payment_method) : paymentMethodLabel(transaction.paymentMethod || transaction.payment_method)} />
             <Detail label="Fecha" value={new Date(transaction.date).toLocaleDateString("es-UY", { day: "2-digit", month: "long", year: "numeric" })} />
             {transactionNote ? <Detail label="Nota" value={transactionNote} /> : null}
             {scheduledPayment && recurrenceLabel ? <Detail label="Se repite" value={recurrenceLabel} /> : null}
-            {scheduledPayment ? <Detail label="Próximo vencimiento" value={new Date(`${scheduledPayment.nextChargeDate}T12:00:00`).toLocaleDateString("es-UY", { day: "2-digit", month: "long", year: "numeric" })} /> : null}
+            {scheduledPayment ? <Detail label={isIncome ? "Próximo ingreso" : "Próximo vencimiento"} value={new Date(`${scheduledPayment.nextChargeDate}T12:00:00`).toLocaleDateString("es-UY", { day: "2-digit", month: "long", year: "numeric" })} /> : null}
             {scheduledPayment && Number(scheduledPayment.reminderDaysBefore ?? scheduledPayment.reminder_days_before) === 1 ? <Detail label="Recordatorio" value="24 horas antes" /> : null}
             {transaction.installment ? <Detail label="Cuota" value={`${transaction.installment.current} de ${transaction.installment.total}`} /> : null}
             {transaction.receiptUrl || transaction.receipt_url ? <Pressable onPress={() => Linking.openURL(transaction.receiptUrl || transaction.receipt_url || "")}><Detail label="Comprobante" value="Ver comprobante" /></Pressable> : null}
@@ -220,13 +221,32 @@ function paymentSourceLabel(type?: string) {
   return "Medio de pago";
 }
 
+function paymentMethodLabel(value?: string) {
+  if (value === "cash") return "Efectivo";
+  if (value === "debit_card") return "Tarjeta de débito";
+  if (value === "credit_card") return "Tarjeta de crédito";
+  if (value === "bank_transfer") return "Transferencia";
+  if (value === "digital_wallet") return "Billetera digital";
+  if (value?.startsWith("other:")) return value.slice(6);
+  return "Otro";
+}
+
+function incomeDestinationLabel(value?: string) {
+  if (value === "cash") return "Efectivo";
+  if (value === "bank_account") return "Cuenta bancaria";
+  if (value === "bank_transfer") return "Transferencia";
+  if (value === "digital_wallet") return "Billetera digital";
+  if (value?.startsWith("other:")) return value.slice(6);
+  return "Otro";
+}
+
 function CategoryDetail({ color, icon, value }: { color?: string; icon?: string; value: string }) {
   const Icon = categoryIcon(icon);
   return <View style={styles.detailRow}><Text style={styles.detailLabel}>Categoría</Text><View style={styles.categoryValue}><Icon color={categoryColor(color)} size={16} /><Text style={styles.detailValueCompact}>{value.charAt(0).toLocaleUpperCase("es-UY") + value.slice(1)}</Text></View></View>;
 }
 
 function categoryIcon(name?: string) {
-  const icons: Record<string, typeof Circle> = { book: BookOpen, heart: Heart, home: Home, paw: PawPrint, "paw-print": PawPrint, "shopping-bag": ShoppingBag, bag: ShoppingBag, ticket: Ticket, "tram-front": TramFront, bus: TramFront, "bus-front": TramFront, utensils: Utensils, zap: Zap, receipt: Receipt };
+  const icons: Record<string, typeof Circle> = { book: BookOpen, gift: Gift, "grid-2x2": Grid2X2, heart: Heart, "heart-pulse": HeartPulse, home: Home, paw: PawPrint, "paw-print": PawPrint, "refresh-cw": RefreshCw, "shopping-bag": ShoppingBag, bag: ShoppingBag, ticket: Ticket, "tram-front": TramFront, bus: TramFront, "bus-front": TramFront, utensils: Utensils, zap: Zap, receipt: Receipt };
   return icons[String(name || "")] || Circle;
 }
 

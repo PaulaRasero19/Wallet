@@ -43,6 +43,8 @@ function paymentDTO(payment: InstanceType<typeof RecurringPayment>) {
     next_charge_date: isoDate(payment.nextChargeDate),
     reminderDaysBefore: payment.reminderDaysBefore,
     reminder_days_before: payment.reminderDaysBefore,
+    notificationsEnabled: payment.notificationsEnabled,
+    notifications_enabled: payment.notificationsEnabled,
     active: payment.active,
     status: payment.status,
     lastTransactionId: idOf(payment.lastTransactionId),
@@ -80,6 +82,9 @@ function installmentPurchaseDTO(purchase: InstanceType<typeof InstallmentPurchas
     account_id: idOf(purchase.accountId),
     name: purchase.name,
     category: purchase.category,
+    cardName: purchase.cardName,
+    card_name: purchase.cardName,
+    note: purchase.note || undefined,
     totalAmount: purchase.totalAmount,
     total_amount: purchase.totalAmount,
     installmentAmount: purchase.installmentAmount,
@@ -125,36 +130,26 @@ async function createReminderNotification(input: {
   reminderDate.setHours(9, 0, 0, 0);
   const due = new Date(input.dueDate);
   due.setHours(9, 0, 0, 0);
-  const rows = [
-    { scheduledFor: reminderDate, suffix: `reminder-${input.reminderDaysBefore}`, title: input.title, message: input.message },
-    { scheduledFor: due, suffix: "due", title: input.title.replace("en ", "vence "), message: input.message }
-  ];
-
-  for (const row of rows) {
-    const day = row.scheduledFor.toISOString().slice(0, 10);
-    await Notification.findOneAndUpdate(
-      { userId: input.userId, dedupeKey: `${input.type}:${input.relatedEntityType}:${input.relatedEntityId}:${row.suffix}:${day}` },
-      {
-        $set: {
-          actionType: `open_${input.relatedEntityType}`,
-          message: row.message,
-          metadata: input.metadata || {},
-          priority: row.suffix === "due" ? "high" : "normal",
-          relatedEntityId: input.relatedEntityId,
-          relatedEntityType: input.relatedEntityType,
-          scheduledFor: row.scheduledFor,
-          title: row.title,
-          type: input.type
-        },
-        $setOnInsert: {
-          dedupeKey: `${input.type}:${input.relatedEntityType}:${input.relatedEntityId}:${row.suffix}:${day}`,
-          status: "pending",
-          userId: input.userId
-        }
+  const dueDay = due.toISOString().slice(0, 10);
+  const dedupeKey = `${input.type}:${input.relatedEntityType}:${input.relatedEntityId}:${dueDay}:reminder-${input.reminderDaysBefore}`;
+  await Notification.findOneAndUpdate(
+    { userId: input.userId, dedupeKey },
+    {
+      $set: {
+        actionType: `open_${input.relatedEntityType}`,
+        message: input.message,
+        metadata: { ...(input.metadata || {}), dueDate: due.toISOString(), reminderDaysBefore: input.reminderDaysBefore },
+        priority: "normal",
+        relatedEntityId: input.relatedEntityId,
+        relatedEntityType: input.relatedEntityType,
+        scheduledFor: reminderDate,
+        title: input.title,
+        type: input.type
       },
-      { upsert: true }
-    );
-  }
+      $setOnInsert: { dedupeKey, status: "pending", userId: input.userId }
+    },
+    { upsert: true }
+  );
 }
 
 export async function getExtendedFinance(userId: Types.ObjectId) {
@@ -210,6 +205,7 @@ export async function createRecurringPayment(userId: Types.ObjectId, input: Reco
     frequency: input.frequency,
     nextChargeDate: input.nextChargeDate,
     reminderDaysBefore: input.reminderDaysBefore ?? 3,
+    notificationsEnabled: input.notificationsEnabled !== false,
     accountId: input.accountId || null,
     categoryId: input.categoryId || null,
     active: true,
@@ -222,12 +218,15 @@ export async function createRecurringPayment(userId: Types.ObjectId, input: Reco
 
   if (input.notificationsEnabled !== false) await createReminderNotification({
     dueDate: payment.nextChargeDate,
-    message: `${payment.merchant} por ${payment.amount.toLocaleString("es-UY")} vence el ${payment.nextChargeDate.toLocaleDateString("es-UY")}.`,
+    message: payment.kind === "income"
+      ? `Esperás recibir ${payment.merchant} por ${payment.amount.toLocaleString("es-UY")} el ${payment.nextChargeDate.toLocaleDateString("es-UY")}.`
+      : `${payment.merchant} por ${payment.amount.toLocaleString("es-UY")} vence el ${payment.nextChargeDate.toLocaleDateString("es-UY")}.`,
     relatedEntityId: payment._id,
     relatedEntityType: "payment",
+    metadata: { amount: payment.amount, currency: payment.currency, kind: payment.kind, name: payment.merchant },
     reminderDaysBefore: payment.reminderDaysBefore,
-    title: `${payment.merchant} vence en ${payment.reminderDaysBefore} días`,
-    type: "scheduled_payment",
+    title: payment.kind === "income" ? `${payment.merchant} se espera pronto` : `${payment.merchant} vence en ${payment.reminderDaysBefore} días`,
+    type: payment.kind === "income" ? "income_reminder" : "payment_reminder",
     userId
   });
 
@@ -243,20 +242,34 @@ export async function createGoal(userId: Types.ObjectId, input: Record<string, a
     currency: input.currency,
     monthlyContribution: input.monthlyContribution || 0,
     targetDate: input.targetDate || null,
-    status: "active",
+    status: Number(input.saved || 0) >= Number(input.target) ? "completed" : "active",
     accent: "lime",
     history: []
   });
   return goalDTO(goal);
 }
 
+export async function addMoneyToGoal(userId: Types.ObjectId, id: string, amount: number) {
+  const goal = await Goal.findOne({ _id: id, userId });
+  if (!goal) throw new AppError("Meta no encontrada.", 404, "GOAL_NOT_FOUND");
+  goal.saved += amount;
+  goal.status = goal.saved >= goal.target ? "completed" : "active";
+  goal.history.push({ month: new Date().toISOString().slice(0, 7), saved: goal.saved, target: goal.target });
+  await goal.save();
+  return goalDTO(goal);
+}
+
 export async function createInstallmentPurchase(userId: Types.ObjectId, input: Record<string, any>) {
   const totalInstallments = Number(input.totalInstallments);
-  const installmentAmount = Number(input.totalAmount) / totalInstallments;
+  const totalInCents = Math.round(Number(input.totalAmount) * 100);
+  const regularInstallmentInCents = Math.floor(totalInCents / totalInstallments);
+  const installmentAmount = regularInstallmentInCents / 100;
   const firstDueDate = new Date(input.firstDueDate);
   const installments = Array.from({ length: totalInstallments }, (_, index) => ({
     number: index + 1,
-    amount: installmentAmount,
+    amount: index === totalInstallments - 1
+      ? (totalInCents - regularInstallmentInCents * (totalInstallments - 1)) / 100
+      : installmentAmount,
     dueDate: addMonths(firstDueDate, index),
     status: "pending"
   }));
@@ -265,6 +278,8 @@ export async function createInstallmentPurchase(userId: Types.ObjectId, input: R
     accountId: input.accountId || null,
     name: input.name,
     category: input.category,
+    cardName: input.cardName,
+    note: input.note || null,
     totalAmount: input.totalAmount,
     installmentAmount,
     totalInstallments,
@@ -282,7 +297,7 @@ export async function createInstallmentPurchase(userId: Types.ObjectId, input: R
       message: `Cuota ${installment.number} de ${purchase.totalInstallments} de ${purchase.name} por ${installment.amount.toLocaleString("es-UY")}.`,
       relatedEntityId: purchase._id,
       relatedEntityType: "installment",
-      metadata: { installmentId: idOf(installment._id) },
+      metadata: { amount: installment.amount, currency: purchase.currency, dueDate: installment.dueDate, installmentId: idOf(installment._id), installmentNumber: installment.number, name: purchase.name, totalInstallments: purchase.totalInstallments },
       reminderDaysBefore: purchase.reminderDaysBefore,
       title: `Cuota ${installment.number} de ${purchase.totalInstallments} vence en ${purchase.reminderDaysBefore} días`,
       type: "installment_due",
@@ -293,12 +308,12 @@ export async function createInstallmentPurchase(userId: Types.ObjectId, input: R
   return installmentPurchaseDTO(purchase);
 }
 
-async function accountAndCategory(userId: Types.ObjectId, accountId: Types.ObjectId | null, categoryName: string, categoryId?: Types.ObjectId | null) {
+async function accountAndCategory(userId: Types.ObjectId, accountId: Types.ObjectId | null, categoryName: string, categoryId?: Types.ObjectId | null, type: "income" | "expense" = "expense") {
   const account = accountId ? await Account.findOne({ _id: accountId, userId, isActive: true }) : await Account.findOne({ userId, isActive: true });
-  if (!account) throw new AppError("Necesitás una cuenta para registrar el gasto.", 400, "ACCOUNT_REQUIRED");
-  const category = categoryId ? await Category.findOne({ _id: categoryId, type: "expense", isActive: true, $or: [{ userId }, { isSystem: true, userId: null }] }) : await Category.findOne({ type: "expense", isActive: true, $or: [{ userId }, { isSystem: true, userId: null }], name: { $regex: categoryName, $options: "i" } })
-    || await Category.findOne({ type: "expense", isActive: true, $or: [{ userId }, { isSystem: true, userId: null }] });
-  if (!category) throw new AppError("No hay categoría de gasto disponible.", 400, "CATEGORY_REQUIRED");
+  if (!account) throw new AppError(type === "income" ? "Necesitás una cuenta de destino para registrar el ingreso." : "Necesitás una cuenta para registrar el gasto.", 400, "ACCOUNT_REQUIRED");
+  const category = categoryId ? await Category.findOne({ _id: categoryId, type, isActive: true, $or: [{ userId }, { isSystem: true, userId: null }] }) : await Category.findOne({ type, isActive: true, $or: [{ userId }, { isSystem: true, userId: null }], name: { $regex: categoryName, $options: "i" } })
+    || await Category.findOne({ type, isActive: true, $or: [{ userId }, { isSystem: true, userId: null }] });
+  if (!category) throw new AppError(type === "income" ? "No hay categoría de ingreso disponible." : "No hay categoría de gasto disponible.", 400, "CATEGORY_REQUIRED");
   return { account, category };
 }
 
@@ -308,17 +323,18 @@ export async function markRecurringPaymentPaid(userId: Types.ObjectId, id: strin
   if (payment.lastTransactionId && payment.lastPaidAt && Date.now() - payment.lastPaidAt.getTime() < 60_000) {
     return { payment: paymentDTO(payment), transactionId: idOf(payment.lastTransactionId) };
   }
-  const { account, category } = await accountAndCategory(userId, payment.accountId as Types.ObjectId | null, payment.category, payment.categoryId as Types.ObjectId | null);
-  await validateExpenseAgainstAvailableBalance({ userId, amount: payment.amount, date: payment.nextChargeDate });
+  const transactionType = payment.kind === "income" ? "income" : "expense";
+  const { account, category } = await accountAndCategory(userId, payment.accountId as Types.ObjectId | null, payment.category, payment.categoryId as Types.ObjectId | null, transactionType);
+  if (transactionType === "expense") await validateExpenseAgainstAvailableBalance({ userId, amount: payment.amount, date: payment.nextChargeDate });
   const existingTransaction = await Transaction.findOne({
     userId,
     accountId: account._id,
-    type: "expense",
+    type: transactionType,
     merchant: payment.merchant,
     amount: payment.amount,
     currency: payment.currency,
     date: payment.nextChargeDate,
-    note: "Pago programado marcado como pagado."
+    note: transactionType === "income" ? "Ingreso previsto confirmado como recibido." : "Pago programado marcado como pagado."
   });
   if (existingTransaction) {
     return { payment: paymentDTO(payment), transactionId: idOf(existingTransaction._id) };
@@ -327,19 +343,19 @@ export async function markRecurringPaymentPaid(userId: Types.ObjectId, id: strin
     userId,
     accountId: account._id,
     categoryId: category._id,
-    type: "expense",
+    type: transactionType,
     title: payment.merchant,
     merchant: payment.merchant,
     amount: payment.amount,
     currency: payment.currency,
     date: payment.nextChargeDate,
-    note: "Pago programado marcado como pagado.",
+    note: transactionType === "income" ? "Ingreso previsto confirmado como recibido." : "Pago programado marcado como pagado.",
     paymentMethod: account.type,
     isRecurring: payment.frequency !== "once",
     isAntExpense: false,
     scheduledPaymentId: payment._id
   });
-  account.currentBalance -= payment.amount;
+  account.currentBalance += transactionType === "income" ? payment.amount : -payment.amount;
   await account.save();
   payment.lastPaidAt = new Date();
   payment.lastTransactionId = transaction._id;
@@ -352,17 +368,23 @@ export async function markRecurringPaymentPaid(userId: Types.ObjectId, id: strin
     next.setDate(next.getDate() + 7);
     payment.nextChargeDate = next;
   }
+  if (payment.frequency === "fortnightly") {
+    const next = new Date(payment.nextChargeDate);
+    next.setDate(next.getDate() + 14);
+    payment.nextChargeDate = next;
+  }
   await payment.save();
-  await Notification.updateMany({ userId, relatedEntityType: "payment", relatedEntityId: payment._id, status: "pending" }, { status: "completed", readAt: new Date() });
+  await Notification.updateMany({ userId, relatedEntityType: "payment", relatedEntityId: payment._id, status: { $in: ["pending", "read", "snoozed"] } }, { status: "completed", readAt: new Date() });
   if (payment.active) {
     await createReminderNotification({
       dueDate: payment.nextChargeDate,
-      message: `${payment.merchant} por ${payment.amount.toLocaleString("es-UY")} vence el ${payment.nextChargeDate.toLocaleDateString("es-UY")}.`,
+      message: payment.kind === "income" ? `Esperás recibir ${payment.merchant} por ${payment.amount.toLocaleString("es-UY")} el ${payment.nextChargeDate.toLocaleDateString("es-UY")}.` : `${payment.merchant} por ${payment.amount.toLocaleString("es-UY")} vence el ${payment.nextChargeDate.toLocaleDateString("es-UY")}.`,
       relatedEntityId: payment._id,
       relatedEntityType: "payment",
+      metadata: { amount: payment.amount, currency: payment.currency, kind: payment.kind, name: payment.merchant },
       reminderDaysBefore: payment.reminderDaysBefore,
-      title: `${payment.merchant} vence en ${payment.reminderDaysBefore} días`,
-      type: "scheduled_payment",
+      title: payment.kind === "income" ? `${payment.merchant} se espera pronto` : `${payment.merchant} vence en ${payment.reminderDaysBefore} días`,
+      type: payment.kind === "income" ? "income_reminder" : "payment_reminder",
       userId
     });
   }
@@ -401,6 +423,6 @@ export async function markInstallmentPaid(userId: Types.ObjectId, purchaseId: st
   purchase.paidInstallments = purchase.installments.filter((item) => item.status === "paid").length;
   purchase.status = purchase.paidInstallments >= purchase.totalInstallments ? "completed" : "active";
   await purchase.save();
-  await Notification.updateMany({ userId, relatedEntityType: "installment", relatedEntityId: purchase._id, status: "pending" }, { status: "completed", readAt: new Date() });
+  await Notification.updateMany({ userId, relatedEntityType: "installment", relatedEntityId: purchase._id, "metadata.installmentId": idOf(installment._id), status: { $in: ["pending", "read", "snoozed"] } }, { status: "completed", readAt: new Date() });
   return installmentPurchaseDTO(purchase);
 }

@@ -4,37 +4,35 @@ const systemCategories = [
   ["income.salary", "salario", "income", "briefcase", "lime"],
   ["income.freelance", "freelance", "income", "laptop", "blue"],
   ["income.sales", "ventas", "income", "shopping-bag", "orange"],
+  ["income.gift", "regalo", "income", "gift", "purple"],
+  ["income.scholarship", "beca", "income", "book", "blue"],
+  ["income.commission", "comisión", "income", "receipt", "lime"],
+  ["income.rent", "alquiler", "income", "home", "orange"],
+  ["income.prize", "premio", "income", "award", "purple"],
   ["income.transfers", "transferencias", "income", "repeat", "black"],
   ["income.refund", "devolución", "income", "rotate-ccw", "lime"],
   ["income.other", "otros ingresos", "income", "circle", "gray"],
-  ["expense.rent", "alquiler", "expense", "home", "black"],
-  ["expense.common_expenses", "gastos comunes", "expense", "building", "gray"],
-  ["expense.supermarket", "supermercado", "expense", "shopping-cart", "lime"],
   ["expense.food", "comida", "expense", "utensils", "orange"],
-  ["expense.delivery", "delivery", "expense", "bike", "orange"],
   ["expense.transport", "transporte", "expense", "bus", "blue"],
-  ["expense.stm", "STM", "expense", "bus-front", "blue"],
-  ["expense.ute", "UTE", "expense", "zap", "yellow"],
-  ["expense.ose", "OSE", "expense", "droplets", "blue"],
-  ["expense.antel", "Antel", "expense", "wifi", "blue"],
-  ["expense.mutualista", "mutualista", "expense", "heart-pulse", "lime"],
-  ["expense.health", "salud", "expense", "heart", "lime"],
+  ["expense.home_services", "hogar y servicios", "expense", "home", "gray"],
+  ["expense.health", "salud", "expense", "heart-pulse", "lime"],
   ["expense.education", "educación", "expense", "book", "black"],
   ["expense.shopping", "compras", "expense", "bag", "orange"],
-  ["expense.pet", "mascota", "expense", "paw-print", "lime"],
-  ["expense.sport", "deporte", "expense", "dumbbell", "blue"],
-  ["expense.entertainment", "entretenimiento", "expense", "ticket", "purple"],
+  ["expense.leisure", "ocio", "expense", "ticket", "purple"],
   ["expense.subscriptions", "suscripciones", "expense", "refresh-cw", "purple"],
-  ["expense.savings", "ahorro", "expense", "piggy-bank", "lime"],
-  ["expense.other", "otros", "expense", "circle", "gray"]
+  ["expense.pets", "mascotas", "expense", "paw-print", "lime"],
+  ["expense.gifts", "regalos", "expense", "gift", "blue"],
+  ["expense.other", "otros", "expense", "grid-2x2", "gray"]
 ] as const;
 
 export async function ensureSystemCategories() {
+  const activeExpenseKeys = systemCategories.filter(([, , type]) => type === "expense").map(([translationKey]) => translationKey);
+  await Category.updateMany({ type: "expense", isSystem: true, userId: null, translationKey: { $nin: activeExpenseKeys } }, { $set: { isActive: false } });
   await Promise.all(
     systemCategories.map(([translationKey, name, type, icon, color]) =>
       Category.updateOne(
         { translationKey, type, isSystem: true, userId: null },
-        { $setOnInsert: { translationKey, name, type, icon, color, isSystem: true, isActive: true, userId: null } },
+        { $set: { name, icon, color, isActive: true }, $setOnInsert: { translationKey, type, isSystem: true, userId: null } },
         { upsert: true }
       )
     )
@@ -42,15 +40,8 @@ export async function ensureSystemCategories() {
 }
 
 export const essentialAntExpenseCategoryKeys = new Set([
-  "expense.rent",
-  "expense.common_expenses",
+  "expense.home_services",
   "expense.transport",
-  "expense.stm",
-  "expense.ute",
-  "expense.ose",
-  "expense.antel",
-  "expense.mutualista",
   "expense.health",
-  "expense.education",
-  "expense.savings"
+  "expense.education"
 ]);
