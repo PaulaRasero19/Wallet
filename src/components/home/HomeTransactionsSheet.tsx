@@ -27,30 +27,12 @@ function nearestSnap(value: number, velocityY: number, expandedY: number, collap
 export function HomeTransactionsSheet({ accounts, transactions }: { accounts: Account[]; transactions: Transaction[] }) {
   const { height, width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
-  const expandedY = height * 0.34;
-  const collapsedY = height * 0.785;
+  const expandedY = height * 0.36;
+  const collapsedY = height * 0.86;
   const [expanded, setExpanded] = useState(false);
   const sheetY = useSharedValue(collapsedY);
   const startY = useSharedValue(collapsedY);
-  const visibleTransactions = useMemo(() => {
-    const source = transactions.slice(0, 28);
-    if (!source.length || source.some((transaction) => transaction.type === "income")) return source;
-
-    const insertionIndex = Math.min(1, source.length - 1);
-    return source.map((transaction, index) => {
-      if (index !== insertionIndex) return transaction;
-      return {
-        ...transaction,
-        id: `${transaction.id}-sample-income`,
-        merchant: "Reintegro",
-        title: "Reintegro",
-        amount: 1260,
-        rawAmount: 1260,
-        raw_amount: 1260,
-        type: "income" as const
-      };
-    });
-  }, [transactions]);
+  const visibleTransactions = useMemo(() => transactions.slice(0, 28), [transactions]);
   const bottomPadding = NAVBAR_HEIGHT + Math.max(10, insets.bottom) + 24;
   const cutoutWidth = Math.min(156, width * 0.31);
   const cutoutDepth = 20;

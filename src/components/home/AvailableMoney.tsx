@@ -23,9 +23,9 @@ const styles = StyleSheet.create({
   amount: {
     ...typography.value,
     color: colors.white,
-    fontSize: 61,
+    fontSize: 52,
     fontWeight: "700",
-    lineHeight: 68,
+    lineHeight: 58,
     textAlign: "center"
   },
   subtitle: {
@@ -38,7 +38,7 @@ const styles = StyleSheet.create({
   },
   wrap: {
     alignItems: "center",
-    marginTop: 34,
+    marginTop: 26,
     paddingHorizontal: 32
   }
 });

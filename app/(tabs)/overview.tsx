@@ -22,7 +22,7 @@ export default function Overview() {
   const { profile } = useSessionStore();
   const primaryCurrency = profile?.primary_currency || "UYU";
   const firstName = String(profile?.full_name || "Lucía").split(" ")[0];
-  const metricsTop = height * 0.455;
+  const metricsTop = Math.min(height * 0.49, 440);
 
   useEffect(() => {
     void loadOverview(periodToApi(period));

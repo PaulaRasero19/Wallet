@@ -50,7 +50,7 @@ function makePath(points: ChartPoint[]) {
 export function HomeBalanceChart({ currency, history, period }: { currency: Currency; history: DailyHistoryPoint[]; period: HomePeriod }) {
   const { width } = useWindowDimensions();
   const chartWidth = Math.min(360, Math.max(330, width - 64));
-  const chartHeight = 96;
+  const chartHeight = 86;
 
   const points = useMemo(() => {
     const source = sampleHistory(history, period);
@@ -58,7 +58,7 @@ export function HomeBalanceChart({ currency, history, period }: { currency: Curr
     const left = 24;
     const right = chartWidth - 46;
     const top = 10;
-    const bottom = chartHeight - 14;
+    const bottom = chartHeight - 12;
     const minValue = Math.min(...rawValues);
     const maxValue = Math.max(...rawValues);
     const range = maxValue - minValue;
@@ -98,7 +98,7 @@ export function HomeBalanceChart({ currency, history, period }: { currency: Curr
 const styles = StyleSheet.create({
   empty: {
     alignItems: "center",
-    height: 96,
+    height: 86,
     justifyContent: "center",
     paddingHorizontal: 38
   },
@@ -109,8 +109,8 @@ const styles = StyleSheet.create({
   },
   wrap: {
     alignSelf: "center",
-    height: 96,
-    marginTop: 24,
+    height: 86,
+    marginTop: 18,
     position: "relative"
   }
 });
