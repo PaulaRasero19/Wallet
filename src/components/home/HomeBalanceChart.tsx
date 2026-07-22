@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { Pressable, StyleSheet, Text, useWindowDimensions, View } from "react-native";
+import { StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import Svg, { Circle, Path } from "react-native-svg";
 import { colors, typography } from "../../theme";
 import { Currency, DailyHistoryPoint } from "../../types/finflow";
@@ -47,7 +47,7 @@ function makePath(points: ChartPoint[]) {
   }, "");
 }
 
-export function HomeBalanceChart({ currency, history, onPress, period }: { currency: Currency; history: DailyHistoryPoint[]; onPress?: () => void; period: HomePeriod }) {
+export function HomeBalanceChart({ currency, history, period }: { currency: Currency; history: DailyHistoryPoint[]; period: HomePeriod }) {
   const { width } = useWindowDimensions();
   const chartWidth = Math.min(360, Math.max(330, width - 64));
   const chartHeight = 96;
@@ -84,14 +84,14 @@ export function HomeBalanceChart({ currency, history, onPress, period }: { curre
   }
 
   return (
-    <Pressable accessibilityLabel="Ver análisis detallado" accessibilityRole="button" onPress={onPress} style={[styles.wrap, { width: chartWidth }]}>
+    <View style={[styles.wrap, { width: chartWidth }]}>
       <Svg height={chartHeight} width="100%" viewBox={`0 0 ${chartWidth} ${chartHeight}`}>
         <Path d={path} fill="none" stroke="#FFFFFF" strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.4} />
         {points.map((point, index) => (
           <Circle cx={point.x} cy={point.y} fill="#FFFFFF" key={`${point.date}-${index}-dot`} r={index === points.length - 1 ? 6.8 : 5} />
         ))}
       </Svg>
-    </Pressable>
+    </View>
   );
 }
 
