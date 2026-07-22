@@ -28,7 +28,7 @@ export function HomeTransactionsSheet({ accounts, transactions }: { accounts: Ac
   const { height, width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const expandedY = height * 0.36;
-  const collapsedY = height * 0.86;
+  const collapsedY = height * 0.84;
   const [expanded, setExpanded] = useState(false);
   const sheetY = useSharedValue(collapsedY);
   const startY = useSharedValue(collapsedY);

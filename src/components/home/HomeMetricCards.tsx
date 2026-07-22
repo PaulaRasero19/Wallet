@@ -74,12 +74,12 @@ const styles = StyleSheet.create({
   largeCard: {
     backgroundColor: "rgba(41,41,39,0.68)",
     borderColor: "rgba(255,255,255,0.08)",
-    borderRadius: 20,
+    borderRadius: 23,
     borderWidth: 1,
-    height: 118,
+    height: 142,
     justifyContent: "space-between",
-    padding: 14,
-    paddingRight: 58,
+    padding: 16,
+    paddingRight: 66,
     position: "relative",
     shadowColor: "#000",
     shadowOffset: { height: 10, width: 0 },
@@ -89,22 +89,22 @@ const styles = StyleSheet.create({
   largeValue: {
     ...typography.value,
     color: colors.white,
-    fontSize: 34,
+    fontSize: 42,
     fontWeight: "700",
-    lineHeight: 38
+    lineHeight: 46
   },
   largeTitle: {
     ...typography.body,
     color: colors.white,
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: "600",
-    lineHeight: 19
+    lineHeight: 20
   },
   meta: {
     ...typography.label,
     color: "rgba(255,255,255,0.76)",
-    fontSize: 12,
-    lineHeight: 15
+    fontSize: 14,
+    lineHeight: 18
   },
   incomeHeader: {
     paddingRight: 34
@@ -112,23 +112,23 @@ const styles = StyleSheet.create({
   incomeMeta: {
     ...typography.body,
     color: colors.white,
-    fontSize: 11,
-    lineHeight: 14,
-    marginTop: 18
+    fontSize: 13,
+    lineHeight: 16,
+    marginTop: 28
   },
   incomeTitle: {
     ...typography.body,
     color: colors.white,
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: "600",
     lineHeight: 20
   },
   incomeValue: {
     ...typography.value,
     color: colors.white,
-    fontSize: 38,
+    fontSize: 50,
     fontWeight: "700",
-    lineHeight: 42,
+    lineHeight: 54,
     marginTop: 0
   },
   smallMeta: {
@@ -144,14 +144,14 @@ const styles = StyleSheet.create({
   smallCard: {
     backgroundColor: "rgba(41,41,39,0.68)",
     borderColor: "rgba(255,255,255,0.08)",
-    borderRadius: 20,
+    borderRadius: 22,
     borderWidth: 1,
     flex: 1,
-    height: 108,
+    height: 137,
     justifyContent: "space-between",
-    paddingBottom: 12,
-    paddingHorizontal: 12,
-    paddingTop: 12,
+    paddingBottom: 14,
+    paddingHorizontal: 13,
+    paddingTop: 13,
     paddingRight: 13,
     position: "relative",
     shadowColor: "#000",
@@ -162,29 +162,29 @@ const styles = StyleSheet.create({
   smallValue: {
     ...typography.value,
     color: colors.white,
-    fontSize: 38,
+    fontSize: 47,
     fontWeight: "700",
-    lineHeight: 42,
+    lineHeight: 52,
     marginTop: 0
   },
   smallTitle: {
     ...typography.body,
     color: colors.white,
-    fontSize: 13,
+    fontSize: 14.5,
     fontWeight: "600",
-    lineHeight: 17,
+    lineHeight: 19,
     paddingRight: 0
   },
   trendIcon: {
     alignItems: "center",
     backgroundColor: "rgba(28,28,27,0.94)",
-    borderRadius: 14,
-    height: 28,
+    borderRadius: 15,
+    height: 30,
     justifyContent: "center",
     position: "absolute",
-    right: 12,
-    top: 12,
-    width: 28
+    right: 14,
+    top: 14,
+    width: 30
   },
   wrap: {
     gap: 5,
