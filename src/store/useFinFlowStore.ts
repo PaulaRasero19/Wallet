@@ -1,6 +1,8 @@
 import { create } from "zustand";
 import {
   createAccountApi,
+  createRecurringPaymentApi,
+  createTransferApi,
   createTransactionApi,
   deleteTransactionApi,
   fetchAccounts,
@@ -28,15 +30,46 @@ import {
 
 type TransactionInput = {
   accountId: string;
-  categoryId: string;
-  type: "income" | "expense";
+  categoryId?: string;
+  type: "income" | "expense" | "transfer";
   title: string;
   merchant?: string;
   amount: number;
   currency: Currency;
   date: string;
   note?: string;
+  isRecurring?: boolean;
   isAntExpense?: boolean;
+  paymentMethod?: string;
+  installment?: {
+    current?: number;
+    total?: number;
+    amountPerInstallment?: number;
+    remainingAmount?: number;
+    nextDueDate?: string;
+  };
+};
+
+type TransferInput = {
+  fromAccountId: string;
+  toAccountId: string;
+  amount: number;
+  currency: Currency;
+  date: string;
+  title?: string;
+  note?: string;
+};
+
+type RecurringPaymentInput = {
+  merchant: string;
+  category: string;
+  amount: number;
+  currency: Currency;
+  frequency: "weekly" | "monthly" | "annual";
+  nextChargeDate: string;
+  kind?: "fixed" | "subscription" | "service";
+  accountId?: string;
+  notificationsEnabled?: boolean;
 };
 
 type AccountInput = {
@@ -72,6 +105,8 @@ type FinFlowState = {
   createAccount: (input: AccountInput) => Promise<Account>;
   loadTransactions: () => Promise<void>;
   createTransaction: (input: TransactionInput) => Promise<Transaction>;
+  createTransfer: (input: TransferInput) => Promise<Transaction>;
+  createRecurringPayment: (input: RecurringPaymentInput) => Promise<RecurringPayment>;
   updateTransaction: (id: string, input: Partial<Transaction>) => Promise<Transaction>;
   deleteTransaction: (id: string) => Promise<void>;
   loadOverview: (period?: string) => Promise<void>;
@@ -200,6 +235,32 @@ export const useFinFlowStore = create<FinFlowState>()((set, get) => {
         set({ accounts, transactions, balance: getBalance(accounts), loading: false });
         await get().loadOverview();
         return result.transaction;
+      } catch (error) {
+        fail(error);
+      }
+    },
+    createTransfer: async (input) => {
+      set({ loading: true, error: null, errors: null });
+      try {
+        const result = await createTransferApi(input);
+        const transactions = [result.transaction, ...get().transactions];
+        const updatedAccounts = result.accounts || [];
+        const accounts = updatedAccounts.length
+          ? get().accounts.map((account) => updatedAccounts.find((updated) => updated.id === account.id) || account)
+          : get().accounts;
+        set({ accounts, transactions, balance: getBalance(accounts), loading: false });
+        await get().loadOverview();
+        return result.transaction;
+      } catch (error) {
+        fail(error);
+      }
+    },
+    createRecurringPayment: async (input) => {
+      set({ loading: true, error: null, errors: null });
+      try {
+        const payment = await createRecurringPaymentApi(input);
+        set({ recurringPayments: [...get().recurringPayments, payment], loading: false });
+        return payment;
       } catch (error) {
         fail(error);
       }

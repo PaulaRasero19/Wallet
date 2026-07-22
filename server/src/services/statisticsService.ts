@@ -18,6 +18,12 @@ function dayKey(date: Date) {
   return date.toISOString().slice(0, 10);
 }
 
+function balanceImpact(type: string, amount: number) {
+  if (type === "income") return amount;
+  if (type === "expense") return -amount;
+  return 0;
+}
+
 export async function getOverview(userId: Types.ObjectId, period = "30d") {
   let days = periodDays[period] || 30;
   const from = new Date();
@@ -50,7 +56,7 @@ export async function getOverview(userId: Types.ObjectId, period = "30d") {
 
   const expenseByCategory = new Map<string, number>();
   for (const transaction of periodTransactions) {
-    if (transaction.type === "expense") {
+    if (transaction.type === "expense" && transaction.categoryId) {
       const key = transaction.categoryId.toString();
       expenseByCategory.set(key, (expenseByCategory.get(key) || 0) + transaction.amount);
     }
@@ -66,7 +72,7 @@ export async function getOverview(userId: Types.ObjectId, period = "30d") {
     const dailyExpenses = daily.filter((item) => item.type === "expense").reduce((total, item) => total + item.amount, 0);
     const closingBalance = transactions
       .filter((item) => item.date <= date)
-      .reduce((total, item) => total + (item.type === "income" ? item.amount : -item.amount), 0);
+      .reduce((total, item) => total + balanceImpact(item.type, item.amount), 0);
 
     return { date: key, income: dailyIncome, expenses: dailyExpenses, closingBalance };
   });

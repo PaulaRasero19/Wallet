@@ -4,7 +4,7 @@ import { currencySchema, objectIdSchema, transactionTypeSchema } from "./commonV
 export const createTransactionSchema = z.object({
   accountId: objectIdSchema,
   account_id: objectIdSchema.optional(),
-  categoryId: objectIdSchema,
+  categoryId: objectIdSchema.optional(),
   category_id: objectIdSchema.optional(),
   type: transactionTypeSchema,
   title: z.string().trim().min(1, "El título es obligatorio."),
@@ -13,13 +13,34 @@ export const createTransactionSchema = z.object({
   currency: currencySchema,
   date: z.coerce.date(),
   note: z.string().trim().optional().default(""),
+  paymentMethod: z.string().trim().optional().default(""),
+  payment_method: z.string().trim().optional(),
   isRecurring: z.boolean().optional().default(false),
   is_recurring: z.boolean().optional(),
   isAntExpense: z.boolean().optional(),
-  is_ant_expense: z.boolean().optional()
+  is_ant_expense: z.boolean().optional(),
+  installment: z
+    .object({
+      current: z.coerce.number().int().min(1).optional(),
+      total: z.coerce.number().int().min(1).optional(),
+      amountPerInstallment: z.coerce.number().min(0).optional(),
+      remainingAmount: z.coerce.number().min(0).optional(),
+      nextDueDate: z.string().trim().optional()
+    })
+    .optional()
 });
 
 export const updateTransactionSchema = createTransactionSchema.partial();
+
+export const transferTransactionSchema = z.object({
+  fromAccountId: objectIdSchema,
+  toAccountId: objectIdSchema,
+  amount: z.coerce.number().positive("El importe debe ser mayor a cero."),
+  currency: currencySchema,
+  date: z.coerce.date(),
+  title: z.string().trim().optional().default("Transferencia"),
+  note: z.string().trim().optional().default("")
+});
 
 export const transactionQuerySchema = z.object({
   type: transactionTypeSchema.optional(),

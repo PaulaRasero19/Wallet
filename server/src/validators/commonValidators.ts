@@ -4,7 +4,7 @@ import { AppError } from "../utils/appError";
 export const objectIdSchema = z.string().regex(/^[a-f\d]{24}$/i, "Identificador inválido.");
 export const currencySchema = z.enum(["UYU", "USD", "EUR"]);
 export const languageSchema = z.enum(["es", "en", "pt"]);
-export const transactionTypeSchema = z.enum(["income", "expense"]);
+export const transactionTypeSchema = z.enum(["income", "expense", "transfer"]);
 
 export function parseBody<T>(schema: z.ZodType<T>, body: unknown) {
   const result = schema.safeParse(body);

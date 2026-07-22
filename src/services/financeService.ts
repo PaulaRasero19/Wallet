@@ -16,6 +16,7 @@ type CategoriesResponse = {
 type TransactionResponse = {
   transaction: Transaction;
   account?: Account;
+  accounts?: Account[];
 };
 
 type TransactionsResponse = {
@@ -24,6 +25,10 @@ type TransactionsResponse = {
 
 type OverviewResponse = {
   overview: DashboardOverview;
+};
+
+type RecurringPaymentResponse = {
+  payment: RecurringPayment;
 };
 
 export type ExtendedFinanceResponse = {
@@ -58,8 +63,8 @@ export async function fetchTransaction(id: string) {
 
 export async function createTransactionApi(input: {
   accountId: string;
-  categoryId: string;
-  type: "income" | "expense";
+  categoryId?: string;
+  type: "income" | "expense" | "transfer";
   title: string;
   merchant?: string;
   amount: number;
@@ -67,8 +72,20 @@ export async function createTransactionApi(input: {
   date: string;
   note?: string;
   isAntExpense?: boolean;
+  paymentMethod?: string;
+  installment?: {
+    current?: number;
+    total?: number;
+    amountPerInstallment?: number;
+    remainingAmount?: number;
+    nextDueDate?: string;
+  };
 }) {
   return apiRequest<TransactionResponse>("/transactions", { body: input, method: "POST", requireAuth: true });
+}
+
+export async function createTransferApi(input: { fromAccountId: string; toAccountId: string; amount: number; currency: Currency; date: string; title?: string; note?: string }) {
+  return apiRequest<TransactionResponse>("/transactions/transfer", { body: input, method: "POST", requireAuth: true });
 }
 
 export async function updateTransactionApi(id: string, input: Partial<Transaction>) {
@@ -85,4 +102,18 @@ export async function fetchOverview(period = "30d") {
 
 export async function fetchExtendedFinance() {
   return apiRequest<ExtendedFinanceResponse>("/finance/extended", { requireAuth: true });
+}
+
+export async function createRecurringPaymentApi(input: {
+  merchant: string;
+  category: string;
+  amount: number;
+  currency: Currency;
+  frequency: "weekly" | "monthly" | "annual";
+  nextChargeDate: string;
+  kind?: "fixed" | "subscription" | "service";
+  accountId?: string;
+  notificationsEnabled?: boolean;
+}) {
+  return (await apiRequest<RecurringPaymentResponse>("/finance/recurring-payments", { body: input, method: "POST", requireAuth: true })).payment;
 }

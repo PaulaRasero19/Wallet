@@ -59,6 +59,10 @@ export type Transaction = {
   accent: AccentColor;
   accountId?: string;
   account_id?: string;
+  toAccountId?: string;
+  to_account_id?: string;
+  transferGroupId?: string;
+  transfer_group_id?: string;
   categoryId?: string;
   category_id?: string;
   title?: string;

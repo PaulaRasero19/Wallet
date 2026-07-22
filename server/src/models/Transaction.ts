@@ -4,8 +4,10 @@ const transactionSchema = new Schema(
   {
     userId: { type: Types.ObjectId, ref: "User", required: true, index: true },
     accountId: { type: Types.ObjectId, ref: "Account", required: true, index: true },
-    categoryId: { type: Types.ObjectId, ref: "Category", required: true, index: true },
-    type: { type: String, enum: ["income", "expense"], required: true, index: true },
+    categoryId: { type: Types.ObjectId, ref: "Category", default: null, index: true },
+    toAccountId: { type: Types.ObjectId, ref: "Account", default: null, index: true },
+    transferGroupId: { type: String, trim: true, default: null, index: true },
+    type: { type: String, enum: ["income", "expense", "transfer"], required: true, index: true },
     title: { type: String, required: true, trim: true },
     merchant: { type: String, trim: true, default: "" },
     amount: { type: Number, required: true, min: 0.01 },

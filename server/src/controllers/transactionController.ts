@@ -1,8 +1,8 @@
 import type { Response } from "express";
 import type { FinFlowRequest } from "../types/http";
-import { createTransaction, deleteTransaction, getTransaction, listTransactions, updateTransaction } from "../services/transactionService";
+import { createTransaction, createTransfer, deleteTransaction, getTransaction, listTransactions, updateTransaction } from "../services/transactionService";
 import { objectIdSchema, parseBody } from "../validators/commonValidators";
-import { createTransactionSchema, transactionQuerySchema, updateTransactionSchema } from "../validators/transactionValidators";
+import { createTransactionSchema, transactionQuerySchema, transferTransactionSchema, updateTransactionSchema } from "../validators/transactionValidators";
 
 export async function indexTransactions(req: FinFlowRequest, res: Response) {
   const query = parseBody(transactionQuerySchema, req.query);
@@ -12,6 +12,11 @@ export async function indexTransactions(req: FinFlowRequest, res: Response) {
 export async function storeTransaction(req: FinFlowRequest, res: Response) {
   const body = parseBody(createTransactionSchema, req.body);
   res.status(201).json(await createTransaction(req.user!.mongoId, body));
+}
+
+export async function storeTransfer(req: FinFlowRequest, res: Response) {
+  const body = parseBody(transferTransactionSchema, req.body);
+  res.status(201).json(await createTransfer(req.user!.mongoId, body));
 }
 
 export async function showTransaction(req: FinFlowRequest, res: Response) {
