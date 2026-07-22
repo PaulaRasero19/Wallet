@@ -108,6 +108,7 @@ export function HomeTransactionsSheet({ accounts, transactions }: { accounts: Ac
                   return (
                     <Pressable
                       accessibilityRole="button"
+                      disabled={!/^[a-f\d]{24}$/i.test(String(transaction.id || ""))}
                       key={transaction.id}
                       onPress={() => router.push(`/transaction/${transaction.id}`)}
                       style={{ opacity }}

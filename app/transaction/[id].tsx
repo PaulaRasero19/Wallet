@@ -10,12 +10,21 @@ import { colors, spacing, typography } from "../../src/theme";
 import { Currency, Transaction } from "../../src/types/finflow";
 import { formatMoney } from "../../src/utils/money";
 
+function normalizeId(value: string | string[] | undefined) {
+  return Array.isArray(value) ? value[0] : value || "";
+}
+
+function isValidObjectId(value: string) {
+  return /^[a-f\d]{24}$/i.test(value);
+}
+
 function valueOf(transaction: Transaction) {
   return Math.abs(Number(transaction.rawAmount ?? transaction.raw_amount ?? transaction.amount ?? 0));
 }
 
 export default function TransactionDetail() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const params = useLocalSearchParams<{ id?: string | string[] }>();
+  const id = normalizeId(params.id);
   const { accounts, categories, deleteTransaction, loadAccounts, loadCategories, transactions, updateTransaction } = useFinFlowStore();
   const [transaction, setTransaction] = useState<Transaction | null>(null);
   const [editing, setEditing] = useState(false);
@@ -24,6 +33,7 @@ export default function TransactionDetail() {
   const [amount, setAmount] = useState("");
   const [note, setNote] = useState("");
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
 
   useEffect(() => {
     void loadAccounts();
@@ -33,8 +43,13 @@ export default function TransactionDetail() {
   useEffect(() => {
     let alive = true;
     async function load() {
-      if (!id) return;
+      if (!id || !isValidObjectId(id)) {
+        setLoading(false);
+        setLoadError("No pude abrir este movimiento porque no tiene un identificador válido.");
+        return;
+      }
       setLoading(true);
+      setLoadError("");
       const cached = transactions.find((item) => item.id === id);
       try {
         const next = cached || (await fetchTransaction(id));
@@ -45,7 +60,7 @@ export default function TransactionDetail() {
         setAmount(String(valueOf(next)));
         setNote(next.note || "");
       } catch (error) {
-        Alert.alert("FinFlow", error instanceof Error ? error.message : "No se pudo cargar el movimiento.");
+        if (alive) setLoadError(error instanceof Error ? error.message : "No se pudo cargar el movimiento.");
       } finally {
         if (alive) setLoading(false);
       }
@@ -99,11 +114,26 @@ export default function TransactionDetail() {
     ]);
   }
 
-  if (loading || !transaction) {
+  if (loading) {
     return (
       <ScreenContainer>
         <Header title="Movimiento" back />
         <Text style={styles.empty}>Cargando movimiento...</Text>
+      </ScreenContainer>
+    );
+  }
+
+  if (loadError || !transaction) {
+    return (
+      <ScreenContainer>
+        <Header title="Movimiento" back />
+        <View style={styles.errorPanel}>
+          <Text style={styles.errorTitle}>No se pudo abrir el movimiento</Text>
+          <Text style={styles.empty}>{loadError || "No encontré este movimiento para tu usuario."}</Text>
+          <Pressable accessibilityRole="button" onPress={() => router.back()} style={styles.secondaryButton}>
+            <Text style={styles.secondaryText}>Volver</Text>
+          </Pressable>
+        </View>
       </ScreenContainer>
     );
   }
@@ -225,6 +255,20 @@ const styles = StyleSheet.create({
     ...typography.body,
     color: colors.transparentWhite,
     marginTop: spacing.xl
+  },
+  errorPanel: {
+    backgroundColor: colors.appGrayDark,
+    borderColor: colors.appGrayBorder,
+    borderRadius: 8,
+    borderWidth: 1,
+    gap: spacing.md,
+    marginTop: spacing.xl,
+    padding: spacing.lg
+  },
+  errorTitle: {
+    ...typography.title,
+    color: colors.white,
+    fontSize: 20
   },
   form: {
     gap: spacing.md,

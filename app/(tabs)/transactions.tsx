@@ -75,6 +75,10 @@ function isWithinDate(value: string, from: string, to: string) {
   return true;
 }
 
+function canOpenTransaction(transaction: Transaction) {
+  return /^[a-f\d]{24}$/i.test(String(transaction.id || ""));
+}
+
 export default function Transactions() {
   const { accounts, loadAccounts, loadTransactions, transactions } = useFinFlowStore();
   const [filter, setFilter] = useState<MainFilter>("Todos");
@@ -193,7 +197,9 @@ export default function Transactions() {
                 <TransactionRow
                   account={accountById.get(transaction.account_id || transaction.accountId || "")}
                   key={transaction.id}
-                  onPress={() => router.push(`/transaction/${transaction.id}`)}
+                  onPress={() => {
+                    if (canOpenTransaction(transaction)) router.push(`/transaction/${transaction.id}`);
+                  }}
                   transaction={transaction}
                 />
               ))}
@@ -233,9 +239,10 @@ function TransactionRow({ account, onPress, transaction }: { account?: Account; 
   const amountValue = isIncome ? amount : isTransfer ? 0 : -amount;
   const date = new Date(transaction.date).toLocaleDateString("es-UY", { day: "2-digit", month: "short" });
   const meta = [String(transaction.category || transactionTypeLabel(transaction.type)), date, account?.name || account?.type].filter(Boolean).join(" · ");
+  const disabled = !canOpenTransaction(transaction);
 
   return (
-    <Pressable accessibilityRole="button" onPress={onPress} style={styles.transactionRow}>
+    <Pressable accessibilityRole="button" disabled={disabled} onPress={onPress} style={[styles.transactionRow, disabled && styles.disabledRow]}>
       <View style={styles.initials}>
         <Text style={styles.initialsText}>{initials(title)}</Text>
       </View>
@@ -385,6 +392,9 @@ const styles = StyleSheet.create({
   empty: {
     ...typography.body,
     color: colors.transparentWhite
+  },
+  disabledRow: {
+    opacity: 0.48
   },
   expense: {
     color: "#E65C50"
