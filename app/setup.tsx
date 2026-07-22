@@ -11,6 +11,8 @@ import { colors, spacing, typography } from "../src/theme";
 import { Currency } from "../src/types/finflow";
 
 const currencies: Currency[] = ["UYU", "USD", "EUR"];
+const incomeFrequencies = ["monthly", "biweekly", "weekly", "variable"] as const;
+const goals = ["llegar a fin de mes", "ahorrar", "controlar gastos", "reducir deudas", "detectar gastos hormiga", "organizar pagos"];
 
 export default function Setup() {
   const completeOnboarding = useSessionStore((state) => state.completeOnboarding);
@@ -21,6 +23,9 @@ export default function Setup() {
   const [income, setIncome] = useState(profile?.monthly_income ? String(profile.monthly_income) : "");
   const [payday, setPayday] = useState(profile?.payday ? String(profile.payday) : "");
   const [goal, setGoal] = useState(profile?.financial_goal || "");
+  const [incomeFrequency, setIncomeFrequency] = useState<(typeof incomeFrequencies)[number]>(profile?.income_frequency || "monthly");
+  const [initialBalance, setInitialBalance] = useState(profile?.initial_balance ? String(profile.initial_balance) : "0");
+  const [antThreshold, setAntThreshold] = useState(profile?.ant_expense_threshold ? String(profile.ant_expense_threshold) : "400");
   const [formMessage, setFormMessage] = useState("");
   const [saving, setSaving] = useState(false);
   const t = (key: string) => translate(language, key);
@@ -38,10 +43,12 @@ export default function Setup() {
       await completeOnboarding({
         country_code: country.trim() || "UY",
         financial_goal: goal.trim() || null,
-        income_frequency: skipSensitive ? null : "monthly",
+        income_frequency: skipSensitive ? null : incomeFrequency,
         monthly_income: skipSensitive || !income ? null : Number(income.replace(",", ".")),
         payday: skipSensitive || !payday ? null : Number(payday),
-        primary_currency: currency
+        primary_currency: currency,
+        initial_balance: Number(initialBalance.replace(",", ".") || 0),
+        ant_expense_threshold: Number(antThreshold.replace(",", ".") || 400)
       });
       router.replace("/(tabs)/overview");
     } catch (error) {
@@ -84,6 +91,19 @@ export default function Setup() {
           placeholder={t("setup.income")}
           value={income}
         />
+        <Text style={styles.label}>{t("setup.frequency")}</Text>
+        <View style={styles.wrapRow}>
+          {incomeFrequencies.map((item) => (
+            <Pressable
+              accessibilityRole="button"
+              key={item}
+              onPress={() => setIncomeFrequency(item)}
+              style={[styles.choice, incomeFrequency === item && styles.currencyActive]}
+            >
+              <Text style={[styles.currencyText, incomeFrequency === item && styles.currencyTextActive]}>{t(`setup.frequency.${item}`)}</Text>
+            </Pressable>
+          ))}
+        </View>
         <InputField
           accessibilityLabel={t("setup.payday")}
           keyboardType="number-pad"
@@ -92,11 +112,33 @@ export default function Setup() {
           value={payday}
         />
         <InputField accessibilityLabel={t("setup.goal")} onChangeText={setGoal} placeholder={t("setup.goal")} value={goal} />
+        <View style={styles.wrapRow}>
+          {goals.map((item) => (
+            <Pressable accessibilityRole="button" key={item} onPress={() => setGoal(item)} style={[styles.choice, goal === item && styles.currencyActive]}>
+              <Text style={[styles.currencyText, goal === item && styles.currencyTextActive]}>{item}</Text>
+            </Pressable>
+          ))}
+        </View>
+        <InputField
+          accessibilityLabel={t("setup.initialBalance")}
+          keyboardType="decimal-pad"
+          onChangeText={setInitialBalance}
+          placeholder={t("setup.initialBalance")}
+          value={initialBalance}
+        />
+        <InputField
+          accessibilityLabel={t("setup.antThreshold")}
+          keyboardType="decimal-pad"
+          onChangeText={setAntThreshold}
+          placeholder={t("setup.antThreshold")}
+          value={antThreshold}
+        />
       </View>
 
       <View style={styles.actions}>
         {formMessage ? <Text style={styles.message}>{formMessage}</Text> : null}
         <PrimaryButton onPress={() => void save(false)}>{saving ? t("common.loading") : t("setup.finish")}</PrimaryButton>
+        <Text onPress={() => void save(true)} style={styles.later}>{t("setup.later")}</Text>
       </View>
     </ScreenContainer>
   );
@@ -134,6 +176,19 @@ const styles = StyleSheet.create({
     minHeight: 48,
     justifyContent: "center"
   },
+  wrapRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: spacing.sm
+  },
+  choice: {
+    borderColor: colors.grayLight,
+    borderRadius: 16,
+    borderWidth: 1,
+    minHeight: 38,
+    justifyContent: "center",
+    paddingHorizontal: spacing.md
+  },
   currencyActive: {
     backgroundColor: colors.black,
     borderColor: colors.black
@@ -153,5 +208,11 @@ const styles = StyleSheet.create({
   message: {
     ...typography.body,
     color: colors.orange
+  },
+  later: {
+    ...typography.label,
+    color: colors.grayDark,
+    fontWeight: "600",
+    textAlign: "center"
   }
 });

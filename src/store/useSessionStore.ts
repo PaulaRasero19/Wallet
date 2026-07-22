@@ -11,7 +11,7 @@ import {
   signOut,
   signUpWithEmail
 } from "../services/authService";
-import { Language, Profile, ProfileUpdate, updateProfile } from "../services/profileService";
+import { completeProfileOnboarding, Language, Profile, ProfileUpdate, updateProfile } from "../services/profileService";
 
 type SessionStatus = "loading" | "authenticated" | "unauthenticated";
 
@@ -25,6 +25,7 @@ type SessionState = {
   status: SessionStatus;
   completeOnboarding: (update: ProfileUpdate) => Promise<void>;
   initialize: () => Promise<void>;
+  restoreSession: () => Promise<void>;
   login: (email: string, password: string) => Promise<void>;
   loginDemo: () => Promise<void>;
   logout: () => Promise<void>;
@@ -68,6 +69,7 @@ export const useSessionStore = create<SessionState>()((set, get) => ({
       });
     }
   },
+  restoreSession: async () => get().initialize(),
   login: async (email, password) => {
     set({ error: null, status: "loading" });
     try {
@@ -156,10 +158,7 @@ export const useSessionStore = create<SessionState>()((set, get) => ({
       throw new Error("You must be logged in to complete onboarding.");
     }
 
-    const profile = await updateProfile(authUser.id, {
-      ...update,
-      onboarding_completed: true
-    });
+    const profile = await completeProfileOnboarding(update);
     set({ language: profile.language, profile });
   }
 }));

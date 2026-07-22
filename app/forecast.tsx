@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { ForecastScenarioCard } from "../src/components/ForecastScenarioCard";
 import { Header } from "../src/components/Header";
@@ -21,6 +21,11 @@ export default function Forecast() {
     rejectRecurringPayment,
     transactions
   } = useFinFlowStore();
+  const loadOverview = useFinFlowStore((state) => state.loadOverview);
+
+  useEffect(() => {
+    void loadOverview("30d");
+  }, [loadOverview]);
   const hasFinancialData = accounts.length > 0 || transactions.length > 0 || budgets.length > 0 || goals.length > 0;
   const forecast = useMemo(
     () =>
@@ -42,7 +47,7 @@ export default function Forecast() {
       {!hasFinancialData ? (
         <View style={styles.panel}>
           <Text style={styles.section}>Sin datos financieros reales</Text>
-          <Text style={styles.detail}>La proyección se habilitará cuando existan cuentas, movimientos y pagos reales en Supabase.</Text>
+          <Text style={styles.detail}>La proyección se habilitará cuando existan cuentas, movimientos y pagos reales en MongoDB.</Text>
         </View>
       ) : (
         <>
@@ -105,7 +110,7 @@ export default function Forecast() {
       </View>
 
       <Text style={styles.disclaimer}>
-        FinFlow uses local simulated data. Recommendations are educational and not professional financial advice.
+        FinFlow calcula estas proyecciones desde datos persistidos en MongoDB. Las recomendaciones son educativas y no reemplazan asesoramiento financiero profesional.
       </Text>
         </>
       )}

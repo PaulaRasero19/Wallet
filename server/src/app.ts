@@ -5,8 +5,17 @@ import morgan from "morgan";
 import { env } from "./config/env";
 import { errorHandler } from "./middlewares/errorHandler";
 import { notFound } from "./middlewares/notFound";
+import { requireDatabase } from "./middlewares/requireDatabase";
 import { apiRateLimit } from "./middlewares/rateLimit";
+import { sanitizeMongoOperators } from "./utils/security";
+import { accountRouter } from "./routes/account.routes";
+import { authRouter } from "./routes/auth.routes";
+import { categoryRouter } from "./routes/category.routes";
 import { healthRouter } from "./routes/health.routes";
+import { financeRouter } from "./routes/finance.routes";
+import { profileRouter } from "./routes/profile.routes";
+import { statisticsRouter } from "./routes/statistics.routes";
+import { transactionRouter } from "./routes/transaction.routes";
 import { AppError } from "./utils/appError";
 
 export function createApp() {
@@ -29,9 +38,18 @@ export function createApp() {
   );
   app.use(apiRateLimit);
   app.use(express.json({ limit: "1mb" }));
+  app.use(sanitizeMongoOperators);
   app.use(morgan(env.nodeEnv === "production" ? "combined" : "dev"));
 
   app.use(healthRouter);
+  app.use("/api", requireDatabase);
+  app.use("/api/auth", authRouter);
+  app.use("/api/profile", profileRouter);
+  app.use("/api/accounts", accountRouter);
+  app.use("/api/categories", categoryRouter);
+  app.use("/api/finance", financeRouter);
+  app.use("/api/transactions", transactionRouter);
+  app.use("/api/statistics", statisticsRouter);
 
   app.use(notFound);
   app.use(errorHandler);

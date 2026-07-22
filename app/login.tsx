@@ -10,28 +10,48 @@ import { translate } from "../src/i18n";
 import { spacing, typography } from "../src/theme";
 import { useSessionStore } from "../src/store/useSessionStore";
 
+type LoginErrors = {
+  email?: string;
+  password?: string;
+  form?: string;
+};
+
 export default function Login() {
-  const { language, login, profile, status } = useSessionStore();
+  const { language, login, status } = useSessionStore();
   const [email, setEmail] = useState("");
+  const [errors, setErrors] = useState<LoginErrors>({});
   const [password, setPassword] = useState("");
   const t = (key: string) => translate(language, key);
 
-  async function submit() {
-    if (!email.includes("@")) {
-      Alert.alert("FinFlow", t("auth.invalidEmail"));
-      return;
+  function validate() {
+    const nextErrors: LoginErrors = {};
+    const normalizedEmail = email.trim().toLowerCase();
+
+    if (!normalizedEmail) {
+      nextErrors.email = t("auth.emailRequired");
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
+      nextErrors.email = t("auth.invalidEmail");
     }
 
-    if (password.length < 6) {
-      Alert.alert("FinFlow", t("auth.invalidPassword"));
-      return;
+    if (!password) {
+      nextErrors.password = t("auth.passwordRequired");
     }
+
+    setErrors(nextErrors);
+    return Object.keys(nextErrors).length === 0;
+  }
+
+  async function submit() {
+    if (!validate()) return;
 
     try {
-      await login(email.trim(), password);
-      router.replace(profile?.onboarding_completed ? "/(tabs)/overview" : "/setup");
+      await login(email.trim().toLowerCase(), password);
+      const nextProfile = useSessionStore.getState().profile;
+      router.replace(nextProfile?.onboarding_completed ? "/(tabs)/overview" : "/setup");
     } catch (error) {
-      Alert.alert("FinFlow", error instanceof Error ? error.message : t("auth.configMissing"));
+      const message = error instanceof Error ? error.message : t("auth.configMissing");
+      setErrors({ form: message });
+      Alert.alert("FinFlow", message);
     }
   }
 
@@ -40,8 +60,31 @@ export default function Login() {
       <Header title={t("auth.login")} back />
       <View style={styles.form}>
         <Text style={styles.title}>Welcome back</Text>
-        <InputField accessibilityLabel={t("auth.email")} autoCapitalize="none" keyboardType="email-address" onChangeText={setEmail} placeholder={t("auth.email")} value={email} />
-        <InputField accessibilityLabel={t("auth.password")} onChangeText={setPassword} placeholder={t("auth.password")} secureTextEntry value={password} />
+        <InputField
+          accessibilityLabel={t("auth.email")}
+          autoCapitalize="none"
+          autoCorrect={false}
+          keyboardType="email-address"
+          onChangeText={(value) => {
+            setEmail(value.trim().toLowerCase());
+            setErrors((current) => ({ ...current, email: undefined, form: undefined }));
+          }}
+          placeholder={t("auth.email")}
+          value={email}
+        />
+        {errors.email ? <Text style={styles.message}>{errors.email}</Text> : null}
+        <InputField
+          accessibilityLabel={t("auth.password")}
+          onChangeText={(value) => {
+            setPassword(value);
+            setErrors((current) => ({ ...current, password: undefined, form: undefined }));
+          }}
+          placeholder={t("auth.password")}
+          secureTextEntry
+          value={password}
+        />
+        {errors.password ? <Text style={styles.message}>{errors.password}</Text> : null}
+        {errors.form ? <Text style={styles.message}>{errors.form}</Text> : null}
         <PrimaryButton onPress={submit}>{status === "loading" ? t("common.loading") : t("auth.login")}</PrimaryButton>
         <SecondaryButton onPress={() => router.push("/forgot-password")}>{t("auth.forgot")}</SecondaryButton>
         <SecondaryButton onPress={() => router.push("/register")}>{t("auth.register")}</SecondaryButton>
@@ -60,5 +103,9 @@ const styles = StyleSheet.create({
   title: {
     ...typography.display,
     marginBottom: spacing.md
+  },
+  message: {
+    ...typography.body,
+    color: "#ff4b1f"
   }
 });

@@ -2,12 +2,14 @@ import { ReactNode } from "react";
 import { Pressable, StyleSheet, Text, ViewStyle } from "react-native";
 import { colors, radii, typography } from "../theme";
 
-export function PrimaryButton({ children, onPress, style }: { children: ReactNode; onPress: () => void; style?: ViewStyle }) {
+export function PrimaryButton({ children, disabled = false, onPress, style }: { children: ReactNode; disabled?: boolean; onPress: () => void; style?: ViewStyle }) {
   return (
     <Pressable
       accessibilityRole="button"
+      accessibilityState={{ disabled }}
+      disabled={disabled}
       onPress={onPress}
-      style={({ pressed }) => [styles.button, pressed && styles.pressed, style]}
+      style={({ pressed }) => [styles.button, disabled && styles.disabled, pressed && !disabled && styles.pressed, style]}
     >
       <Text style={styles.text}>{children}</Text>
     </Pressable>
@@ -29,5 +31,8 @@ const styles = StyleSheet.create({
   pressed: {
     opacity: 0.76,
     transform: [{ scale: 0.99 }]
+  },
+  disabled: {
+    opacity: 0.45
   }
 });

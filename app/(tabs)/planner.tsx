@@ -1,95 +1,91 @@
-import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
-import { Plus } from "lucide-react-native";
+import { useEffect } from "react";
+import { Pressable, StyleSheet, Text, View } from "react-native";
+import { router } from "expo-router";
+import { CalendarDays, CreditCard, PiggyBank, WalletCards } from "lucide-react-native";
 import { CalendarEventItem } from "../../src/components/CalendarEventItem";
 import { Header } from "../../src/components/Header";
 import { ScreenContainer } from "../../src/components/ScreenContainer";
 import { useFinFlowStore } from "../../src/store/useFinFlowStore";
 import { colors, spacing, typography } from "../../src/theme";
 
-const week = [
-  ["S", "19"],
-  ["M", "20"],
-  ["T", "21"],
-  ["W", "22"],
-  ["T", "23"],
-  ["F", "24"],
-  ["S", "25"]
-];
-
 export default function Planner() {
   const events = useFinFlowStore((state) => state.events);
-  const addEvent = useFinFlowStore((state) => state.addEvent);
+  const loadOverview = useFinFlowStore((state) => state.loadOverview);
   const toggleEventDone = useFinFlowStore((state) => state.toggleEventDone);
 
-  function createEvent() {
-    addEvent({ title: "New Event", time: "4 PM", category: "Personal", done: false, accent: "orange" });
-    Alert.alert("FinFlow", "Event created. Tap it to mark it as done.");
-  }
+  useEffect(() => {
+    void loadOverview("30d");
+  }, [loadOverview]);
 
   return (
     <ScreenContainer>
-      <Header title="May 2024" />
-      <View style={styles.week}>
-        {week.map(([day, number]) => {
-          const active = number === "21";
-          return (
-            <View key={number} style={styles.day}>
-              <Text style={styles.dayLabel}>{day}</Text>
-              <Text style={[styles.dayNumber, active && styles.activeDay]}>{number}</Text>
-            </View>
-          );
-        })}
+      <Header title="Plan" />
+      <Text style={styles.lead}>Planificá lo que ya está comprometido antes de decidir nuevos gastos.</Text>
+      <View style={styles.grid}>
+        <Shortcut icon={<WalletCards color={colors.black} size={20} />} title="Presupuesto" />
+        <Shortcut icon={<PiggyBank color={colors.black} size={20} />} title="Ahorro" onPress={() => router.push("/plan?tab=Ahorro")} />
+        <Shortcut icon={<CreditCard color={colors.black} size={20} />} title="Tarjetas" onPress={() => router.push("/plan?tab=Tarjetas")} />
+        <Shortcut icon={<CalendarDays color={colors.black} size={20} />} title="Calendario" onPress={() => router.push("/plan?tab=Calendario")} />
       </View>
+      <Text style={styles.section}>Próximos eventos</Text>
       <View style={styles.agenda}>
-        {events.map((event) => (
+        {events.length === 0 ? <Text style={styles.empty}>Sin eventos futuros cargados.</Text> : null}
+        {events.slice(0, 5).map((event) => (
           <CalendarEventItem key={event.id} event={event} onToggle={() => toggleEventDone(event.id)} />
         ))}
       </View>
-      <Pressable accessibilityRole="button" onPress={createEvent} style={styles.fab}>
-        <Plus color={colors.white} size={22} />
-      </Pressable>
     </ScreenContainer>
   );
 }
 
+function Shortcut({ icon, onPress, title }: { icon: React.ReactNode; onPress?: () => void; title: string }) {
+  return (
+    <Pressable accessibilityRole="button" onPress={onPress || (() => router.push(`/plan?tab=${title}`))} style={styles.shortcut}>
+      {icon}
+      <Text style={styles.shortcutTitle}>{title}</Text>
+    </Pressable>
+  );
+}
+
 const styles = StyleSheet.create({
-  week: {
+  lead: {
+    ...typography.body,
+    color: colors.grayDark,
+    marginTop: spacing.lg
+  },
+  grid: {
     flexDirection: "row",
-    justifyContent: "space-between",
+    flexWrap: "wrap",
+    gap: spacing.sm,
     marginTop: spacing.xl
   },
-  day: {
-    alignItems: "center",
-    gap: spacing.xs
+  shortcut: {
+    alignItems: "flex-start",
+    backgroundColor: colors.white,
+    borderColor: colors.grayLight,
+    borderRadius: 8,
+    borderWidth: 1,
+    gap: spacing.sm,
+    minHeight: 96,
+    padding: spacing.md,
+    width: "48%"
   },
-  dayLabel: {
-    ...typography.label
-  },
-  dayNumber: {
+  shortcutTitle: {
     ...typography.body,
     color: colors.black,
-    height: 32,
-    lineHeight: 32,
-    textAlign: "center",
-    width: 32
+    fontWeight: "700"
   },
-  activeDay: {
-    backgroundColor: colors.black,
-    borderRadius: 16,
-    color: colors.white,
-    overflow: "hidden"
-  },
-  agenda: {
+  section: {
+    ...typography.body,
+    color: colors.black,
+    fontWeight: "700",
     marginTop: spacing.xl
   },
-  fab: {
-    alignItems: "center",
-    alignSelf: "flex-end",
-    backgroundColor: colors.black,
-    borderRadius: 24,
-    height: 48,
-    justifyContent: "center",
-    marginTop: spacing.xl,
-    width: 48
+  agenda: {
+    marginTop: spacing.md
+  },
+  empty: {
+    ...typography.body,
+    color: colors.grayDark
   }
 });

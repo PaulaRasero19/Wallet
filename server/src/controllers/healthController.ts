@@ -11,7 +11,8 @@ export const getHealth: RequestHandler = (_req, res) => {
     environment: env.nodeEnv,
     database,
     features: {
-      auth: "not-implemented",
+      auth: "implemented",
+      financialCore: "implemented",
       mongoPrepared: true,
       geminiConfigured: env.geminiConfigured
     },

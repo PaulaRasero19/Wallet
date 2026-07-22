@@ -14,10 +14,27 @@ export type User = {
 export type Account = {
   id: string;
   name: string;
-  mask: string;
+  mask?: string;
+  type?: "cash" | "bank" | "savings" | "wallet" | "credit" | "other";
   balance: number;
+  currentBalance?: number;
+  current_balance?: number;
+  initialBalance?: number;
+  initial_balance?: number;
   currency: Currency;
-  accent: AccentColor;
+  accent?: AccentColor;
+};
+
+export type Category = {
+  id: string;
+  name: string;
+  type: "income" | "expense";
+  icon: string;
+  color: string;
+  translationKey?: string;
+  translation_key?: string;
+  isSystem?: boolean;
+  is_system?: boolean;
 };
 
 export type Installment = {
@@ -35,14 +52,52 @@ export type Transaction = {
   date: string;
   time: string;
   amount: number;
+  rawAmount?: number;
+  raw_amount?: number;
   currency: Currency;
   type: TransactionType;
   accent: AccentColor;
   accountId?: string;
+  account_id?: string;
+  categoryId?: string;
+  category_id?: string;
+  title?: string;
+  note?: string;
   weekday?: string;
   hour?: number;
+  isRecurring?: boolean;
+  is_recurring?: boolean;
   isAntExpense?: boolean;
+  is_ant_expense?: boolean;
   installment?: Installment;
+};
+
+export type DailyHistoryPoint = {
+  date: string;
+  income: number;
+  expenses: number;
+  closingBalance: number;
+};
+
+export type DashboardOverview = {
+  period: string;
+  accounts: Account[];
+  balancesByCurrency?: Record<Currency, number>;
+  balances_by_currency?: Record<Currency, number>;
+  income: number;
+  expenses: number;
+  net: number;
+  transactionCount?: number;
+  transaction_count?: number;
+  averageDailyExpense?: number;
+  average_daily_expense?: number;
+  topExpenseCategory?: { categoryId: string; total: number } | null;
+  top_expense_category?: { category_id: string; total: number } | null;
+  recentTransactions?: Transaction[];
+  recent_transactions?: Transaction[];
+  antExpenseTotal?: number;
+  ant_expense_total?: number;
+  history: DailyHistoryPoint[];
 };
 
 export type Budget = {
@@ -96,6 +151,7 @@ export type ExchangeRates = Record<Currency, number>;
 export type PlannerEvent = {
   id: string;
   title: string;
+  date?: string;
   time: string;
   category: string;
   done: boolean;

@@ -1,14 +1,20 @@
-import { apiRequest, setStoredToken } from "./localBackend/client";
+import { apiRequest, clearTokens, getRefreshToken, setTokens } from "./apiClient";
 import { Language, Profile, updateProfile } from "./profileService";
 
 export type AuthUser = {
   id: string;
   email: string;
+  fullName?: string | null;
   full_name: string | null;
+  onboardingCompleted?: boolean;
+  onboarding_completed?: boolean;
+  isDemo?: boolean;
+  is_demo?: boolean;
 };
 
 export type AuthSession = {
   access_token: string;
+  refresh_token: string;
   user_id: string;
   created_at: string;
 };
@@ -28,7 +34,7 @@ type AuthResponse = {
 
 export async function getCurrentAuth(): Promise<AuthResult> {
   try {
-    const result = await apiRequest<{ user: AuthUser; profile: Profile }>("/api/auth/me", { requireAuth: true });
+    const result = await apiRequest<{ user: AuthUser; profile: Profile }>("/auth/me", { requireAuth: true });
     return {
       session: null,
       user: result.user,
@@ -44,11 +50,11 @@ export function onAuthChanged() {
 }
 
 export async function signInWithEmail(email: string, password: string): Promise<AuthResult> {
-  const result = await apiRequest<AuthResponse>("/api/auth/login", {
+  const result = await apiRequest<AuthResponse>("/auth/login", {
     body: { email, password },
     method: "POST"
   });
-  await setStoredToken(result.session.access_token);
+  await setTokens(result.session.access_token, result.session.refresh_token);
   return result;
 }
 
@@ -58,11 +64,11 @@ export async function signUpWithEmail(params: {
   fullName: string;
   language: Language;
 }): Promise<AuthResult> {
-  const result = await apiRequest<AuthResponse>("/api/auth/register", {
+  const result = await apiRequest<AuthResponse>("/auth/register", {
     body: params,
     method: "POST"
   });
-  await setStoredToken(result.session.access_token);
+  await setTokens(result.session.access_token, result.session.refresh_token);
   return result;
 }
 
@@ -77,17 +83,14 @@ export async function signInDemoAccount(): Promise<AuthResult> {
   const result = await signInWithEmail(email, password);
 
   if (result.user) {
-    result.profile = await updateProfile(result.user.id, {
-      is_demo: true,
-      onboarding_completed: true
-    });
+    result.profile = await updateProfile(result.user.id, {});
   }
 
   return result;
 }
 
 export async function sendPasswordRecovery(email: string) {
-  await apiRequest("/api/auth/recover", {
+  await apiRequest("/auth/forgot-password", {
     body: { email },
     method: "POST"
   });
@@ -95,12 +98,14 @@ export async function sendPasswordRecovery(email: string) {
 
 export async function signOut() {
   try {
-    await apiRequest("/api/auth/logout", {
+    const refreshToken = await getRefreshToken();
+    await apiRequest("/auth/logout", {
+      body: { refreshToken },
       method: "POST",
       requireAuth: true
     });
   } finally {
-    await setStoredToken(null);
+    await clearTokens();
   }
 }
 

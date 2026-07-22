@@ -21,6 +21,6 @@ const styles = StyleSheet.create({
   content: {
     flexGrow: 1,
     padding: spacing.lg,
-    paddingBottom: 110
+    paddingBottom: 140
   }
 });

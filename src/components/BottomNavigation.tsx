@@ -1,6 +1,7 @@
-import { Pressable, StyleSheet, View } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 import { ArrowLeftRight, CalendarDays, Home, Plus, UserRound } from "lucide-react-native";
-import { colors } from "../theme";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { colors, typography } from "../theme";
 import { DotGrid } from "./DotGrid";
 
 const iconMap = {
@@ -11,9 +12,19 @@ const iconMap = {
   profile: UserRound
 };
 
+const labelMap = {
+  overview: "Inicio",
+  transactions: "Movimientos",
+  add: "Agregar",
+  planner: "Plan",
+  profile: "Perfil"
+};
+
 export function BottomNavigation({ state, navigation }: any) {
+  const insets = useSafeAreaInsets();
+
   return (
-    <View style={styles.wrap}>
+    <View style={[styles.wrap, { bottom: Math.max(10, insets.bottom + 8) }]}>
       {state.routes.map((route: any, index: number) => {
         const focused = state.index === index;
         const Icon = iconMap[route.name as keyof typeof iconMap] || Home;
@@ -27,6 +38,7 @@ export function BottomNavigation({ state, navigation }: any) {
             style={[styles.item, focused && styles.activeItem]}
           >
             {focused ? <DotGrid columns={2} dotSize={5} gap={4} matrix={["black", "black", "black", "orange"]} /> : <Icon color={colors.grayMedium} size={19} strokeWidth={1.8} />}
+            <Text style={[styles.label, focused && styles.activeLabel]}>{labelMap[route.name as keyof typeof labelMap] || route.name}</Text>
           </Pressable>
         );
       })}
@@ -40,24 +52,33 @@ const styles = StyleSheet.create({
     alignSelf: "center",
     backgroundColor: colors.surface,
     borderColor: colors.grayLight,
-    borderRadius: 30,
+    borderRadius: 24,
     borderWidth: 1,
-    bottom: 18,
     flexDirection: "row",
-    height: 60,
+    height: 68,
     justifyContent: "space-between",
     paddingHorizontal: 9,
     position: "absolute",
-    width: "82%"
+    width: "92%"
   },
   item: {
     alignItems: "center",
-    borderRadius: 22,
-    height: 44,
+    borderRadius: 18,
+    gap: 3,
+    height: 52,
     justifyContent: "center",
-    width: 44
+    width: 58
   },
   activeItem: {
     backgroundColor: colors.background
+  },
+  label: {
+    ...typography.label,
+    color: colors.grayMedium,
+    fontSize: 9,
+    lineHeight: 11
+  },
+  activeLabel: {
+    color: colors.black
   }
 });

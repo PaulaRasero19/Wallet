@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import { Text, View } from "react-native";
 import { Tabs } from "expo-router";
 import { router } from "expo-router";
-import { BottomNavigation } from "../../src/components/BottomNavigation";
+import { FloatingTabBar } from "../../src/components/navigation/FloatingTabBar";
 import { useSessionStore } from "../../src/store/useSessionStore";
 
 export default function TabLayout() {
@@ -30,12 +30,14 @@ export default function TabLayout() {
   }
 
   return (
-    <Tabs tabBar={(props) => <BottomNavigation {...props} />} screenOptions={{ headerShown: false }}>
-      <Tabs.Screen name="overview" options={{ title: "Overview" }} />
-      <Tabs.Screen name="transactions" options={{ title: "Transactions" }} />
-      <Tabs.Screen name="add" options={{ title: "Add" }} />
-      <Tabs.Screen name="planner" options={{ title: "Planner" }} />
-      <Tabs.Screen name="profile" options={{ title: "Profile" }} />
+    <Tabs tabBar={(props) => <FloatingTabBar {...props} />} screenOptions={{ headerShown: false }}>
+      <Tabs.Screen name="overview" options={{ title: "Inicio" }} />
+      <Tabs.Screen name="transactions" options={{ title: "Movimientos" }} />
+      <Tabs.Screen name="add" options={{ title: "Agregar" }} />
+      <Tabs.Screen name="ai" options={{ title: "IA" }} />
+      <Tabs.Screen name="settings" options={{ title: "Ajustes" }} />
+      <Tabs.Screen name="planner" options={{ href: null, title: "Plan" }} />
+      <Tabs.Screen name="profile" options={{ href: null, title: "Perfil" }} />
     </Tabs>
   );
 }

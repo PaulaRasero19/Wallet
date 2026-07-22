@@ -1,147 +1,152 @@
-import { useState } from "react";
-import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
+import { useEffect, useMemo, useState } from "react";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 import { SendHorizontal } from "lucide-react-native";
-import Animated, { FadeIn, FadeInUp } from "react-native-reanimated";
 import { DarkScreenContainer } from "../src/components/DarkScreenContainer";
-import { Dot } from "../src/components/Dot";
-import { DotGrid } from "../src/components/DotGrid";
 import { Header } from "../src/components/Header";
 import { InputField } from "../src/components/InputField";
-import { InsightCard } from "../src/components/InsightCard";
-import { generateAdvisorResult } from "../src/services/aiAdvisorService";
 import { useFinFlowStore } from "../src/store/useFinFlowStore";
+import { useSessionStore } from "../src/store/useSessionStore";
 import { colors, spacing, typography } from "../src/theme";
-import { MovementProposal } from "../src/types/finflow";
+import { categorySummary, getAntExpenses, overviewMetrics } from "../src/utils/financeInsights";
 import { formatMoney } from "../src/utils/money";
 
-export default function Insights() {
-  const [question, setQuestion] = useState("Show me ways to save more");
-  const [proposal, setProposal] = useState<MovementProposal | null>(null);
-  const [typing, setTyping] = useState(false);
-  const { addTask, addTransaction, aiMessages, addAiMessage, budgets, goals, transactions } = useFinFlowStore();
+const prompts = [
+  "¿En qué gasté más?",
+  "¿Cuánto puedo gastar por día?",
+  "¿Voy a cumplir mi meta?",
+  "¿Qué tengo comprometido?",
+  "¿Cuáles son mis gastos hormiga?",
+  "¿Cómo puedo ahorrar?"
+];
 
-  async function ask() {
-    if (!question.trim()) return;
-    const prompt = question.trim();
-    addAiMessage({ role: "user", text: prompt });
-    setQuestion("");
-    setProposal(null);
-    setTyping(true);
-    const result = await generateAdvisorResult(prompt, { budgets, goals, transactions });
-    addAiMessage({
-      role: "assistant",
-      text: `${result.summary}\n${result.recommendedActions[0]}`,
-      progress: result.riskLevel === "High" ? 86 : 58
-    });
-    setTyping(false);
+export default function Insights() {
+  const [question, setQuestion] = useState("");
+  const [answer, setAnswer] = useState("");
+  const { accounts, creditCards, events, goals, loadOverview, overview, recurringPayments, transactions } = useFinFlowStore();
+  const profile = useSessionStore((state) => state.profile);
+  const primaryCurrency = profile?.primary_currency || "UYU";
+  const metrics = overviewMetrics({ accounts, creditCards, events, goals, overview, payday: profile?.payday, primaryCurrency, recurringPayments, transactions, monthlyIncome: Number(profile?.monthly_income || 0) });
+  const categories = useMemo(() => categorySummary(transactions), [transactions]);
+  const ant = useMemo(() => getAntExpenses(transactions), [transactions]);
+
+  useEffect(() => {
+    void loadOverview("30d");
+  }, [loadOverview]);
+
+  function ask(value = question) {
+    const q = value.trim();
+    if (!q) return;
+    setQuestion(q);
+    setAnswer(buildAnswer(q));
   }
 
-  function confirmProposal() {
-    if (!proposal) return;
-    if (proposal.type === "task") {
-      addTask({
-        title: proposal.reminderText || proposal.merchant,
-        date: proposal.date,
-        time: "10:00 AM",
-        category: "Reminder",
-        reminder: true,
-        note: "Created from natural language.",
-        accent: "blue"
-      });
-    } else {
-      addTransaction({
-        merchant: proposal.merchant,
-        category: proposal.category,
-        date: proposal.date,
-        time: "9:41 AM",
-        amount: proposal.amount,
-        currency: proposal.currency,
-        type: proposal.type,
-        accent: proposal.isAntExpense ? "orange" : proposal.type === "income" ? "lime" : "black",
-        accountId: proposal.accountId,
-        isAntExpense: proposal.isAntExpense,
-        installment: proposal.installments
-      });
+  function buildAnswer(q: string) {
+    const lower = q.toLowerCase();
+    if (!transactions.length) return "Todavía no hay datos suficientes. Registrá movimientos reales para que FinFlow pueda responder con contexto.";
+    if (lower.includes("gasté más") || lower.includes("gaste mas")) {
+      const top = categories[0];
+      return top ? `Tu mayor gasto es ${top.name}: ${formatMoney(top.total, primaryCurrency, false)}, ${top.percent}% del gasto del período.` : "No encontré gastos en el período.";
     }
-    setProposal(null);
-    Alert.alert("FinFlow", "Confirmed. The movement was saved after your approval.");
+    if (lower.includes("por día") || lower.includes("por dia")) {
+      return `Podés gastar aproximadamente ${formatMoney(metrics.dailyLimit, primaryCurrency, false)} por día hasta el próximo cobro, considerando compromisos.`;
+    }
+    if (lower.includes("meta")) {
+      const goal = goals[0];
+      return goal ? `Tu meta "${goal.name}" está en ${Math.round((goal.saved / goal.target) * 100)}%. Te faltan ${formatMoney(goal.target - goal.saved, goal.currency, false)}.` : "No hay una meta activa para evaluar.";
+    }
+    if (lower.includes("comprometido")) {
+      return `Tenés ${formatMoney(metrics.committed, primaryCurrency, false)} comprometidos entre pagos recurrentes y cuotas próximas.`;
+    }
+    if (lower.includes("hormiga")) {
+      const total = ant.reduce((sum, item) => sum + Math.abs(item.raw_amount ?? item.rawAmount ?? item.amount), 0);
+      return `Detecté ${ant.length} gastos hormiga por ${formatMoney(total, primaryCurrency, false)}. Reducir la mitad liberaría ${formatMoney(total * 0.5, primaryCurrency, false)}.`;
+    }
+    return metrics.priorityInsight;
   }
 
   return (
     <DarkScreenContainer>
-      <Header title="Insights" dark back />
-      <View style={styles.messages}>
-        {aiMessages.map((message) => (
-          <Animated.View key={message.id} entering={FadeInUp.duration(280)}>
-            <InsightCard message={message} />
-          </Animated.View>
+      <Header title="Asistente" dark back />
+      <Text style={styles.lead}>Preguntá sobre tus datos reales. Las respuestas usan movimientos, cuentas, metas y vencimientos cargados.</Text>
+      <View style={styles.suggestions}>
+        {prompts.map((prompt) => (
+          <Pressable key={prompt} accessibilityRole="button" onPress={() => ask(prompt)} style={styles.prompt}>
+            <Text style={styles.promptText}>{prompt}</Text>
+          </Pressable>
         ))}
-        {typing ? (
-          <Animated.View entering={FadeIn.duration(220)} style={styles.typing}>
-            <DotGrid columns={3} dotSize={7} gap={7} matrix={["white", "white", "white"]} animated />
-          </Animated.View>
-        ) : null}
       </View>
+      {answer ? (
+        <View style={styles.answer}>
+          <Text style={styles.answerTitle}>{question}</Text>
+          <Text style={styles.answerText}>{answer}</Text>
+        </View>
+      ) : (
+        <View style={styles.answer}>
+          <Text style={styles.answerTitle}>Recomendación prioritaria</Text>
+          <Text style={styles.answerText}>{metrics.priorityInsight}</Text>
+        </View>
+      )}
       <View style={styles.inputBar}>
         <InputField
-          accessibilityLabel="Ask FinFlow anything"
+          accessibilityLabel="Preguntale a FinFlow"
           onChangeText={setQuestion}
-          placeholder="Ask FinFlow anything..."
+          placeholder="Preguntale a FinFlow..."
           style={styles.input}
           value={question}
         />
-        <Pressable accessibilityRole="button" onPress={ask} style={styles.send}>
+        <Pressable accessibilityRole="button" onPress={() => ask()} style={styles.send}>
           <SendHorizontal color={colors.black} size={18} />
         </Pressable>
-      </View>
-      {proposal ? (
-        <View style={styles.proposal}>
-          <Text style={styles.proposalTitle}>Structured proposal</Text>
-          <Text style={styles.proposalLine}>Type: {proposal.type}</Text>
-          <Text style={styles.proposalLine}>Merchant: {proposal.merchant}</Text>
-          <Text style={styles.proposalLine}>Amount: {formatMoney(proposal.amount, proposal.currency)}</Text>
-          <Text style={styles.proposalLine}>Category: {proposal.category}</Text>
-          <Text style={styles.proposalLine}>Account: {proposal.accountId}</Text>
-          <Text style={styles.proposalLine}>Ant expense: {proposal.isAntExpense ? "yes" : "no"}</Text>
-          {proposal.installments ? (
-            <Text style={styles.proposalLine}>
-              Installments: {proposal.installments.current}/{proposal.installments.total} · {formatMoney(proposal.installments.amountPerInstallment, proposal.currency, false)}
-            </Text>
-          ) : null}
-          <View style={styles.proposalActions}>
-            <Pressable accessibilityRole="button" onPress={confirmProposal} style={styles.confirm}>
-              <Text style={styles.confirmText}>Confirm</Text>
-            </Pressable>
-            <Pressable accessibilityRole="button" onPress={() => setProposal(null)} style={styles.reject}>
-              <Text style={styles.rejectText}>Reject</Text>
-            </Pressable>
-          </View>
-        </View>
-      ) : null}
-      <View style={styles.source}>
-        <Dot color="lime" size={6} />
-        <Text style={styles.sourceText}>AI works with Gemini backend or local fallback.</Text>
       </View>
     </DarkScreenContainer>
   );
 }
 
 const styles = StyleSheet.create({
-  messages: {
+  lead: {
+    ...typography.body,
+    color: colors.transparentWhite,
+    marginTop: spacing.lg
+  },
+  suggestions: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: spacing.sm,
     marginTop: spacing.xl
   },
-  typing: {
-    alignSelf: "flex-start",
-    backgroundColor: colors.darkSurface,
+  prompt: {
     borderColor: colors.grayDark,
-    borderRadius: 18,
+    borderRadius: 8,
     borderWidth: 1,
-    padding: spacing.md
+    minHeight: 38,
+    justifyContent: "center",
+    paddingHorizontal: spacing.md
+  },
+  promptText: {
+    ...typography.label,
+    color: colors.white,
+    fontWeight: "700"
+  },
+  answer: {
+    backgroundColor: colors.white,
+    borderRadius: 8,
+    gap: spacing.sm,
+    marginTop: spacing.xl,
+    padding: spacing.lg
+  },
+  answerTitle: {
+    ...typography.body,
+    color: colors.black,
+    fontWeight: "700"
+  },
+  answerText: {
+    ...typography.body,
+    color: colors.grayDark
   },
   inputBar: {
     alignItems: "center",
     borderColor: colors.grayDark,
-    borderRadius: 24,
+    borderRadius: 8,
     borderWidth: 1,
     flexDirection: "row",
     gap: spacing.sm,
@@ -158,66 +163,9 @@ const styles = StyleSheet.create({
   send: {
     alignItems: "center",
     backgroundColor: colors.white,
-    borderRadius: 20,
+    borderRadius: 8,
     height: 40,
     justifyContent: "center",
     width: 40
-  },
-  source: {
-    alignItems: "center",
-    flexDirection: "row",
-    gap: spacing.sm,
-    marginTop: spacing.md
-  },
-  sourceText: {
-    ...typography.label,
-    color: colors.transparentWhite
-  },
-  proposal: {
-    backgroundColor: colors.white,
-    borderRadius: 18,
-    gap: spacing.xs,
-    marginTop: spacing.md,
-    padding: spacing.md
-  },
-  proposalTitle: {
-    ...typography.body,
-    color: colors.black,
-    fontWeight: "600",
-    marginBottom: spacing.xs
-  },
-  proposalLine: {
-    ...typography.label,
-    color: colors.grayDark
-  },
-  proposalActions: {
-    flexDirection: "row",
-    gap: spacing.sm,
-    marginTop: spacing.sm
-  },
-  confirm: {
-    backgroundColor: colors.black,
-    borderRadius: 16,
-    minHeight: 38,
-    justifyContent: "center",
-    paddingHorizontal: spacing.md
-  },
-  confirmText: {
-    ...typography.label,
-    color: colors.white,
-    fontWeight: "600"
-  },
-  reject: {
-    borderColor: colors.grayLight,
-    borderRadius: 16,
-    borderWidth: 1,
-    minHeight: 38,
-    justifyContent: "center",
-    paddingHorizontal: spacing.md
-  },
-  rejectText: {
-    ...typography.label,
-    color: colors.black,
-    fontWeight: "600"
   }
 });
