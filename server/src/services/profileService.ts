@@ -7,22 +7,67 @@ import { accountDTO, profileDTO } from "./serializers";
 
 type ProfileInput = Record<string, unknown>;
 
+function valueFrom(input: ProfileInput, camel: string, snake: string) {
+  return input[camel] ?? input[snake];
+}
+
+function hasValue(input: ProfileInput, camel: string, snake: string) {
+  return input[camel] !== undefined || input[snake] !== undefined;
+}
+
+function profileUpdateFrom(input: ProfileInput, useDefaults: boolean) {
+  const update: Record<string, unknown> = {};
+
+  function assign(target: string, camel: string, snake: string, fallback?: unknown) {
+    if (hasValue(input, camel, snake)) {
+      update[target] = valueFrom(input, camel, snake);
+    } else if (useDefaults && fallback !== undefined) {
+      update[target] = fallback;
+    }
+  }
+
+  assign("countryName", "countryName", "country_name", "Uruguay");
+  assign("countryCode", "countryCode", "country_code", "UY");
+  assign("language", "language", "language", "es");
+  assign("locale", "locale", "locale", input.language === "pt" ? "pt-BR" : input.language === "en" ? "en-US" : "es-UY");
+  assign("currencyName", "currencyName", "currency_name", "Peso uruguayo");
+  assign("currencySymbol", "currencySymbol", "currency_symbol", "$U");
+  assign("primaryCurrency", "primaryCurrency", "primary_currency", "UYU");
+  if (input.currencyCode !== undefined || input.currency_code !== undefined) {
+    update.primaryCurrency = input.currencyCode ?? input.currency_code;
+  }
+  assign("secondaryCurrencies", "secondaryCurrencies", "secondary_currencies", []);
+  assign("profileSetupStep", "profileSetupStep", "profile_setup_step", 0);
+  assign("incomeFrequency", "incomeFrequency", "income_frequency", null);
+  assign("payday", "payday", "payday_day", null);
+  assign("secondPayday", "secondPayday", "second_payday", null);
+  assign("paydayWeekday", "paydayWeekday", "payday_weekday", null);
+  assign("monthlyIncome", "monthlyIncome", "monthly_income", null);
+  assign("hasVariableIncome", "hasVariableIncome", "has_variable_income", false);
+  assign("initialBalance", "initialBalance", "initial_balance", 0);
+  assign("financialGoal", "financialGoal", "financial_goal", null);
+  assign("primaryGoal", "primaryGoal", "primary_goal", null);
+  assign("antExpenseThreshold", "antExpenseThreshold", "ant_expense_threshold", 400);
+  assign("notificationsEnabled", "notificationsEnabled", "notifications_enabled", false);
+  assign("weeklySummaryEnabled", "weeklySummaryEnabled", "weekly_summary_enabled", false);
+
+  if (input.paydayDay !== undefined || input.payday_day !== undefined) {
+    update.payday = input.paydayDay ?? input.payday_day;
+  }
+
+  return update;
+}
+
 function normalizeProfile(input: ProfileInput) {
+  const update = profileUpdateFrom(input, true);
+
   return {
-    countryCode: (input.countryCode || input.country_code || "UY") as string,
-    language: (input.language || "es") as "es" | "en" | "pt",
-    locale: (input.locale || (input.language === "pt" ? "pt-BR" : input.language === "en" ? "en-US" : "es-UY")) as string,
-    primaryCurrency: (input.primaryCurrency || input.primary_currency || "UYU") as "UYU" | "USD" | "EUR",
-    secondaryCurrencies: (input.secondaryCurrencies || input.secondary_currencies || []) as string[],
-    incomeFrequency: input.incomeFrequency ?? input.income_frequency ?? null,
-    payday: input.payday ?? null,
-    monthlyIncome: input.monthlyIncome ?? input.monthly_income ?? null,
-    hasVariableIncome: Boolean(input.hasVariableIncome ?? input.has_variable_income ?? false),
-    initialBalance: Number(input.initialBalance ?? input.initial_balance ?? 0),
-    financialGoal: (input.financialGoal ?? input.financial_goal ?? null) as string | null,
-    antExpenseThreshold: Number(input.antExpenseThreshold ?? input.ant_expense_threshold ?? 400),
-    notificationsEnabled: Boolean(input.notificationsEnabled ?? input.notifications_enabled ?? false),
-    weeklySummaryEnabled: Boolean(input.weeklySummaryEnabled ?? input.weekly_summary_enabled ?? false)
+    ...update,
+    hasVariableIncome: Boolean(update.hasVariableIncome),
+    initialBalance: Number(update.initialBalance),
+    antExpenseThreshold: Number(update.antExpenseThreshold),
+    notificationsEnabled: Boolean(update.notificationsEnabled),
+    weeklySummaryEnabled: Boolean(update.weeklySummaryEnabled)
   };
 }
 
@@ -32,11 +77,16 @@ export async function getProfileForUser(userId: Types.ObjectId) {
 }
 
 export async function patchProfileForUser(userId: Types.ObjectId, input: ProfileInput) {
-  const update = normalizeProfile(input);
+  const update = profileUpdateFrom(input, false);
   const profile = await FinancialProfile.findOneAndUpdate({ userId }, update, { upsert: true, returnDocument: "after", setDefaultsOnInsert: true });
 
   if (input.fullName || input.full_name) {
     await User.findByIdAndUpdate(userId, { fullName: input.fullName || input.full_name });
+  }
+
+  const setupCompleted = input.profileSetupCompleted ?? input.profile_setup_completed ?? input.onboarding_completed;
+  if (setupCompleted !== undefined) {
+    await User.findByIdAndUpdate(userId, { onboardingCompleted: Boolean(setupCompleted) });
   }
 
   const user = await User.findById(userId);
@@ -44,7 +94,7 @@ export async function patchProfileForUser(userId: Types.ObjectId, input: Profile
 }
 
 export async function completeOnboardingForUser(userId: Types.ObjectId, input: ProfileInput) {
-  const normalized = normalizeProfile(input);
+  const normalized = normalizeProfile(input) as Record<string, any>;
   const user = await User.findById(userId);
 
   if (!user) {

@@ -36,7 +36,7 @@ export default function LanguageSelector() {
         })}
       </View>
 
-      <PrimaryButton onPress={() => router.replace("/onboarding")}>{t("language.continue")}</PrimaryButton>
+      <PrimaryButton onPress={() => router.replace("/welcome")}>{t("language.continue")}</PrimaryButton>
     </ScreenContainer>
   );
 }

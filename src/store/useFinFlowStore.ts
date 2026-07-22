@@ -9,6 +9,8 @@ import {
 import {
   createAccountApi,
   createRecurringPaymentApi,
+  createGoalApi,
+  createInstallmentPurchaseApi,
   createTransferApi,
   createTransactionApi,
   deleteTransactionApi,
@@ -17,6 +19,8 @@ import {
   fetchExtendedFinance,
   fetchOverview,
   fetchTransactions,
+  markInstallmentPaidApi,
+  markRecurringPaymentPaidApi,
   updateTransactionApi
 } from "../services/financeService";
 import {
@@ -30,6 +34,7 @@ import {
   ExchangeRates,
   FinFlowNotification,
   Goal,
+  InstallmentPurchase,
   PlannerEvent,
   RecurringPayment,
   Task,
@@ -73,11 +78,32 @@ type RecurringPaymentInput = {
   category: string;
   amount: number;
   currency: Currency;
-  frequency: "weekly" | "monthly" | "annual";
+  frequency: "once" | "weekly" | "monthly" | "annual";
   nextChargeDate: string;
   kind?: "fixed" | "subscription" | "service";
   accountId?: string;
   notificationsEnabled?: boolean;
+  reminderDaysBefore?: number;
+};
+
+type GoalInput = {
+  name: string;
+  target: number;
+  saved?: number;
+  currency: Currency;
+  monthlyContribution?: number;
+  targetDate?: string | null;
+};
+
+type InstallmentPurchaseInput = {
+  accountId?: string;
+  name: string;
+  totalAmount: number;
+  totalInstallments: number;
+  firstDueDate: string;
+  category: string;
+  currency: Currency;
+  reminderDaysBefore?: number;
 };
 
 type AccountInput = {
@@ -98,6 +124,7 @@ type FinFlowState = {
   creditCards: CreditCard[];
   exchangeRates: ExchangeRates;
   goals: Goal[];
+  installmentPurchases: InstallmentPurchase[];
   recurringPayments: RecurringPayment[];
   events: PlannerEvent[];
   tasks: Task[];
@@ -112,10 +139,14 @@ type FinFlowState = {
   loadAccounts: () => Promise<void>;
   loadCategories: (type?: "income" | "expense") => Promise<void>;
   createAccount: (input: AccountInput) => Promise<Account>;
-  loadTransactions: () => Promise<void>;
+  loadTransactions: (filters?: { dateFrom?: string; dateTo?: string; limit?: number }) => Promise<void>;
   createTransaction: (input: TransactionInput) => Promise<Transaction>;
   createTransfer: (input: TransferInput) => Promise<Transaction>;
   createRecurringPayment: (input: RecurringPaymentInput) => Promise<RecurringPayment>;
+  createGoal: (input: GoalInput) => Promise<Goal>;
+  createInstallmentPurchase: (input: InstallmentPurchaseInput) => Promise<InstallmentPurchase>;
+  markPaymentPaid: (id: string) => Promise<void>;
+  markInstallmentPaid: (purchaseId: string, installmentId: string) => Promise<void>;
   updateTransaction: (id: string, input: Partial<Transaction>) => Promise<Transaction>;
   deleteTransaction: (id: string) => Promise<void>;
   loadOverview: (period?: string) => Promise<void>;
@@ -165,6 +196,7 @@ function emptyState() {
     events: [],
     exchangeRates: emptyExchangeRates,
     goals: [],
+    installmentPurchases: [],
     hasLoaded: true,
     loading: false,
     notifications: [],
@@ -194,6 +226,7 @@ export const useFinFlowStore = create<FinFlowState>()((set, get) => {
     creditCards: [],
     exchangeRates: emptyExchangeRates,
     goals: [],
+    installmentPurchases: [],
     recurringPayments: [],
     events: [],
     tasks: [],
@@ -233,10 +266,10 @@ export const useFinFlowStore = create<FinFlowState>()((set, get) => {
         fail(error);
       }
     },
-    loadTransactions: async () => {
+    loadTransactions: async (filters = {}) => {
       set({ loading: true, error: null, errors: null });
       try {
-        const transactions = await fetchTransactions();
+        const transactions = await fetchTransactions(filters);
         set({ transactions, hasLoaded: true, loading: false });
       } catch (error) {
         fail(error);
@@ -281,6 +314,49 @@ export const useFinFlowStore = create<FinFlowState>()((set, get) => {
         fail(error);
       }
     },
+    createGoal: async (input) => {
+      set({ loading: true, error: null, errors: null });
+      try {
+        const goal = await createGoalApi(input);
+        set({ goals: [...get().goals, goal], loading: false });
+        return goal;
+      } catch (error) {
+        fail(error);
+      }
+    },
+    createInstallmentPurchase: async (input) => {
+      set({ loading: true, error: null, errors: null });
+      try {
+        const purchase = await createInstallmentPurchaseApi(input);
+        set({ installmentPurchases: [...get().installmentPurchases, purchase], loading: false });
+        return purchase;
+      } catch (error) {
+        fail(error);
+      }
+    },
+    markPaymentPaid: async (id) => {
+      set({ loading: true, error: null, errors: null });
+      try {
+        const result = await markRecurringPaymentPaidApi(id);
+        set({
+          recurringPayments: get().recurringPayments.map((payment) => (payment.id === id ? result.payment : payment)).filter((payment) => payment.active !== false),
+          loading: false
+        });
+        await get().loadOverview();
+      } catch (error) {
+        fail(error);
+      }
+    },
+    markInstallmentPaid: async (purchaseId, installmentId) => {
+      set({ loading: true, error: null, errors: null });
+      try {
+        const purchase = await markInstallmentPaidApi(purchaseId, installmentId);
+        set({ installmentPurchases: get().installmentPurchases.map((item) => (item.id === purchaseId ? purchase : item)), loading: false });
+        await get().loadOverview();
+      } catch (error) {
+        fail(error);
+      }
+    },
     updateTransaction: async (id, input) => {
       set({ loading: true, error: null, errors: null });
       try {
@@ -311,13 +387,14 @@ export const useFinFlowStore = create<FinFlowState>()((set, get) => {
       try {
         const [overview, extended] = await Promise.all([fetchOverview(period), fetchExtendedFinance()]);
         const accounts = overview.accounts || get().accounts;
-        const transactions = overview.recent_transactions || overview.recentTransactions || get().transactions;
+        const transactions = get().transactions.length ? get().transactions : overview.recent_transactions || overview.recentTransactions || [];
         set({
           accounts,
           balance: getBalance(accounts),
           creditCards: extended.creditCards || extended.credit_cards || [],
           events: extended.events || [],
           goals: extended.goals || [],
+          installmentPurchases: extended.installmentPurchases || extended.installment_purchases || [],
           overview,
           recurringPayments: extended.recurringPayments || extended.recurring_payments || [],
           transactions,

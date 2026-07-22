@@ -31,6 +31,7 @@ type SessionState = {
   logout: () => Promise<void>;
   recoverPassword: (email: string) => Promise<void>;
   register: (email: string, password: string, fullName: string) => Promise<string | undefined>;
+  saveProfile: (update: ProfileUpdate) => Promise<void>;
   setLanguage: (language: Language) => Promise<void>;
 };
 
@@ -142,6 +143,15 @@ export const useSessionStore = create<SessionState>()((set, get) => ({
       set({ error: messageFrom(error) });
       throw error;
     }
+  },
+  saveProfile: async (update) => {
+    const { authUser } = get();
+    if (!authUser) {
+      throw new Error("You must be logged in to update your profile.");
+    }
+
+    const profile = await updateProfile(authUser.id, update);
+    set({ language: profile.language, profile });
   },
   setLanguage: async (language) => {
     const { authUser, profile } = get();

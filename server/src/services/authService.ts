@@ -63,8 +63,12 @@ export async function registerUser(input: { fullName: string; email: string; pas
     userId: user._id,
     language: input.language,
     locale: input.language === "es" ? "es-UY" : input.language === "pt" ? "pt-BR" : "en-US",
+    countryName: "Uruguay",
     countryCode: "UY",
+    currencyName: "Peso uruguayo",
+    currencySymbol: "$U",
     primaryCurrency: "UYU",
+    profileSetupStep: 0,
     secondaryCurrencies: []
   });
 

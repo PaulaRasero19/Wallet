@@ -17,12 +17,12 @@ export default function TabLayout() {
       return;
     }
 
-    if (!profile?.onboarding_completed) {
+    if (!(profile?.profile_setup_completed || profile?.onboarding_completed)) {
       router.replace("/setup");
     }
-  }, [profile?.onboarding_completed, status]);
+  }, [profile?.onboarding_completed, profile?.profile_setup_completed, status]);
 
-  if (status === "loading" || status !== "authenticated" || !profile?.onboarding_completed) {
+  if (status === "loading" || status !== "authenticated" || !(profile?.profile_setup_completed || profile?.onboarding_completed)) {
     return (
       <View style={{ backgroundColor: colors.black, flex: 1, justifyContent: "center", padding: 24 }}>
         <Text style={{ color: colors.white }}>Loading FinFlow...</Text>

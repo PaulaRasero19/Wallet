@@ -47,7 +47,7 @@ export default function Login() {
     try {
       await login(email.trim().toLowerCase(), password);
       const nextProfile = useSessionStore.getState().profile;
-      router.replace(nextProfile?.onboarding_completed ? "/(tabs)/overview" : "/setup");
+      router.replace(nextProfile?.profile_setup_completed || nextProfile?.onboarding_completed ? "/(tabs)/overview" : "/setup");
     } catch (error) {
       const message = error instanceof Error ? error.message : t("auth.configMissing");
       setErrors({ form: message });

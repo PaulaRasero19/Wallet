@@ -66,18 +66,20 @@ async function createIfMissing(input: {
   const notification = await Notification.findOneAndUpdate(
     { userId: input.userId, dedupeKey },
     {
-      $setOnInsert: {
+      $set: {
         actionType: input.actionType,
-        dedupeKey,
         message: input.message,
         metadata: input.metadata || {},
         priority: input.priority || "normal",
         relatedEntityId: input.relatedEntityId,
         relatedEntityType: input.relatedEntityType,
         scheduledFor: input.scheduledFor,
-        status: "pending",
         title: input.title,
-        type: input.type,
+        type: input.type
+      },
+      $setOnInsert: {
+        dedupeKey,
+        status: "pending",
         userId: input.userId
       }
     },
@@ -105,7 +107,7 @@ export async function generateNotificationsForUser(userId: Types.ObjectId) {
     if (dayKey(due) === dayKey(tomorrow)) {
       await createIfMissing({
         actionType: "open_payment",
-        message: `$U ${payment.amount.toLocaleString("es-UY")} · Vence el ${due.toLocaleDateString("es-UY", { day: "numeric", month: "long" })}`,
+        message: `Te queda 1 día para pagar $U ${payment.amount.toLocaleString("es-UY")} · Vence el ${due.toLocaleDateString("es-UY", { day: "numeric", month: "long" })}`,
         priority: "high",
         relatedEntityId: payment._id,
         relatedEntityType: "payment",
@@ -114,10 +116,22 @@ export async function generateNotificationsForUser(userId: Types.ObjectId) {
         type: "bill_due_tomorrow",
         userId
       });
+    } else if (dayKey(due) === dayKey(threeDays)) {
+      await createIfMissing({
+        actionType: "open_payment",
+        message: `Te quedan 3 días para pagar $U ${payment.amount.toLocaleString("es-UY")} · Vence el ${due.toLocaleDateString("es-UY", { day: "numeric", month: "long" })}`,
+        priority: "normal",
+        relatedEntityId: payment._id,
+        relatedEntityType: "payment",
+        scheduledFor: due,
+        title: `En 3 días vence ${payment.merchant}`,
+        type: "bill_due_soon",
+        userId
+      });
     } else if (due < today) {
       await createIfMissing({
         actionType: "open_payment",
-        message: `Venció el ${due.toLocaleDateString("es-UY", { day: "numeric", month: "long" })}`,
+        message: `Venció el ${due.toLocaleDateString("es-UY", { day: "numeric", month: "long" })}. Podés registrarlo como pagado o posponerlo.`,
         priority: "urgent",
         relatedEntityId: payment._id,
         relatedEntityType: "payment",
@@ -135,7 +149,7 @@ export async function generateNotificationsForUser(userId: Types.ObjectId) {
     if (dayKey(closing) === dayKey(threeDays)) {
       await createIfMissing({
         actionType: "open_card",
-        message: `Tenés $U ${card.used.toLocaleString("es-UY")} acumulados`,
+        message: `Te quedan 3 días. Tenés $U ${card.used.toLocaleString("es-UY")} acumulados`,
         priority: "normal",
         relatedEntityId: card._id,
         relatedEntityType: "card",
@@ -148,7 +162,7 @@ export async function generateNotificationsForUser(userId: Types.ObjectId) {
     if (dayKey(due) === dayKey(tomorrow)) {
       await createIfMissing({
         actionType: "open_card",
-        message: `Pago estimado $U ${card.nextPaymentAmount.toLocaleString("es-UY")}`,
+        message: `Te queda 1 día. Pago estimado $U ${card.nextPaymentAmount.toLocaleString("es-UY")}`,
         priority: "high",
         relatedEntityId: card._id,
         relatedEntityType: "card",

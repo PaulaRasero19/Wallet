@@ -131,13 +131,50 @@ export type RecurringPayment = {
   category: BudgetCategory | "Other";
   amount: number;
   currency: Currency;
-  frequency: "weekly" | "monthly" | "annual";
+  frequency: "once" | "weekly" | "monthly" | "annual";
   nextChargeDate: string;
-  status: RecurringStatus;
+  status: RecurringStatus | "paid";
   kind: "fixed" | "subscription" | "service";
+  reminderDaysBefore?: number;
+  reminder_days_before?: number;
+  active?: boolean;
   confidence: number;
   priceChange?: number;
   duplicateGroup?: string;
+};
+
+export type InstallmentPurchase = {
+  id: string;
+  accountId?: string;
+  account_id?: string;
+  name: string;
+  category: string;
+  totalAmount: number;
+  total_amount?: number;
+  installmentAmount: number;
+  installment_amount?: number;
+  totalInstallments: number;
+  total_installments?: number;
+  paidInstallments: number;
+  paid_installments?: number;
+  currency: Currency;
+  firstDueDate: string;
+  first_due_date?: string;
+  reminderDaysBefore?: number;
+  reminder_days_before?: number;
+  status: "active" | "completed";
+  installments: Array<{
+    id: string;
+    number: number;
+    amount: number;
+    dueDate: string;
+    due_date?: string;
+    status: "pending" | "paid";
+    paidAt?: string | null;
+    paid_at?: string | null;
+    transactionId?: string;
+    transaction_id?: string;
+  }>;
 };
 
 export type CreditCard = {

@@ -102,7 +102,7 @@ export default function Register() {
     <ScreenContainer style={styles.content}>
       <Header title={t("auth.register")} back />
       <View style={styles.form}>
-        <Text style={styles.title}>Start flowing</Text>
+        <Text style={styles.title}>Crear tu cuenta</Text>
         <InputField
           inputRef={nameInputRef}
           accessibilityLabel={t("auth.name")}

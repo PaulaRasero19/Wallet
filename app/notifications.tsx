@@ -26,13 +26,14 @@ function openRelated(notification: FinFlowNotification) {
   const id = notification.relatedEntityId || notification.related_entity_id;
   if (!id) return;
   if (type === "payment") router.push(`/payment/${id}`);
+  if (type === "installment") router.push("/(tabs)/plan?tab=Calendario");
   if (type === "card") router.push(`/card/${id}`);
   if (type === "transaction") router.push(`/transaction/${id}`);
   if (type === "goal") router.push(`/goal/${id}`);
 }
 
 export default function Notifications() {
-  const { completeNotification, loadNotifications, markAllNotificationsRead, markNotificationRead, notifications, snoozeNotification } = useFinFlowStore();
+  const { completeNotification, loadNotifications, markAllNotificationsRead, markInstallmentPaid, markNotificationRead, markPaymentPaid, notifications, snoozeNotification } = useFinFlowStore();
   const [filter, setFilter] = useState<Filter>("Todas");
 
   useEffect(() => {
@@ -84,7 +85,14 @@ export default function Notifications() {
               <NotificationRow
                 key={notification.id}
                 notification={notification}
-                onComplete={() => void completeNotification(notification.id)}
+                onComplete={() => {
+                  const type = notification.relatedEntityType || notification.related_entity_type;
+                  const id = notification.relatedEntityId || notification.related_entity_id;
+                  const installmentId = typeof notification.metadata?.installmentId === "string" ? notification.metadata.installmentId : "";
+                  if (type === "payment" && id) void markPaymentPaid(id).then(() => completeNotification(notification.id));
+                  else if (type === "installment" && id && installmentId) void markInstallmentPaid(id, installmentId).then(() => completeNotification(notification.id));
+                  else void completeNotification(notification.id);
+                }}
                 onOpen={() => {
                   void markNotificationRead(notification.id);
                   openRelated(notification);

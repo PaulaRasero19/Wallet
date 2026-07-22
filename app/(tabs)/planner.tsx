@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { router } from "expo-router";
-import { CalendarDays, CreditCard, PiggyBank, WalletCards } from "lucide-react-native";
+import { CalendarDays, PiggyBank, WalletCards } from "lucide-react-native";
 import { CalendarEventItem } from "../../src/components/CalendarEventItem";
 import { Header } from "../../src/components/Header";
 import { ScreenContainer } from "../../src/components/ScreenContainer";
@@ -22,9 +22,8 @@ export default function Planner() {
       <Header title="Plan" />
       <Text style={styles.lead}>Planificá lo que ya está comprometido antes de decidir nuevos gastos.</Text>
       <View style={styles.grid}>
-        <Shortcut icon={<WalletCards color={colors.white} size={20} />} title="Presupuesto" />
-        <Shortcut icon={<PiggyBank color={colors.white} size={20} />} title="Ahorro" onPress={() => router.push("/plan?tab=Ahorro")} />
-        <Shortcut icon={<CreditCard color={colors.white} size={20} />} title="Tarjetas" onPress={() => router.push("/plan?tab=Tarjetas")} />
+        <Shortcut icon={<WalletCards color={colors.white} size={20} />} title="Resumen" onPress={() => router.push("/plan?tab=Resumen")} />
+        <Shortcut icon={<PiggyBank color={colors.white} size={20} />} title="Metas" onPress={() => router.push("/plan?tab=Metas")} />
         <Shortcut icon={<CalendarDays color={colors.white} size={20} />} title="Calendario" onPress={() => router.push("/plan?tab=Calendario")} />
       </View>
       <Text style={styles.section}>Próximos eventos</Text>

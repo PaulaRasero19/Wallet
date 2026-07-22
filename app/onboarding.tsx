@@ -5,22 +5,23 @@ import { router } from "expo-router";
 import Animated, { FadeInRight } from "react-native-reanimated";
 import { DotComposition } from "../src/components/DotGrid";
 import { PageIndicator } from "../src/components/PageIndicator";
+import { setHasSeenOnboarding } from "../src/services/onboardingStorage";
 import { colors, spacing, typography } from "../src/theme";
 
 const pages = [
   {
-    title: "Track what\nmatters",
-    subtitle: "All your finances in one\nbeautiful, simple overview.",
+    title: "Controlá tu\ndinero",
+    subtitle: "Organizá tus ingresos, gastos y\npagos desde un solo lugar.",
     variant: 1
   },
   {
-    title: "Plan with\nclarity",
-    subtitle: "Organize goals, habits, and\nroutines that move you forward.",
+    title: "Anticipate a\ntus gastos",
+    subtitle: "Recibí alertas antes de tus\npagos y vencimientos.",
     variant: 2
   },
   {
-    title: "Let AI guide\nyou",
-    subtitle: "Smart insights and gentle nudges\nto help you make better decisions.",
+    title: "Decidí con\nayuda de IA",
+    subtitle: "Obtené análisis y recomendaciones\nbasados en tus movimientos.",
     variant: 3
   }
 ] as const;
@@ -29,8 +30,9 @@ export default function Onboarding() {
   const [index, setIndex] = useState(0);
   const page = pages[index];
 
-  function next() {
+  async function next() {
     if (index === pages.length - 1) {
+      await setHasSeenOnboarding();
       router.replace("/welcome");
       return;
     }

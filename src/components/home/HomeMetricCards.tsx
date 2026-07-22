@@ -1,65 +1,84 @@
 import { StyleSheet, Text, View } from "react-native";
 import { ArrowDown, ArrowUp } from "lucide-react-native";
 import { colors, typography } from "../../theme";
-import { Currency, Goal, Transaction } from "../../types/finflow";
+import { Currency } from "../../types/finflow";
+import { HomeFinancialInsights, InsightTone } from "../../utils/homeFinancialInsights";
+import { formatCompactMoney, formatMoney } from "../../utils/money";
 
 export function HomeMetricCards({
   currency,
-  expenses,
-  goal,
-  income,
-  monthlyIncome,
-  transactions
+  insights
 }: {
   currency: Currency;
-  expenses: number;
-  goal?: Goal;
-  income: number;
-  monthlyIncome?: number;
-  transactions: Transaction[];
+  insights: HomeFinancialInsights;
 }) {
+  const smallExpenseLabel = insights.smallExpenses.count === 1 ? "1 gasto" : `${insights.smallExpenses.count} gastos`;
+  const smallExpenseMeta = !insights.hasMovements
+    ? "Todavía no hay movimientos"
+    : insights.smallExpenses.count > 0
+      ? `Ahorro potencial ${formatMoney(insights.smallExpenses.potentialSavings, currency, false)}`
+      : "Buen control este mes";
+  const smallExpenseValue = !insights.hasMovements
+    ? formatCompactMoney(0, currency, false)
+    : insights.smallExpenses.count > 0
+      ? `${smallExpenseLabel} · ${formatCompactMoney(insights.smallExpenses.total, currency, false)}`
+      : "Sin gastos detectados";
+  const savingsValue = !insights.hasMovements || insights.savings.rate === null
+    ? "0 %"
+    : insights.savings.goalProgress !== null
+      ? `${formatPercent(insights.savings.goalProgress)}`
+      : `${formatPercent(insights.savings.rate)}`;
+  const incomeUsedValue = !insights.hasMovements || insights.incomeUsed.percentage === null ? "0 %" : formatPercent(insights.incomeUsed.percentage);
+
   return (
     <View pointerEvents="none" style={styles.wrap}>
       <View style={styles.largeCard}>
         <View style={styles.cardTop}>
           <Text style={styles.largeTitle}>Gastos hormiga</Text>
         </View>
-        <TrendIcon direction="down" />
+        <TrendIcon direction={insights.smallExpenses.trendState.direction} tone={insights.smallExpenses.trendState.tone} />
         <View>
-          <Text style={styles.meta}>Ahorro potencial $U 482,50</Text>
-          <Text adjustsFontSizeToFit numberOfLines={1} style={styles.largeValue}>2 gastos $U 965</Text>
+          <Text style={styles.meta}>{smallExpenseMeta}</Text>
+          <Text adjustsFontSizeToFit numberOfLines={1} style={styles.largeValue}>{smallExpenseValue}</Text>
         </View>
       </View>
       <View style={styles.row}>
         <View style={styles.smallCard}>
           <View style={styles.cardTop}>
-            <Text numberOfLines={2} style={styles.smallTitle}>Objetivo de ahorro{"\n"}mensual</Text>
+            <Text numberOfLines={2} style={styles.smallTitle}>{insights.hasMovements ? insights.savings.title : "Ahorro del mes"}</Text>
           </View>
-          <TrendIcon direction="up" />
-          <Text adjustsFontSizeToFit numberOfLines={1} style={styles.smallValue}>+41.6%</Text>
+          <TrendIcon direction={insights.savings.trendState.direction} tone={insights.savings.trendState.tone} />
+          <Text adjustsFontSizeToFit numberOfLines={1} style={styles.smallValue}>{savingsValue}</Text>
         </View>
         <View style={styles.smallCard}>
-          <View style={styles.incomeHeader}>
+          <View style={styles.cardTop}>
             <Text adjustsFontSizeToFit minimumFontScale={0.72} numberOfLines={1} style={styles.incomeTitle}>
-              Ingresos utilizados
-            </Text>
-            <Text adjustsFontSizeToFit minimumFontScale={0.72} numberOfLines={1} style={styles.incomeMeta}>
-              Más que el mes pasado
+              Ingresos usados
             </Text>
           </View>
-          <TrendIcon direction="down" />
-          <Text adjustsFontSizeToFit numberOfLines={1} style={styles.incomeValue}>+60%</Text>
+          <TrendIcon direction={insights.incomeUsed.trendState.direction} tone={insights.incomeUsed.trendState.tone} />
+          <Text adjustsFontSizeToFit numberOfLines={1} style={styles.incomeValue}>{incomeUsedValue}</Text>
         </View>
       </View>
     </View>
   );
 }
 
-function TrendIcon({ direction }: { direction: "down" | "up" }) {
+function formatPercent(value: number) {
+  return `${Number(value.toFixed(1)).toLocaleString("es-UY", { maximumFractionDigits: 1 })} %`;
+}
+
+function colorForTone(tone: InsightTone) {
+  if (tone === "positive") return "#5EBA43";
+  if (tone === "negative") return "#B73732";
+  return "rgba(255,255,255,0.72)";
+}
+
+function TrendIcon({ direction, tone }: { direction: "down" | "up"; tone: InsightTone }) {
   const Icon = direction === "up" ? ArrowUp : ArrowDown;
   return (
     <View style={styles.trendIcon}>
-      <Icon color={direction === "up" ? "#5EBA43" : "#B73732"} size={15} strokeWidth={3.1} />
+      <Icon color={colorForTone(tone)} size={15} strokeWidth={3.1} />
     </View>
   );
 }
@@ -105,16 +124,6 @@ const styles = StyleSheet.create({
     color: "rgba(255,255,255,0.76)",
     fontSize: 14,
     lineHeight: 18
-  },
-  incomeHeader: {
-    paddingRight: 34
-  },
-  incomeMeta: {
-    ...typography.body,
-    color: colors.white,
-    fontSize: 13,
-    lineHeight: 16,
-    marginTop: 28
   },
   incomeTitle: {
     ...typography.body,

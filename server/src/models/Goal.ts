@@ -17,6 +17,8 @@ const goalSchema = new Schema(
     saved: { type: Number, required: true, min: 0 },
     currency: { type: String, enum: ["UYU", "USD", "EUR"], required: true, default: "UYU" },
     monthlyContribution: { type: Number, required: true, min: 0 },
+    targetDate: { type: Date, default: null },
+    status: { type: String, enum: ["active", "completed", "paused"], default: "active", index: true },
     accent: { type: String, required: true, default: "lime" },
     history: { type: [goalHistorySchema], default: [] }
   },

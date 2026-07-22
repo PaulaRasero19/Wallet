@@ -58,6 +58,37 @@ export async function registerExpoPushToken() {
   return { registered: true, token };
 }
 
+export async function requestPaymentNotificationPermission() {
+  const current = await Notifications.getPermissionsAsync();
+  return current.status === "granted" ? current : Notifications.requestPermissionsAsync();
+}
+
+export async function scheduleLocalPaymentNotifications(input: {
+  title: string;
+  body: string;
+  dueDate: string;
+  reminderDaysBefore: number;
+  data?: Record<string, unknown>;
+}) {
+  const permission = await requestPaymentNotificationPermission();
+  if (permission.status !== "granted") return { scheduled: false };
+  const due = new Date(input.dueDate);
+  due.setHours(9, 0, 0, 0);
+  const reminder = new Date(due);
+  reminder.setDate(reminder.getDate() - input.reminderDaysBefore);
+  const now = new Date();
+  const ids: string[] = [];
+  for (const triggerDate of [reminder, due]) {
+    if (triggerDate <= now) continue;
+    const id = await Notifications.scheduleNotificationAsync({
+      content: { body: input.body, data: input.data || {}, title: input.title },
+      trigger: triggerDate as any
+    });
+    ids.push(id);
+  }
+  return { ids, scheduled: ids.length > 0 };
+}
+
 export async function unregisterExpoPushToken(token: string) {
   await apiRequest<{ ok: boolean }>("/devices/push-token", { body: { platform: Platform.OS, token }, method: "DELETE", requireAuth: true });
 }

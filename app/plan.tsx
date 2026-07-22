@@ -7,11 +7,11 @@ import { ScreenContainer } from "../src/components/ScreenContainer";
 import { useFinFlowStore } from "../src/store/useFinFlowStore";
 import { useSessionStore } from "../src/store/useSessionStore";
 import { colors, spacing, typography } from "../src/theme";
-import { CreditCard, Currency, Goal, PlannerEvent, RecurringPayment, Transaction } from "../src/types/finflow";
-import { categorySummary, getInstallments, overviewMetrics, positiveAmount } from "../src/utils/financeInsights";
+import { Currency, Goal, InstallmentPurchase, PlannerEvent, RecurringPayment, Transaction } from "../src/types/finflow";
+import { categorySummary, positiveAmount } from "../src/utils/financeInsights";
 import { formatMoney, percentage } from "../src/utils/money";
 
-const tabs = ["Mes", "Metas", "Tarjetas", "Calendario"] as const;
+const tabs = ["Resumen", "Metas", "Calendario"] as const;
 type Tab = (typeof tabs)[number];
 
 function monthName(date = new Date()) {
@@ -22,10 +22,6 @@ function addMonths(date: Date, months: number) {
   const next = new Date(date);
   next.setMonth(next.getMonth() + months);
   return next;
-}
-
-function monthKey(date: Date) {
-  return date.toLocaleDateString("es-UY", { month: "long", year: "numeric" });
 }
 
 function budgetStatus(spent: number, budget: number) {
@@ -43,18 +39,19 @@ function statusColor(status: string) {
 
 export default function Plan() {
   const params = useLocalSearchParams<{ tab?: Tab }>();
-  const [tab, setTab] = useState<Tab>(tabs.includes(params.tab as Tab) ? (params.tab as Tab) : "Mes");
-  const { accounts, creditCards, events, goals, loadOverview, overview, recurringPayments, transactions, toggleEventDone } = useFinFlowStore();
+  const [tab, setTab] = useState<Tab>(tabs.includes(params.tab as Tab) ? (params.tab as Tab) : "Resumen");
+  const { events, goals, installmentPurchases, loadOverview, markInstallmentPaid, markPaymentPaid, overview, recurringPayments, transactions, toggleEventDone } = useFinFlowStore();
   const profile = useSessionStore((state) => state.profile);
   const currency: Currency = profile?.primary_currency || "UYU";
-  const monthlyIncome = Number(profile?.monthly_income || overview?.income || 0);
-  const installments = useMemo(() => getInstallments(transactions), [transactions]);
-  const metrics = overviewMetrics({ accounts, creditCards, events, goals, overview, payday: profile?.payday, primaryCurrency: currency, recurringPayments, transactions, monthlyIncome });
+  const monthlyIncome = Number(profile?.monthly_income || 0);
   const categories = useMemo(() => categorySummary(transactions).slice(0, 6), [transactions]);
-  const fixedExpenses = recurringPayments.filter((payment) => payment.status !== "rejected").reduce((sum, payment) => sum + Number(payment.amount || 0), 0);
-  const installmentMonthly = installments.reduce((sum, transaction) => sum + Number(transaction.installment?.amountPerInstallment || 0), 0);
-  const savingsTarget = goals.reduce((sum, goal) => sum + Number(goal.monthlyContribution || 0), 0);
-  const variableAvailable = monthlyIncome - fixedExpenses - installmentMonthly - savingsTarget;
+  const currentMonth = new Date();
+  const additionalIncome = transactions.filter((transaction) => transaction.type === "income" && isSameMonth(transaction.date, currentMonth)).reduce((sum, transaction) => sum + positiveAmount(transaction), 0);
+  const expectedIncome = monthlyIncome + additionalIncome;
+  const fixedExpenses = recurringPayments.filter((payment) => payment.status !== "rejected" && payment.active !== false && isSameMonth(payment.nextChargeDate, currentMonth)).reduce((sum, payment) => sum + Number(payment.amount || 0), 0);
+  const installmentMonthly = installmentPurchases.reduce((sum, purchase) => sum + purchase.installments.filter((installment) => installment.status === "pending" && isSameMonth(installment.dueDate, currentMonth)).reduce((total, installment) => total + Number(installment.amount || 0), 0), 0);
+  const savingsTarget = goals.filter((goal) => (goal as any).status !== "completed").reduce((sum, goal) => sum + Number(goal.monthlyContribution || (goal as any).monthly_contribution || 0), 0);
+  const variableAvailable = expectedIncome - fixedExpenses - installmentMonthly - savingsTarget;
 
   useEffect(() => {
     void loadOverview("30d");
@@ -71,11 +68,11 @@ export default function Plan() {
         ))}
       </View>
 
-      {tab === "Mes" ? (
+      {tab === "Resumen" ? (
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Plan de {monthName()}</Text>
           <View style={styles.panel}>
-            <PlanRow label="Ingresos previstos" value={formatMoney(monthlyIncome, currency, false)} />
+            <PlanRow label="Ingresos previstos" value={formatMoney(expectedIncome, currency, false)} />
             <PlanRow label="Gastos fijos" value={formatMoney(fixedExpenses, currency, false)} />
             <PlanRow label="Cuotas" value={formatMoney(installmentMonthly, currency, false)} />
             <PlanRow label="Meta de ahorro" value={formatMoney(savingsTarget, currency, false)} />
@@ -89,26 +86,22 @@ export default function Plan() {
               return <BudgetRow budget={budget} currency={currency} key={category.name} name={category.name} spent={category.total} status={status} />;
             })
           ) : (
-            <Text style={styles.empty}>Cuando registres gastos, FinFlow va a mostrar presupuestos por categoría.</Text>
+            <Text style={styles.empty}>No hay movimientos este mes.</Text>
           )}
+          <Text style={styles.sectionTitle}>Próximos pagos</Text>
+          <UpcomingPayments currency={currency} installmentPurchases={installmentPurchases} payments={recurringPayments} />
         </View>
       ) : null}
 
       {tab === "Metas" ? (
         <View style={styles.section}>
-          {goals.length ? goals.map((goal) => <GoalRow goal={goal} key={goal.id} />) : <Text style={styles.empty}>No tenés metas cargadas todavía.</Text>}
-        </View>
-      ) : null}
-
-      {tab === "Tarjetas" ? (
-        <View style={styles.section}>
-          {creditCards.length ? creditCards.map((card) => <CardBlock card={card} installments={installments} key={card.id} />) : <Text style={styles.empty}>No hay tarjetas cargadas.</Text>}
+          {goals.length ? goals.map((goal) => <GoalRow goal={goal} key={goal.id} />) : <Text style={styles.empty}>Aún no creaste una meta.{"\n"}Creá una desde el botón +.</Text>}
         </View>
       ) : null}
 
       {tab === "Calendario" ? (
         <View style={styles.section}>
-          <CalendarList cards={creditCards} events={events} goals={goals} installments={installments} payments={recurringPayments} onToggleEvent={toggleEventDone} />
+          <CalendarList events={events} goals={goals} installmentPurchases={installmentPurchases} onMarkInstallmentPaid={markInstallmentPaid} onMarkPaymentPaid={markPaymentPaid} payments={recurringPayments} onToggleEvent={toggleEventDone} />
         </View>
       ) : null}
     </ScreenContainer>
@@ -158,80 +151,39 @@ function GoalRow({ goal }: { goal: Goal }) {
   );
 }
 
-function CardBlock({ card, installments }: { card: CreditCard; installments: Transaction[] }) {
-  const relatedInstallments = installments.filter((transaction) => String(transaction.accountId || transaction.account_id) === card.id);
-  const committed = new Map<string, number>();
-  relatedInstallments.forEach((transaction) => {
-    const total = transaction.installment?.total || 0;
-    const current = transaction.installment?.current || 1;
-    const amount = Number(transaction.installment?.amountPerInstallment || 0);
-    const base = transaction.installment?.nextDueDate ? new Date(transaction.installment.nextDueDate) : new Date();
-    for (let index = current; index <= total; index += 1) {
-      const key = monthKey(addMonths(base, index - current));
-      committed.set(key, (committed.get(key) || 0) + amount);
-    }
-  });
-
-  return (
-    <Pressable accessibilityRole="button" onPress={() => router.push(`/card/${card.id}`)} style={styles.panel}>
-      <Text style={styles.sectionTitle}>{card.name}</Text>
-      <PlanRow label="Límite" value={formatMoney(card.limit, card.currency, false)} />
-      <PlanRow label="Utilizado" value={formatMoney(card.used, card.currency, false)} />
-      <PlanRow label="Disponible" value={formatMoney(Math.max(0, card.limit - card.used), card.currency, false)} />
-      <PlanRow label="Cierra" value={new Date(card.closingDate).toLocaleDateString("es-UY", { day: "numeric", month: "long" })} />
-      <PlanRow label="Vence" value={new Date(card.dueDate).toLocaleDateString("es-UY", { day: "numeric", month: "long" })} />
-      <Text style={styles.subTitle}>Ya comprometido</Text>
-      {[...committed.entries()].slice(0, 3).map(([key, total]) => (
-        <PlanRow key={key} label={key} value={formatMoney(total, card.currency, false)} />
-      ))}
-      <Text style={styles.subTitle}>Compras en cuotas</Text>
-      {relatedInstallments.slice(0, 3).map((transaction) => (
-        <View key={transaction.id} style={styles.installmentRow}>
-          <Text style={styles.rowTitle}>{transaction.merchant || transaction.title}</Text>
-          <Text style={styles.rowMeta}>
-            Cuota {transaction.installment?.current} de {transaction.installment?.total} · {formatMoney(transaction.installment?.amountPerInstallment || 0, transaction.currency, false)}
-          </Text>
-          <Text style={styles.rowMeta}>Restante: {formatMoney(transaction.installment?.remainingAmount || 0, transaction.currency, false)}</Text>
-        </View>
-      ))}
-    </Pressable>
-  );
-}
-
 function CalendarList({
-  cards,
   events,
   goals,
-  installments,
+  installmentPurchases,
+  onMarkInstallmentPaid,
+  onMarkPaymentPaid,
   onToggleEvent,
   payments
 }: {
-  cards: CreditCard[];
   events: PlannerEvent[];
   goals: Goal[];
-  installments: Transaction[];
+  installmentPurchases: InstallmentPurchase[];
+  onMarkInstallmentPaid: (purchaseId: string, installmentId: string) => Promise<void>;
+  onMarkPaymentPaid: (id: string) => Promise<void>;
   onToggleEvent: (id: string) => void;
   payments: RecurringPayment[];
 }) {
   const rows = [
-    ...events.map((event) => ({ date: event.date || new Date().toISOString(), id: event.id, kind: event.category, title: event.title, route: null as string | null, onPress: () => onToggleEvent(event.id) })),
-    ...payments.map((payment) => ({ date: payment.nextChargeDate, id: payment.id, kind: payment.status === "pending" ? "vencimiento" : payment.status, title: payment.merchant, route: `/payment/${payment.id}`, onPress: null })),
-    ...cards.flatMap((card) => [
-      { date: card.closingDate, id: `${card.id}-closing`, kind: "cierre de tarjeta", title: `${card.name} cierra`, route: `/card/${card.id}`, onPress: null },
-      { date: card.dueDate, id: `${card.id}-due`, kind: "vencimiento de tarjeta", title: `${card.name} vence`, route: `/card/${card.id}`, onPress: null }
-    ]),
-    ...installments.map((transaction) => ({
-      date: transaction.installment?.nextDueDate || transaction.date,
-      id: `${transaction.id}-installment`,
+    ...events.map((event) => ({ amount: 0, currency: "UYU" as Currency, date: event.date || new Date().toISOString(), id: event.id, kind: event.category, title: event.title, action: () => Promise.resolve(onToggleEvent(event.id)) })),
+    ...payments.map((payment) => ({ amount: payment.amount, currency: payment.currency, date: payment.nextChargeDate, id: payment.id, kind: statusForDate(payment.nextChargeDate), title: payment.merchant, action: () => onMarkPaymentPaid(payment.id) })),
+    ...installmentPurchases.flatMap((purchase) => purchase.installments.filter((installment) => installment.status === "pending").map((installment) => ({
+      amount: installment.amount,
+      currency: purchase.currency,
+      date: installment.dueDate,
+      id: `${purchase.id}-${installment.id}`,
       kind: "cuota",
-      title: transaction.merchant || transaction.title || "Cuota",
-      route: `/transaction/${transaction.id}`,
-      onPress: null
-    })),
-    ...goals.map((goal) => ({ date: new Date().toISOString(), id: `${goal.id}-goal`, kind: "meta", title: `Aporte a ${goal.name}`, route: `/goal/${goal.id}`, onPress: null }))
+      title: `Cuota ${installment.number} de ${purchase.totalInstallments || purchase.total_installments} · ${purchase.name}`,
+      action: () => onMarkInstallmentPaid(purchase.id, installment.id)
+    }))),
+    ...goals.filter((goal) => (goal as any).targetDate || (goal as any).target_date).map((goal) => ({ amount: 0, currency: goal.currency, date: (goal as any).targetDate || (goal as any).target_date, id: `${goal.id}-goal`, kind: "meta", title: goal.name, action: null }))
   ].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
-  if (!rows.length) return <Text style={styles.empty}>No hay agenda financiera cargada.</Text>;
+  if (!rows.length) return <Text style={styles.empty}>No tenés pagos programados para este día.</Text>;
 
   return (
     <View>
@@ -240,17 +192,51 @@ function CalendarList({
           accessibilityRole="button"
           key={row.id}
           onPress={() => {
-            if (row.onPress) row.onPress();
-            else if (row.route) router.push(row.route as never);
+            if (row.action) void row.action();
           }}
           style={styles.calendarRow}
         >
           <Text style={styles.dateBadge}>{new Date(row.date).toLocaleDateString("es-UY", { day: "2-digit", month: "short" })}</Text>
           <View style={styles.rowCopy}>
             <Text style={styles.rowTitle}>{row.title}</Text>
-            <Text style={styles.rowMeta}>{row.kind}</Text>
+            <Text style={styles.rowMeta}>{row.amount ? `${formatMoney(row.amount, row.currency, false)} · ` : ""}{row.kind}</Text>
+            {row.action ? (
+              <Pressable accessibilityRole="button" onPress={() => void row.action?.()}>
+                <Text style={styles.actionText}>Marcar como pagado</Text>
+              </Pressable>
+            ) : null}
           </View>
         </Pressable>
+      ))}
+    </View>
+  );
+}
+
+function isSameMonth(value: string, month: Date) {
+  const date = new Date(value);
+  return date.getFullYear() === month.getFullYear() && date.getMonth() === month.getMonth();
+}
+
+function statusForDate(value: string) {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const date = new Date(value);
+  date.setHours(0, 0, 0, 0);
+  if (date.getTime() === today.getTime()) return "Vence hoy";
+  if (date < today) return "Vencido";
+  return "Próximo";
+}
+
+function UpcomingPayments({ currency, installmentPurchases, payments }: { currency: Currency; installmentPurchases: InstallmentPurchase[]; payments: RecurringPayment[] }) {
+  const rows = [
+    ...payments.filter((payment) => payment.active !== false && payment.status !== "paid").map((payment) => ({ amount: payment.amount, currency: payment.currency, date: payment.nextChargeDate, id: `payment-${payment.id}`, status: statusForDate(payment.nextChargeDate), title: payment.merchant })),
+    ...installmentPurchases.flatMap((purchase) => purchase.installments.filter((installment) => installment.status === "pending").map((installment) => ({ amount: installment.amount, currency: purchase.currency, date: installment.dueDate, id: `installment-${purchase.id}-${installment.id}`, status: statusForDate(installment.dueDate), title: `Cuota ${installment.number} de ${purchase.totalInstallments || purchase.total_installments} · ${purchase.name}` })))
+  ].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()).slice(0, 6);
+  if (!rows.length) return <Text style={styles.empty}>No tenés pagos próximos.</Text>;
+  return (
+    <View style={styles.panel}>
+      {rows.map((row) => (
+        <PlanRow key={row.id} label={`${row.title} · ${new Date(row.date).toLocaleDateString("es-UY")}`} value={`${formatMoney(row.amount, row.currency || currency, false)} · ${row.status}`} />
       ))}
     </View>
   );
@@ -289,15 +275,16 @@ const styles = StyleSheet.create({
     fontWeight: "900",
     width: 54
   },
+  actionText: {
+    ...typography.label,
+    color: colors.white,
+    fontWeight: "900",
+    marginTop: spacing.xs
+  },
   empty: {
     ...typography.body,
     color: colors.transparentWhite,
     marginTop: spacing.lg
-  },
-  installmentRow: {
-    borderBottomColor: colors.appGrayBorder,
-    borderBottomWidth: 1,
-    paddingVertical: spacing.sm
   },
   panel: {
     backgroundColor: colors.appGrayDark,
@@ -362,13 +349,6 @@ const styles = StyleSheet.create({
   status: {
     ...typography.label,
     fontWeight: "900"
-  },
-  subTitle: {
-    ...typography.label,
-    color: colors.transparentWhite,
-    fontWeight: "900",
-    marginTop: spacing.md,
-    textTransform: "uppercase"
   },
   tab: {
     borderColor: colors.appGrayBorder,

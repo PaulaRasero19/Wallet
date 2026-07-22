@@ -1,20 +1,22 @@
 import { useEffect, useMemo, useState } from "react";
 import { Alert, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
-import { ArrowLeftRight, Bell, Brain, CreditCard, Minus, Plus } from "lucide-react-native";
+import { Bell, Brain, CreditCard, Minus, PiggyBank, Plus } from "lucide-react-native";
 import { Header } from "../../src/components/Header";
 import { PrimaryButton } from "../../src/components/PrimaryButton";
 import { ScreenContainer } from "../../src/components/ScreenContainer";
 import { useFinFlowStore } from "../../src/store/useFinFlowStore";
 import { useSessionStore } from "../../src/store/useSessionStore";
+import { scheduleLocalPaymentNotifications } from "../../src/services/notificationsService";
 import { colors, spacing, typography } from "../../src/theme";
 import { Category, Currency } from "../../src/types/finflow";
 import { formatMoney } from "../../src/utils/money";
 
-type Mode = "menu" | "expense" | "income" | "transfer" | "installment" | "payment" | "ai";
+type Mode = "menu" | "expense" | "income" | "installment" | "payment" | "goal" | "ai";
 const frequentExpenseLabels = ["Comida", "Transporte", "Compras", "Servicios"];
 const incomeSources = ["Sueldo", "Freelance", "Devolución", "Transferencia recibida", "Otro"];
-const frequencies = ["weekly", "monthly", "annual"] as const;
+const frequencies = ["once", "monthly", "annual"] as const;
+const reminders = [0, 1, 3, 7] as const;
 
 function todayInput() {
   return new Date().toISOString().slice(0, 10);
@@ -24,8 +26,21 @@ function toIsoDate(value: string) {
   return value ? new Date(`${value}T12:00:00`).toISOString() : new Date().toISOString();
 }
 
+function dateOptions(days = 35) {
+  const today = new Date();
+  return Array.from({ length: days }, (_, index) => {
+    const date = new Date(today);
+    date.setDate(today.getDate() + index);
+    return date.toISOString().slice(0, 10);
+  });
+}
+
 function amountValue(value: string) {
-  return Number(value.replace(",", ".") || 0);
+  return Number(value.replace(/\./g, "").replace(",", ".") || 0);
+}
+
+function cleanAmount(value: string) {
+  return value.replace(/[^\d,.]/g, "");
 }
 
 function chooseCategory(categories: Category[], type: "income" | "expense", label?: string) {
@@ -37,9 +52,9 @@ function chooseCategory(categories: Category[], type: "income" | "expense", labe
 export default function Add() {
   const params = useLocalSearchParams<{ type?: "income" | "expense"; mode?: string }>();
   const profile = useSessionStore((state) => state.profile);
-  const { accounts, categories, createRecurringPayment, createTransaction, createTransfer, loadAccounts, loadCategories, loading } = useFinFlowStore();
+  const { accounts, categories, createGoal, createInstallmentPurchase, createRecurringPayment, createTransaction, loadAccounts, loadCategories, loading } = useFinFlowStore();
   const [mode, setMode] = useState<Mode>(
-    params.mode === "transfer" || params.mode === "installment" || params.mode === "ai" ? params.mode : params.type === "income" ? "income" : params.type === "expense" ? "expense" : "menu"
+    params.mode === "installment" || params.mode === "ai" ? params.mode : params.type === "income" ? "income" : params.type === "expense" ? "expense" : "menu"
   );
   const [amount, setAmount] = useState("");
   const [merchant, setMerchant] = useState("");
@@ -47,7 +62,6 @@ export default function Add() {
   const [date, setDate] = useState(todayInput());
   const [time, setTime] = useState("");
   const [accountId, setAccountId] = useState("");
-  const [toAccountId, setToAccountId] = useState("");
   const [categoryId, setCategoryId] = useState("");
   const [showAllCategories, setShowAllCategories] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
@@ -56,7 +70,11 @@ export default function Add() {
   const [installments, setInstallments] = useState("3");
   const [firstInstallmentDate, setFirstInstallmentDate] = useState(todayInput());
   const [frequency, setFrequency] = useState<(typeof frequencies)[number]>("monthly");
+  const [reminderDaysBefore, setReminderDaysBefore] = useState<(typeof reminders)[number]>(3);
   const [paymentCategory, setPaymentCategory] = useState("Servicios");
+  const [goalSaved, setGoalSaved] = useState("");
+  const [goalMonthlyContribution, setGoalMonthlyContribution] = useState("");
+  const [goalTargetDate, setGoalTargetDate] = useState("");
   const [aiText, setAiText] = useState("");
   const [proposal, setProposal] = useState<null | { type: "income" | "expense"; amount: number; merchant: string; categoryId: string; accountId: string; antExpense: boolean }>(null);
 
@@ -74,8 +92,7 @@ export default function Add() {
 
   useEffect(() => {
     if (!accountId && accounts[0]) setAccountId(accounts[0].id);
-    if (!toAccountId && accounts[1]) setToAccountId(accounts[1].id);
-  }, [accountId, accounts, toAccountId]);
+  }, [accountId, accounts]);
 
   useEffect(() => {
     const type = mode === "income" ? "income" : "expense";
@@ -96,6 +113,11 @@ export default function Add() {
 
   async function saveMovement(type: "income" | "expense") {
     const category = categories.find((item) => item.id === categoryId) || chooseCategory(categories, type, merchant);
+    const value = amountValue(amount);
+    if (!value || value < 0) {
+      Alert.alert("FinFlow", "Ingresá un monto válido.");
+      return;
+    }
     if (!accountId || !category) {
       Alert.alert("FinFlow", "Necesitás seleccionar cuenta y categoría.");
       return;
@@ -107,7 +129,7 @@ export default function Add() {
         type,
         title: merchant.trim() || (type === "income" ? "Ingreso" : "Gasto"),
         merchant: merchant.trim(),
-        amount: amountValue(amount),
+        amount: value,
         currency,
         date: toIsoDate(date),
         note: [note.trim(), time ? `Hora: ${time}` : ""].filter(Boolean).join(" · "),
@@ -121,58 +143,33 @@ export default function Add() {
     }
   }
 
-  async function saveTransfer() {
-    const from = accounts.find((account) => account.id === accountId);
-    if (!from || !toAccountId || accountId === toAccountId) {
-      Alert.alert("FinFlow", "Elegí dos cuentas distintas.");
-      return;
-    }
-    try {
-      await createTransfer({
-        fromAccountId: accountId,
-        toAccountId,
-        amount: amountValue(amount),
-        currency: from.currency,
-        date: toIsoDate(date),
-        title: merchant.trim() || "Transferencia",
-        note: note.trim()
-      });
-      router.replace("/(tabs)/overview");
-    } catch (error) {
-      Alert.alert("FinFlow", error instanceof Error ? error.message : "No se pudo transferir.");
-    }
-  }
-
   async function saveInstallment() {
-    const category = categories.find((item) => item.id === categoryId) || chooseCategory(categories, "expense", merchant);
     const total = Math.max(1, Number(installments || 1));
     const totalAmount = amountValue(amount);
-    const amountPerInstallment = totalAmount / total;
-    if (!accountId || !category) {
-      Alert.alert("FinFlow", "Necesitás seleccionar tarjeta/cuenta y categoría.");
+    const category = categories.find((item) => item.id === categoryId) || chooseCategory(categories, "expense", merchant);
+    if (!totalAmount || !category) {
+      Alert.alert("FinFlow", "Completá nombre, importe y categoría.");
       return;
     }
     try {
-      await createTransaction({
+      const purchase = await createInstallmentPurchase({
         accountId,
-        categoryId: category.id,
-        type: "expense",
-        title: merchant.trim() || "Compra en cuotas",
-        merchant: merchant.trim(),
-        amount: totalAmount,
+        category: category.name,
         currency,
-        date: toIsoDate(date),
-        note: note.trim(),
-        paymentMethod: "credito",
-        installment: {
-          current: 1,
-          total,
-          amountPerInstallment,
-          remainingAmount: Math.max(0, totalAmount - amountPerInstallment),
-          nextDueDate: firstInstallmentDate
-        }
+        firstDueDate: toIsoDate(firstInstallmentDate),
+        name: merchant.trim() || "Compra en cuotas",
+        reminderDaysBefore,
+        totalAmount,
+        totalInstallments: total
       });
-      router.replace("/(tabs)/plan?tab=Tarjetas");
+      await scheduleLocalPaymentNotifications({
+        body: `Cuota 1 de ${purchase.totalInstallments || total} por ${formatMoney(purchase.installmentAmount || totalAmount / total, currency, false)} vence el ${firstInstallmentDate}.`,
+        data: { id: purchase.id, type: "installment" },
+        dueDate: toIsoDate(firstInstallmentDate),
+        reminderDaysBefore,
+        title: `${purchase.name} vence pronto`
+      });
+      router.replace("/(tabs)/plan?tab=Calendario");
     } catch (error) {
       Alert.alert("FinFlow", error instanceof Error ? error.message : "No se pudo guardar la compra.");
     }
@@ -180,20 +177,49 @@ export default function Add() {
 
   async function savePayment() {
     try {
-      await createRecurringPayment({
-        merchant: merchant.trim() || "Pago próximo",
+      const payment = await createRecurringPayment({
+        merchant: merchant.trim() || "Pago programado",
         amount: amountValue(amount),
         currency,
         frequency,
         category: paymentCategory || "Servicios",
         nextChargeDate: toIsoDate(date),
+        reminderDaysBefore,
         kind: paymentCategory.toLowerCase().includes("suscripción") ? "subscription" : "service",
         accountId,
         notificationsEnabled: true
       });
+      await scheduleLocalPaymentNotifications({
+        body: `${payment.merchant} por ${formatMoney(payment.amount, payment.currency, false)} vence el ${payment.nextChargeDate}.`,
+        data: { id: payment.id, type: "payment" },
+        dueDate: toIsoDate(date),
+        reminderDaysBefore,
+        title: `${payment.merchant} vence pronto`
+      });
       router.replace("/(tabs)/plan?tab=Calendario");
     } catch (error) {
       Alert.alert("FinFlow", error instanceof Error ? error.message : "No se pudo crear el pago.");
+    }
+  }
+
+  async function saveGoal() {
+    const target = amountValue(amount);
+    if (!target) {
+      Alert.alert("FinFlow", "Ingresá el monto total de la meta.");
+      return;
+    }
+    try {
+      await createGoal({
+        currency,
+        monthlyContribution: amountValue(goalMonthlyContribution),
+        name: merchant.trim() || "Meta",
+        saved: amountValue(goalSaved),
+        target,
+        targetDate: goalTargetDate ? toIsoDate(goalTargetDate) : null
+      });
+      router.replace("/(tabs)/plan?tab=Metas");
+    } catch (error) {
+      Alert.alert("FinFlow", error instanceof Error ? error.message : "No se pudo guardar la meta.");
     }
   }
 
@@ -245,9 +271,9 @@ export default function Add() {
         <View style={styles.actions}>
           <Action icon={<Minus color={colors.white} size={21} />} title="Gasto" onPress={() => resetForm("expense")} />
           <Action icon={<Plus color={colors.white} size={21} />} title="Ingreso" onPress={() => resetForm("income")} />
-          <Action icon={<ArrowLeftRight color={colors.white} size={21} />} title="Transferencia" onPress={() => resetForm("transfer")} />
+          <Action icon={<Bell color={colors.white} size={21} />} title="Pago programado" onPress={() => resetForm("payment")} />
           <Action icon={<CreditCard color={colors.white} size={21} />} title="Compra en cuotas" onPress={() => resetForm("installment")} />
-          <Action icon={<Bell color={colors.white} size={21} />} title="Pago próximo" onPress={() => resetForm("payment")} />
+          <Action icon={<PiggyBank color={colors.white} size={21} />} title="Meta" onPress={() => resetForm("goal")} />
           <Action icon={<Brain color={colors.white} size={21} />} title="Registrar con IA" onPress={() => resetForm("ai")} />
         </View>
       ) : null}
@@ -286,21 +312,10 @@ export default function Add() {
           <Text style={styles.label}>Fuente</Text>
           <View style={styles.wrap}>{incomeSources.map((source) => <Chip key={source} active={merchant === source} label={source} onPress={() => setMerchant(source)} />)}</View>
           <AccountPicker accounts={accounts} selected={accountId} onSelect={setAccountId} title="Cuenta destino" />
-          <Input label="Fecha" placeholder="YYYY-MM-DD" value={date} onChangeText={setDate} />
+          <DatePicker label="Fecha" value={date} onChange={setDate} />
           <Toggle active={recurring} label="Recurrente" onPress={() => setRecurring(!recurring)} />
           <Input label="Nota" value={note} onChangeText={setNote} />
           <PrimaryButton onPress={() => saveMovement("income")}>{loading ? "Guardando..." : "Guardar ingreso"}</PrimaryButton>
-        </View>
-      ) : null}
-
-      {mode === "transfer" ? (
-        <View style={styles.form}>
-          <AccountPicker accounts={accounts} selected={accountId} onSelect={setAccountId} title="Cuenta origen" />
-          <AccountPicker accounts={accounts.filter((account) => account.id !== accountId)} selected={toAccountId} onSelect={setToAccountId} title="Cuenta destino" />
-          <AmountInput value={amount} onChangeText={setAmount} />
-          <Input label="Fecha" placeholder="YYYY-MM-DD" value={date} onChangeText={setDate} />
-          <Input label="Nota" value={note} onChangeText={setNote} />
-          <PrimaryButton onPress={saveTransfer}>{loading ? "Moviendo..." : "Guardar transferencia"}</PrimaryButton>
         </View>
       ) : null}
 
@@ -308,12 +323,14 @@ export default function Add() {
         <View style={styles.form}>
           <Input label="Comercio" value={merchant} onChangeText={setMerchant} />
           <AmountInput value={amount} onChangeText={setAmount} />
-          <AccountPicker accounts={accounts} selected={accountId} onSelect={setAccountId} title="Tarjeta" />
-          <Input keyboardType="number-pad" label="Cantidad de cuotas" value={installments} onChangeText={setInstallments} />
-          <Input label="Fecha" placeholder="YYYY-MM-DD" value={date} onChangeText={setDate} />
-          <Input label="Primera cuota" placeholder="YYYY-MM-DD" value={firstInstallmentDate} onChangeText={setFirstInstallmentDate} />
+          <AccountPicker accounts={accounts} selected={accountId} onSelect={setAccountId} title="Cuenta" />
+          <Input label="Cantidad de cuotas" value={installments} onChangeText={(value) => setInstallments(value.replace(/\D/g, ""))} />
+          <DatePicker label="Primera cuota" value={firstInstallmentDate} onChange={setFirstInstallmentDate} />
           <Text style={styles.label}>Categoría</Text>
           <View style={styles.wrap}>{visibleExpenseCategories.map((category) => <Chip key={category.id} active={categoryId === category.id} label={category.name} onPress={() => setCategoryId(category.id)} />)}</View>
+          <Text style={styles.label}>Recordatorio</Text>
+          <View style={styles.wrap}>{reminders.map((item) => <Chip key={item} active={reminderDaysBefore === item} label={item === 0 ? "El mismo día" : `${item} días antes`} onPress={() => setReminderDaysBefore(item)} />)}</View>
+          {amountValue(amount) && Number(installments) ? <Text style={styles.lead}>Cuota aproximada: {formatMoney(amountValue(amount) / Number(installments), currency, false)}</Text> : null}
           <PrimaryButton onPress={saveInstallment}>{loading ? "Guardando..." : "Guardar compra en cuotas"}</PrimaryButton>
         </View>
       ) : null}
@@ -322,12 +339,25 @@ export default function Add() {
         <View style={styles.form}>
           <Input label="Nombre" placeholder="UTE, OSE, alquiler..." value={merchant} onChangeText={setMerchant} />
           <AmountInput value={amount} onChangeText={setAmount} />
-          <Input label="Fecha de vencimiento" placeholder="YYYY-MM-DD" value={date} onChangeText={setDate} />
-          <Text style={styles.label}>Frecuencia</Text>
-          <View style={styles.wrap}>{frequencies.map((item) => <Chip key={item} active={frequency === item} label={item} onPress={() => setFrequency(item)} />)}</View>
+          <DatePicker label="Fecha de vencimiento" value={date} onChange={setDate} />
+          <Text style={styles.label}>Repetición</Text>
+          <View style={styles.wrap}>{frequencies.map((item) => <Chip key={item} active={frequency === item} label={item === "once" ? "Una sola vez" : item === "monthly" ? "Todos los meses" : "Todos los años"} onPress={() => setFrequency(item)} />)}</View>
+          <Text style={styles.label}>Recordatorio</Text>
+          <View style={styles.wrap}>{reminders.map((item) => <Chip key={item} active={reminderDaysBefore === item} label={item === 0 ? "El mismo día" : `${item} días antes`} onPress={() => setReminderDaysBefore(item)} />)}</View>
           <Input label="Categoría" value={paymentCategory} onChangeText={setPaymentCategory} />
           <AccountPicker accounts={accounts} selected={accountId} onSelect={setAccountId} title="Cuenta" />
-          <PrimaryButton onPress={savePayment}>{loading ? "Guardando..." : "Guardar pago próximo"}</PrimaryButton>
+          <PrimaryButton onPress={savePayment}>{loading ? "Guardando..." : "Guardar pago programado"}</PrimaryButton>
+        </View>
+      ) : null}
+
+      {mode === "goal" ? (
+        <View style={styles.form}>
+          <Input label="Nombre de la meta" placeholder="Viaje, fondo de emergencia..." value={merchant} onChangeText={setMerchant} />
+          <AmountInput value={amount} onChangeText={setAmount} />
+          <Input label="Monto ahorrado actualmente" value={goalSaved} onChangeText={(value) => setGoalSaved(cleanAmount(value))} />
+          <Input label="Aporte mensual deseado" value={goalMonthlyContribution} onChangeText={(value) => setGoalMonthlyContribution(cleanAmount(value))} />
+          <DatePicker label="Fecha objetivo" optional value={goalTargetDate} onChange={setGoalTargetDate} />
+          <PrimaryButton onPress={saveGoal}>{loading ? "Guardando..." : "Guardar meta"}</PrimaryButton>
         </View>
       ) : null}
 
@@ -374,7 +404,7 @@ function AccountPicker({ accounts, onSelect, selected, title }: { accounts: Arra
 }
 
 function AmountInput({ onChangeText, value }: { onChangeText: (value: string) => void; value: string }) {
-  return <TextInput keyboardType="decimal-pad" onChangeText={onChangeText} placeholder="$U 0" placeholderTextColor={colors.transparentWhite} style={styles.amountInput} value={value} />;
+  return <TextInput onChangeText={(text) => onChangeText(cleanAmount(text))} placeholder="$U 0" placeholderTextColor={colors.transparentWhite} style={styles.amountInput} value={value} />;
 }
 
 function Chip({ active, label, onPress }: { active: boolean; label: string; onPress: () => void }) {
@@ -390,6 +420,35 @@ function Input({ label, ...props }: { label: string } & React.ComponentProps<typ
     <View>
       <Text style={styles.label}>{label}</Text>
       <TextInput placeholderTextColor={colors.grayMedium} style={styles.input} {...props} />
+    </View>
+  );
+}
+
+function DatePicker({ label, onChange, optional = false, value }: { label: string; onChange: (value: string) => void; optional?: boolean; value: string }) {
+  const [open, setOpen] = useState(false);
+  const options = dateOptions();
+  return (
+    <View>
+      <Text style={styles.label}>{label}</Text>
+      <Pressable accessibilityRole="button" onPress={() => setOpen(!open)} style={styles.input}>
+        <Text style={styles.inputText}>{value || (optional ? "Sin fecha" : todayInput())}</Text>
+      </Pressable>
+      {open ? (
+        <View style={styles.wrap}>
+          {optional ? <Chip active={!value} label="Sin fecha" onPress={() => { onChange(""); setOpen(false); }} /> : null}
+          {options.map((item) => (
+            <Chip
+              active={value === item}
+              key={item}
+              label={new Date(`${item}T12:00:00`).toLocaleDateString("es-UY", { day: "2-digit", month: "short" })}
+              onPress={() => {
+                onChange(item);
+                setOpen(false);
+              }}
+            />
+          ))}
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -432,7 +491,7 @@ function MoreInfo({
       </Pressable>
       {moreOpen ? (
         <View style={styles.morePanel}>
-          <Input label="Fecha" placeholder="YYYY-MM-DD" value={date} onChangeText={setDate} />
+          <DatePicker label="Fecha" value={date} onChange={setDate} />
           <Input label="Hora" placeholder="HH:mm" value={time} onChangeText={setTime} />
           <Input label="Nota" value={note} onChangeText={setNote} />
           <View style={styles.wrap}>
@@ -512,6 +571,10 @@ const styles = StyleSheet.create({
     color: colors.white,
     minHeight: 48,
     paddingHorizontal: spacing.md
+  },
+  inputText: {
+    ...typography.body,
+    color: colors.white
   },
   label: {
     ...typography.label,

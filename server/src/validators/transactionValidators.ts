@@ -52,6 +52,6 @@ export const transactionQuerySchema = z.object({
   isAntExpense: z.coerce.boolean().optional(),
   search: z.string().trim().optional(),
   page: z.coerce.number().int().min(1).default(1),
-  limit: z.coerce.number().int().min(1).max(100).default(30),
+  limit: z.coerce.number().int().min(1).max(500).default(30),
   sort: z.enum(["date_desc", "date_asc", "amount_desc", "amount_asc"]).default("date_desc")
 });

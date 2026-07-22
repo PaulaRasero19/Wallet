@@ -4,6 +4,7 @@ import { router } from "expo-router";
 import Animated, { FadeIn, FadeInUp } from "react-native-reanimated";
 import { colors, spacing, typography } from "../src/theme";
 import { DotLogo } from "../src/components/DotLogo";
+import { getHasSeenOnboarding } from "../src/services/onboardingStorage";
 import { useSessionStore } from "../src/store/useSessionStore";
 
 export default function Splash() {
@@ -14,15 +15,17 @@ export default function Splash() {
 
     const timer = setTimeout(() => {
       if (status === "authenticated") {
-        router.replace(profile?.onboarding_completed ? "/(tabs)/overview" : "/setup");
+        router.replace(profile?.profile_setup_completed || profile?.onboarding_completed ? "/(tabs)/overview" : "/setup");
         return;
       }
 
-      router.replace("/language");
+      void getHasSeenOnboarding().then((hasSeen) => {
+        router.replace(hasSeen ? "/welcome" : "/onboarding");
+      });
     }, 900);
 
     return () => clearTimeout(timer);
-  }, [hasInitialized, profile?.onboarding_completed, status]);
+  }, [hasInitialized, profile?.onboarding_completed, profile?.profile_setup_completed, status]);
 
   return (
     <View style={styles.screen}>

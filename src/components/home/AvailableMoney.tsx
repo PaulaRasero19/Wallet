@@ -1,13 +1,10 @@
 import { StyleSheet, Text, View } from "react-native";
 import { colors, typography } from "../../theme";
 import { Currency } from "../../types/finflow";
+import { formatCompactMoney } from "../../utils/money";
 
-export function AvailableMoney({ amount, currency }: { amount: number; currency: Currency }) {
-  const symbol = currency === "EUR" ? "€ " : "$ ";
-  const displayAmount = `${symbol}${Math.max(0, Math.round(amount)).toLocaleString("es-UY", {
-    maximumFractionDigits: 0,
-    minimumFractionDigits: 0
-  })}`;
+export function AvailableMoney({ amount, currency }: { amount: number | null; currency: Currency }) {
+  const displayAmount = amount === null ? "Cargando" : formatCompactMoney(amount, currency, false);
 
   return (
     <View style={styles.wrap}>

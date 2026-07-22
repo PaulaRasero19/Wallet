@@ -1,5 +1,5 @@
 import { apiRequest } from "./apiClient";
-import { Account, Category, CreditCard, Currency, DashboardOverview, Goal, PlannerEvent, RecurringPayment, Transaction } from "../types/finflow";
+import { Account, Category, CreditCard, Currency, DashboardOverview, Goal, InstallmentPurchase, PlannerEvent, RecurringPayment, Transaction } from "../types/finflow";
 
 type AccountResponse = {
   account: Account;
@@ -31,10 +31,20 @@ type RecurringPaymentResponse = {
   payment: RecurringPayment;
 };
 
+type GoalResponse = {
+  goal: Goal;
+};
+
+type InstallmentPurchaseResponse = {
+  purchase: InstallmentPurchase;
+};
+
 export type ExtendedFinanceResponse = {
   goals: Goal[];
   creditCards: CreditCard[];
   credit_cards?: CreditCard[];
+  installmentPurchases?: InstallmentPurchase[];
+  installment_purchases?: InstallmentPurchase[];
   recurringPayments: RecurringPayment[];
   recurring_payments?: RecurringPayment[];
   events: PlannerEvent[];
@@ -53,8 +63,13 @@ export async function fetchCategories(type?: "income" | "expense") {
   return (await apiRequest<CategoriesResponse>(`/categories${query}`, { requireAuth: true })).categories;
 }
 
-export async function fetchTransactions() {
-  return (await apiRequest<TransactionsResponse>("/transactions", { requireAuth: true })).transactions;
+export async function fetchTransactions(filters: { dateFrom?: string; dateTo?: string; limit?: number } = {}) {
+  const params = new URLSearchParams();
+  if (filters.dateFrom) params.set("dateFrom", filters.dateFrom);
+  if (filters.dateTo) params.set("dateTo", filters.dateTo);
+  if (filters.limit) params.set("limit", String(filters.limit));
+  const query = params.toString() ? `?${params.toString()}` : "";
+  return (await apiRequest<TransactionsResponse>(`/transactions${query}`, { requireAuth: true })).transactions;
 }
 
 export async function fetchTransaction(id: string) {
@@ -109,11 +124,37 @@ export async function createRecurringPaymentApi(input: {
   category: string;
   amount: number;
   currency: Currency;
-  frequency: "weekly" | "monthly" | "annual";
+  frequency: "once" | "weekly" | "monthly" | "annual";
+  reminderDaysBefore?: number;
   nextChargeDate: string;
   kind?: "fixed" | "subscription" | "service";
   accountId?: string;
   notificationsEnabled?: boolean;
 }) {
   return (await apiRequest<RecurringPaymentResponse>("/finance/recurring-payments", { body: input, method: "POST", requireAuth: true })).payment;
+}
+
+export async function createGoalApi(input: { name: string; target: number; saved?: number; currency: Currency; monthlyContribution?: number; targetDate?: string | null }) {
+  return (await apiRequest<GoalResponse>("/finance/goals", { body: input, method: "POST", requireAuth: true })).goal;
+}
+
+export async function createInstallmentPurchaseApi(input: {
+  accountId?: string;
+  name: string;
+  totalAmount: number;
+  totalInstallments: number;
+  firstDueDate: string;
+  category: string;
+  currency: Currency;
+  reminderDaysBefore?: number;
+}) {
+  return (await apiRequest<InstallmentPurchaseResponse>("/finance/installment-purchases", { body: input, method: "POST", requireAuth: true })).purchase;
+}
+
+export async function markRecurringPaymentPaidApi(id: string) {
+  return apiRequest<{ payment: RecurringPayment; transactionId: string }>(`/finance/recurring-payments/${id}/pay`, { method: "POST", requireAuth: true });
+}
+
+export async function markInstallmentPaidApi(purchaseId: string, installmentId: string) {
+  return (await apiRequest<InstallmentPurchaseResponse>(`/finance/installment-purchases/${purchaseId}/installments/${installmentId}/pay`, { method: "POST", requireAuth: true })).purchase;
 }
