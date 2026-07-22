@@ -1,34 +1,117 @@
 # FinFlow
 
-FinFlow es una app movil de finanzas personales hecha con React Native, Expo, TypeScript, Expo Router y backend propio Express + MongoDB Atlas.
+FinFlow es una app movil de finanzas personales y organizacion hecha con Expo React Native, TypeScript, Expo Router y backend Express + MongoDB.
 
-## Estado actual
+## Arquitectura Final
 
-- App Expo React Native con rutas protegidas.
+- Frontend Expo Router con cinco tabs diarios: Inicio, Movimientos, Agregar, Plan e IA.
 - Backend Express 5 + TypeScript en `server/`.
-- Autenticacion real con bcrypt, JWT access token y refresh token rotativo.
-- Perfil financiero y onboarding guardados en MongoDB.
-- Cuentas, categorias, movimientos y dashboard calculado desde MongoDB.
-- Estados vacios reales para usuarios nuevos, sin cifras inventadas.
-- Datos financieros solo en memoria del frontend durante la sesion.
-- Cuenta de presentacion separada mediante seed manual, no automatico.
-- Metas, tarjetas, cuotas, recurrentes y planner se cargan desde MongoDB para usuarios que tengan esos datos.
-- Gemini y presupuestos avanzados quedan para el siguiente bloque.
+- MongoDB como unica fuente de verdad para datos financieros.
+- Autenticacion real con bcrypt, access token y refresh token rotativo.
+- Aislamiento estricto por `userId` en endpoints financieros.
+- SecureStore solo para tokens. No se guardan movimientos, cuentas, metas, tarjetas, presupuestos, notificaciones ni IA en AsyncStorage.
+- Gemini se usa desde backend si `GEMINI_API_KEY` esta configurada; Expo nunca llama Gemini directamente.
+
+## Navegacion
+
+Tabs principales:
+
+- `/(tabs)/overview`
+- `/(tabs)/transactions`
+- `/(tabs)/add`
+- `/(tabs)/plan`
+- `/(tabs)/ai`
+
+Rutas secundarias:
+
+- `/notifications`
+- `/profile`
+- `/settings`
+- `/settings/[section]`
+- `/analysis`
+- `/transaction/[id]`
+- `/goal/[id]`
+- `/card/[id]`
+- `/payment/[id]`
+
+## Pantallas
+
+- Inicio: conserva identidad visual, grafica por periodo, cards mensuales, badge de notificaciones y ultimos movimientos reales.
+- Movimientos: resumen mensual, busqueda, filtros principales, filtros avanzados, lista agrupada y detalle editable.
+- Agregar: flujo progresivo para gasto, ingreso, transferencia, compra en cuotas, pago proximo y registro con IA confirmable.
+- Plan: Mes, Metas, Tarjetas y Calendario financiero.
+- IA: chat autenticado con respuestas basadas en cuentas, movimientos, metas, tarjetas, cuotas y vencimientos.
+- Notificaciones: centro filtrable, acciones de leer, posponer, completar y apertura de entidad relacionada.
+- Perfil/Ajustes: perfil, finanzas, notificaciones, IA, seguridad, tarjetas y general.
+
+## Modelos
+
+Principales:
+
+- `User`
+- `RefreshToken`
+- `FinancialProfile`
+- `Account`
+- `Category`
+- `Transaction`
+- `Goal`
+- `CreditCard`
+- `RecurringPayment`
+- `PlannerEvent`
+- `Notification`
+- `DeviceToken`
+
+## Endpoints
+
+Autenticacion y perfil:
+
+- `POST /api/auth/register`
+- `POST /api/auth/login`
+- `POST /api/auth/refresh`
+- `POST /api/auth/logout`
+- `GET /api/auth/me`
+- `POST /api/auth/forgot-password`
+- `POST /api/auth/reset-password`
+- `GET /api/profile`
+- `PATCH /api/profile`
+- `POST /api/profile/onboarding`
+
+Finanzas:
+
+- `GET /api/accounts`
+- `POST /api/accounts`
+- `GET /api/categories`
+- `POST /api/categories`
+- `GET /api/transactions`
+- `POST /api/transactions`
+- `POST /api/transactions/transfer`
+- `GET /api/transactions/:id`
+- `PATCH /api/transactions/:id`
+- `DELETE /api/transactions/:id`
+- `GET /api/statistics/overview?period=30d`
+- `GET /api/finance/extended`
+- `POST /api/finance/recurring-payments`
+
+IA y notificaciones:
+
+- `POST /api/ai/chat`
+- `GET /api/notifications`
+- `PATCH /api/notifications/:id/read`
+- `PATCH /api/notifications/read-all`
+- `POST /api/notifications/:id/snooze`
+- `POST /api/notifications/:id/complete`
+- `POST /api/devices/push-token`
+- `DELETE /api/devices/push-token`
 
 ## Variables
 
-Frontend, archivo `.env` en la raiz:
+Frontend, `.env` en la raiz:
 
 ```bash
 EXPO_PUBLIC_API_URL=
 ```
 
-Si queda vacio, la app usa:
-
-- Android Emulator: `http://10.0.2.2:3333/api`
-- Web: `http://localhost:3333/api`
-
-Backend, archivo `server/.env`:
+Backend, `server/.env`:
 
 ```bash
 PORT=3333
@@ -40,108 +123,66 @@ JWT_ACCESS_EXPIRES_IN=15m
 JWT_REFRESH_EXPIRES_IN=30d
 CORS_ORIGIN=http://localhost:8082
 GEMINI_API_KEY=
+WHATSAPP_ENABLED=false
+WHATSAPP_ACCESS_TOKEN=
+WHATSAPP_PHONE_NUMBER_ID=
+WHATSAPP_TEMPLATE_PAYMENT_REMINDER=
+WHATSAPP_TEMPLATE_WEEKLY_SUMMARY=
 SAMPLE_USER_EMAIL=
 SAMPLE_USER_PASSWORD=
 ```
 
-`MONGODB_URI`, JWT secrets y `GEMINI_API_KEY` nunca deben ir en Expo ni en variables `EXPO_PUBLIC_`.
+No exponer `MONGODB_URI`, JWT secrets, `GEMINI_API_KEY` ni credenciales de WhatsApp en Expo.
 
-## Configurar MongoDB Atlas
+## IA
 
-1. Crear un cluster en MongoDB Atlas.
-2. Crear un usuario de base de datos.
-3. Habilitar tu IP en Network Access.
-4. Copiar la URI de conexion `mongodb+srv://...`.
-5. Pegarla solo en `/Users/paularasero/Documents/Wallet/server/.env`:
+`POST /api/ai/chat` carga datos del usuario autenticado desde MongoDB y responde con texto y bloques visuales. Si Gemini no esta configurado, el backend usa respuestas deterministicas calculadas con datos reales. La IA puede preparar fichas o acciones, pero la app siempre exige confirmacion antes de guardar.
+
+## Notificaciones, Push y WhatsApp
+
+- Las notificaciones in-app se guardan en MongoDB.
+- El generador usa claves idempotentes por usuario, tipo, entidad y fecha para evitar duplicados.
+- Expo Push registra `DeviceToken` en backend y envia push solo si hay token activo.
+- WhatsApp Business Platform esta preparado como provider opcional.
+- Con `WHATSAPP_ENABLED=false`, la app muestra que WhatsApp no esta configurado y el backend no intenta enviar mensajes.
+
+## Cuenta de Presentacion
+
+La cuenta de presentacion es una cuenta normal con autenticacion real y datos persistidos en MongoDB. Configurar:
 
 ```bash
-MONGODB_URI=mongodb+srv://USUARIO:PASSWORD@CLUSTER.mongodb.net/finflow
+SAMPLE_USER_EMAIL=
+SAMPLE_USER_PASSWORD=
 ```
 
-Para tests destructivos, usar una base separada:
+Crear o regenerar:
 
 ```bash
-TEST_MONGODB_URI=mongodb+srv://USUARIO:PASSWORD@CLUSTER.mongodb.net/finflow_test
+npm run server:seed:sample-user
 ```
+
+Los usuarios nuevos empiezan vacios y no reciben datos de presentacion.
 
 ## Ejecutar
-
-Instalar dependencias:
 
 ```bash
 npm install
 npm install --prefix server
-```
-
-Levantar backend y app movil juntos:
-
-```bash
 npm run dev
 ```
 
-Levantar por separado:
+Separado:
 
 ```bash
 npm run dev:server
 npm run dev:mobile
 ```
 
-Web en Codex:
+Android:
 
 ```bash
-npm run web -- --port 8082
+npm run android
 ```
-
-## Endpoints principales
-
-- `GET /health`
-- `POST /api/auth/register`
-- `POST /api/auth/login`
-- `POST /api/auth/refresh`
-- `POST /api/auth/logout`
-- `GET /api/auth/me`
-- `POST /api/auth/forgot-password`
-- `POST /api/auth/reset-password`
-- `GET /api/profile`
-- `PATCH /api/profile`
-- `POST /api/profile/onboarding`
-- `GET /api/accounts`
-- `POST /api/accounts`
-- `GET /api/accounts/:id`
-- `PATCH /api/accounts/:id`
-- `DELETE /api/accounts/:id`
-- `GET /api/categories`
-- `POST /api/categories`
-- `PATCH /api/categories/:id`
-- `DELETE /api/categories/:id`
-- `GET /api/transactions`
-- `POST /api/transactions`
-- `GET /api/transactions/:id`
-- `PATCH /api/transactions/:id`
-- `DELETE /api/transactions/:id`
-- `GET /api/statistics/overview?period=30d`
-- `GET /api/finance/extended`
-
-## Cuenta de presentacion
-
-La cuenta de presentacion no se crea al iniciar el servidor y no es un modo especial de la app. Es una cuenta normal con `isDemo=false`, autenticacion real y datos persistidos en MongoDB.
-
-Configurar credenciales solo en `/Users/paularasero/Documents/Wallet/server/.env`:
-
-```bash
-SAMPLE_USER_EMAIL=
-SAMPLE_USER_PASSWORD=
-```
-
-Crear o regenerar la cuenta:
-
-```bash
-npm run server:seed:sample-user
-```
-
-El seed busca el usuario por email, lo crea si no existe, lo actualiza si existe, borra solo los datos financieros de esa cuenta y vuelve a cargar datos coherentes. Se puede ejecutar varias veces sin duplicar movimientos, cuentas, tarjetas, cuotas, metas ni eventos.
-
-Los usuarios nuevos siguen empezando vacios y no reciben datos de presentacion.
 
 ## Pruebas
 
@@ -152,29 +193,16 @@ npm run lint
 npm run server:test
 ```
 
-Si `MONGODB_URI` no esta configurado, `/health` funciona y los tests destructivos de Mongo se saltean. El resto de `/api/*` responde `DATABASE_DISCONNECTED` hasta conectar Atlas.
+Si `MONGODB_URI` no esta configurado, `/health` funciona y los endpoints `/api/*` responden `DATABASE_DISCONNECTED`.
 
 ## Seguridad
 
 - Helmet.
-- CORS restringido por `CORS_ORIGIN`.
-- Rate limit general y rate limit especifico para auth.
-- Zod para validaciones.
+- CORS por `CORS_ORIGIN`.
+- Rate limiting.
+- Zod en validaciones.
 - bcrypt para contrasenas.
-- JWT access corto y refresh rotativo hasheado en MongoDB.
-- Sanitizacion basica contra operadores Mongo en body y params.
-- Separacion estricta por `userId` tomado del token.
-- No se devuelve `passwordHash`.
-- No se guardan cuentas, movimientos, balances, perfil completo ni estadisticas en almacenamiento local del frontend.
-
-## APK
-
-```bash
-npm run apk
-```
-
-Salida:
-
-```text
-android/app/build/outputs/apk/debug/app-debug.apk
-```
+- Refresh tokens hasheados.
+- Sanitizacion contra operadores Mongo.
+- `userId` autenticado en cada endpoint financiero.
+- No se devuelven password hashes ni secretos.
