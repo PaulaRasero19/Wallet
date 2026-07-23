@@ -11,6 +11,8 @@ export type AiChatResponse = {
   blocks: AiBlock[];
 };
 
-export async function askFinFlowAi(message: string) {
-  return apiRequest<AiChatResponse>("/ai/chat", { body: { message }, method: "POST", requireAuth: true });
+export type AiConversationMessage = { role: "assistant" | "user"; text: string };
+
+export async function askFinFlowAi(message: string, history: AiConversationMessage[] = []) {
+  return apiRequest<AiChatResponse>("/ai/chat", { body: { history: history.slice(-12), message }, method: "POST", requireAuth: true });
 }

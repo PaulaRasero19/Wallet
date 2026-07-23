@@ -39,3 +39,11 @@ export const goalSchema = z.object({
 export const goalContributionSchema = z.object({
   amount: z.coerce.number().positive("El monto debe ser mayor a cero.")
 });
+
+export const goalUpdateSchema = z.object({
+  name: z.string().trim().min(1, "El nombre de la meta es obligatorio.").optional(),
+  target: z.coerce.number().positive("El monto objetivo debe ser mayor a cero.").optional(),
+  saved: z.coerce.number().min(0).optional(),
+  targetDate: z.coerce.date().nullable().optional(),
+  status: z.enum(["active", "completed", "paused"]).optional()
+});

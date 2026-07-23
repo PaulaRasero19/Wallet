@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Alert, StyleSheet, Text, View } from "react-native";
 import { router } from "expo-router";
+import { LinearGradient } from "expo-linear-gradient";
 import { Header } from "../src/components/Header";
 import { InputField } from "../src/components/InputField";
 import { PrimaryButton } from "../src/components/PrimaryButton";
@@ -56,10 +57,18 @@ export default function Login() {
   }
 
   return (
-    <ScreenContainer style={styles.content}>
+    <ScreenContainer backgroundColor="#1C1C1B" style={styles.content}>
       <Header title={t("auth.login")} back />
+      <LinearGradient colors={["#2A0000", "#B91909", "#F05208", "#D8B600"]} end={{ x: 1, y: 1 }} start={{ x: 0, y: 0 }} style={styles.accent}>
+        <Text style={styles.accentEyebrow}>FINFLOW</Text>
+        <Text style={styles.accentTitle}>Tu plata,{"\n"}más clara.</Text>
+      </LinearGradient>
       <View style={styles.form}>
-        <Text style={styles.title}>Welcome back</Text>
+        <View style={styles.intro}>
+          <Text style={styles.title}>Qué bueno verte de nuevo</Text>
+          <Text style={styles.subtitle}>Ingresá para revisar tus movimientos, pagos y metas.</Text>
+        </View>
+        <Text style={styles.label}>{t("auth.email")}</Text>
         <InputField
           accessibilityLabel={t("auth.email")}
           autoCapitalize="none"
@@ -70,9 +79,11 @@ export default function Login() {
             setErrors((current) => ({ ...current, email: undefined, form: undefined }));
           }}
           placeholder={t("auth.email")}
+          style={styles.input}
           value={email}
         />
         {errors.email ? <Text style={styles.message}>{errors.email}</Text> : null}
+        <Text style={styles.label}>{t("auth.password")}</Text>
         <InputField
           accessibilityLabel={t("auth.password")}
           onChangeText={(value) => {
@@ -81,13 +92,17 @@ export default function Login() {
           }}
           placeholder={t("auth.password")}
           secureTextEntry
+          style={styles.input}
           value={password}
         />
         {errors.password ? <Text style={styles.message}>{errors.password}</Text> : null}
         {errors.form ? <Text style={styles.message}>{errors.form}</Text> : null}
-        <PrimaryButton onPress={submit}>{status === "loading" ? t("common.loading") : t("auth.login")}</PrimaryButton>
-        <SecondaryButton onPress={() => router.push("/forgot-password")}>{t("auth.forgot")}</SecondaryButton>
-        <SecondaryButton onPress={() => router.push("/register")}>{t("auth.register")}</SecondaryButton>
+        <PrimaryButton onPress={submit} style={styles.primary}>{status === "loading" ? t("common.loading") : t("auth.login")}</PrimaryButton>
+        <SecondaryButton onPress={() => router.push("/forgot-password")} style={styles.linkButton}>{t("auth.forgot")}</SecondaryButton>
+        <View style={styles.registerRow}>
+          <Text style={styles.registerCopy}>¿Todavía no tenés cuenta?</Text>
+          <SecondaryButton onPress={() => router.push("/register")} style={styles.registerButton}>{t("auth.register")}</SecondaryButton>
+        </View>
       </View>
     </ScreenContainer>
   );
@@ -95,18 +110,82 @@ export default function Login() {
 
 const styles = StyleSheet.create({
   content: {
-    gap: spacing.xl
+    gap: spacing.lg
   },
-  form: {
-    gap: spacing.md
+  accent: {
+    borderRadius: 34,
+    height: 184,
+    justifyContent: "flex-end",
+    overflow: "hidden",
+    padding: spacing.lg
   },
-  title: {
+  accentEyebrow: {
+    ...typography.label,
+    color: colors.transparentWhite,
+    fontWeight: "700",
+    letterSpacing: 1.8
+  },
+  accentTitle: {
     ...typography.display,
     color: colors.white,
-    marginBottom: spacing.md
+    fontSize: 38,
+    lineHeight: 40,
+    marginTop: spacing.xs
+  },
+  form: {
+    gap: spacing.sm
+  },
+  intro: {
+    gap: spacing.xs,
+    marginBottom: spacing.sm
+  },
+  title: {
+    ...typography.title,
+    color: colors.white
+  },
+  subtitle: {
+    ...typography.body,
+    color: colors.transparentWhite
+  },
+  label: {
+    ...typography.label,
+    color: colors.transparentWhite,
+    fontWeight: "700",
+    marginTop: spacing.xs
+  },
+  input: {
+    backgroundColor: "#595958",
+    borderColor: "transparent",
+    borderRadius: 22,
+    minHeight: 58
+  },
+  primary: {
+    marginTop: spacing.md,
+    minHeight: 58
+  },
+  linkButton: {
+    borderWidth: 0,
+    minHeight: 40
+  },
+  registerRow: {
+    alignItems: "center",
+    borderTopColor: colors.appGrayBorder,
+    borderTopWidth: 1,
+    gap: spacing.xs,
+    marginTop: spacing.sm,
+    paddingTop: spacing.md
+  },
+  registerCopy: {
+    ...typography.body,
+    color: colors.transparentWhite
+  },
+  registerButton: {
+    borderColor: colors.appGrayBorder,
+    minHeight: 46,
+    width: "100%"
   },
   message: {
     ...typography.body,
-    color: "#ff4b1f"
+    color: colors.negative
   }
 });

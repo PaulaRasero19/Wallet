@@ -65,7 +65,7 @@ const styles = StyleSheet.create({
     ...typography.body,
     color: colors.white,
     flex: 1,
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: "700",
     lineHeight: 17
   },

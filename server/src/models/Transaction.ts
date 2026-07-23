@@ -8,6 +8,7 @@ const transactionSchema = new Schema(
     toAccountId: { type: Types.ObjectId, ref: "Account", default: null, index: true },
     transferGroupId: { type: String, trim: true, default: null, index: true },
     scheduledPaymentId: { type: Types.ObjectId, ref: "RecurringPayment", default: null, index: true },
+    clientRequestId: { type: String, trim: true, default: null },
     receiptUrl: { type: String, trim: true, default: null },
     demoId: { type: String, trim: true, default: null },
     type: { type: String, enum: ["income", "expense", "transfer", "refund", "goal_contribution", "internal_transfer"], required: true, index: true },
@@ -35,6 +36,10 @@ const transactionSchema = new Schema(
 );
 
 transactionSchema.index({ userId: 1, date: -1 });
+transactionSchema.index(
+  { userId: 1, clientRequestId: 1 },
+  { name: "unique_client_transaction_request", unique: true, partialFilterExpression: { clientRequestId: { $type: "string" } } }
+);
 transactionSchema.index(
   { userId: 1, demoId: 1 },
   { name: "unique_demo_transaction", unique: true, partialFilterExpression: { demoId: { $type: "string" } } }

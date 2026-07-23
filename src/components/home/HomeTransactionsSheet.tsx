@@ -6,9 +6,10 @@ import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, { runOnJS, useAnimatedStyle, useSharedValue, withSpring } from "react-native-reanimated";
 import Svg, { Path } from "react-native-svg";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Account, Transaction } from "../../types/finflow";
+import { Goal } from "../../types/finflow";
 import { colors, typography } from "../../theme";
-import { TransactionRow } from "./TransactionRow";
+import { sortGoalsForHome } from "../../utils/goals";
+import { HomeGoalRow } from "./HomeGoalRow";
 
 const NAVBAR_HEIGHT = 82;
 
@@ -24,15 +25,16 @@ function nearestSnap(value: number, velocityY: number, expandedY: number, collap
   return Math.abs(value - expandedY) < Math.abs(value - collapsedY) ? expandedY : collapsedY;
 }
 
-export function HomeTransactionsSheet({ accounts, transactions }: { accounts: Account[]; transactions: Transaction[] }) {
+export function HomeGoalsSheet({ goals }: { goals: Goal[] }) {
   const { height, width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const expandedY = height * 0.36;
-  const collapsedY = height * 0.84;
+  const collapsedY = height * 0.75;
   const [expanded, setExpanded] = useState(false);
   const sheetY = useSharedValue(collapsedY);
   const startY = useSharedValue(collapsedY);
-  const visibleTransactions = useMemo(() => transactions.slice(0, 28), [transactions]);
+  const orderedGoals = useMemo(() => sortGoalsForHome(goals), [goals]);
+  const visibleGoals = useMemo(() => orderedGoals.slice(0, 3), [orderedGoals]);
   const bottomPadding = NAVBAR_HEIGHT + Math.max(10, insets.bottom) + 24;
   const cutoutWidth = Math.min(156, width * 0.31);
   const cutoutDepth = 20;
@@ -89,12 +91,17 @@ export function HomeTransactionsSheet({ accounts, transactions }: { accounts: Ac
             <View style={styles.handle} />
           </View>
 
-          <Pressable accessibilityLabel="Desplegar últimos movimientos" accessibilityRole="button" onPress={toggleSheet} style={styles.dragArea}>
-            <Text style={styles.title}>Últimos movimientos</Text>
-          </Pressable>
+          <View style={styles.dragArea}>
+            <View style={styles.titleRow}>
+              <Pressable accessibilityLabel="Desplegar tus metas" accessibilityRole="button" onPress={toggleSheet} style={styles.titleButton}>
+              <Text style={styles.title}>Tus metas</Text>
+              </Pressable>
+              {goals.length > 3 ? <Pressable accessibilityRole="button" onPress={() => router.push("/goals")}><Text style={styles.seeAll}>Ver todas</Text></Pressable> : null}
+            </View>
+          </View>
 
           <View style={styles.listWrap}>
-            {visibleTransactions.length ? (
+            {visibleGoals.length ? (
               <ScrollView
                 bounces={false}
                 contentContainerStyle={[styles.list, { paddingBottom: bottomPadding }]}
@@ -102,21 +109,21 @@ export function HomeTransactionsSheet({ accounts, transactions }: { accounts: Ac
                 scrollEnabled={expanded}
                 showsVerticalScrollIndicator={expanded}
               >
-                {visibleTransactions.map((transaction, index) => {
-                  const account = accounts.find((item) => item.id === (transaction.account_id || transaction.accountId));
+                {visibleGoals.map((goal, index) => {
                   const opacity = expanded ? 1 : index === 0 ? 1 : index === 1 ? 0.5 : 0.2;
                   return (
-                    <View key={transaction.id} style={{ opacity }}>
-                      <TransactionRow account={account} transaction={transaction} />
+                    <View key={goal.id} style={{ opacity }}>
+                      <HomeGoalRow goal={goal} />
                     </View>
                   );
                 })}
               </ScrollView>
             ) : (
               <View style={[styles.emptyState, { paddingBottom: bottomPadding }]}>
-                <Text style={styles.emptyText}>Todavía no registraste movimientos.</Text>
-                <Pressable accessibilityRole="button" onPress={() => router.push("/(tabs)/add")} style={styles.emptyButton}>
-                  <Text style={styles.emptyButtonText}>Agregar primer movimiento</Text>
+                <Text style={styles.emptyText}>No tenés metas activas.</Text>
+                <Text style={styles.emptyHint}>Creá una para empezar a ahorrar con un objetivo.</Text>
+                <Pressable accessibilityRole="button" onPress={() => router.push("/(tabs)/add-goal")} style={styles.emptyButton}>
+                  <Text style={styles.emptyButtonText}>Crear meta</Text>
                 </Pressable>
               </View>
             )}
@@ -129,7 +136,7 @@ export function HomeTransactionsSheet({ accounts, transactions }: { accounts: Ac
         </Animated.View>
       </GestureDetector>
       <Pressable
-        accessibilityLabel={expanded ? "Cerrar últimos movimientos" : "Desplegar últimos movimientos"}
+        accessibilityLabel={expanded ? "Cerrar tus metas" : "Desplegar tus metas"}
         accessibilityRole="button"
         onPress={toggleSheet}
         style={[styles.sheetTapTarget, { top: expanded ? expandedY : collapsedY }]}
@@ -168,6 +175,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     lineHeight: 22
   },
+  emptyHint: { ...typography.label, color: "rgba(255,255,255,0.58)", marginTop: 6 },
   fade: {
     bottom: 0,
     height: 150,
@@ -216,7 +224,7 @@ const styles = StyleSheet.create({
     zIndex: 40
   },
   sheetTapTarget: {
-    height: 170,
+    height: 28,
     left: 0,
     position: "absolute",
     right: 0,
@@ -228,5 +236,8 @@ const styles = StyleSheet.create({
     fontSize: 21,
     lineHeight: 27,
     marginTop: 0
-  }
+  },
+  titleRow: { alignItems: "center", flexDirection: "row", justifyContent: "space-between" },
+  titleButton: { flex: 1 },
+  seeAll: { ...typography.label, color: colors.white, fontWeight: "900" }
 });

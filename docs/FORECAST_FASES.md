@@ -1,4 +1,6 @@
-# FinFlow Forecast - fases de evolucion
+# FinFlow Forecast — registro histórico de evolución
+
+> Este documento conserva decisiones de etapas anteriores. Para conocer el estado vigente consultar `docs/ENTREGA_FINAL.md` y `README.md`. Las referencias a mocks, AsyncStorage financiero o backend opcional describen el punto de partida y no la arquitectura final.
 
 ## Inspeccion del estado actual
 

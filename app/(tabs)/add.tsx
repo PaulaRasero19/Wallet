@@ -1,10 +1,13 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Alert, Modal, Platform, Pressable, StyleSheet, Switch, Text, TextInput, View } from "react-native";
-import { router } from "expo-router";
+import { router, useFocusEffect } from "expo-router";
 import * as DocumentPicker from "expo-document-picker";
 import DateTimePicker, { DateTimePickerEvent } from "@react-native-community/datetimepicker";
-import { Award, Banknote, BookOpen, Brain, BriefcaseBusiness, CalendarDays, Circle, CreditCard, Gift, Grid2X2, Heart, HeartPulse, Home, Laptop, Landmark, Minus, PawPrint, PiggyBank, Plus, Receipt, RefreshCw, ShoppingBag, Smartphone, Tag, Ticket, TramFront, Utensils, WalletCards, Zap } from "lucide-react-native";
+import { LinearGradient } from "expo-linear-gradient";
+import { ArrowLeft, ArrowRight, ArrowUpRight, Award, Banknote, BookOpen, BriefcaseBusiness, CalendarDays, ChevronDown, Circle, Gift, Grid2X2, Heart, HeartPulse, Home, Laptop, Landmark, PawPrint, Pencil, Plus, Receipt, RefreshCw, ShoppingBag, Smartphone, Tag, Ticket, TramFront, Trash2, Utensils, WalletCards, Zap } from "lucide-react-native";
 import { Header } from "../../src/components/Header";
+import { AmountLavaBackground } from "../../src/components/forms/AmountLavaBackground";
+import { LiquidGradientBackground } from "../../src/components/home/LiquidGradientBackground";
 import { PrimaryButton } from "../../src/components/PrimaryButton";
 import { ScreenContainer } from "../../src/components/ScreenContainer";
 import { useFinFlowStore } from "../../src/store/useFinFlowStore";
@@ -70,7 +73,11 @@ function normalizedText(value: string) {
 
 function findCategoryByName(categories: Category[], type: "income" | "expense", name: string) {
   const expected = normalizedText(name);
-  return categories.find((category) => category.type === type && normalizedText(category.name) === expected);
+  const translationKey = type === "expense" && expected === "comida" ? "expense.food" : "";
+  return categories.find((category) => category.type === type && (
+    normalizedText(category.name) === expected
+    || Boolean(translationKey && (category.translationKey || category.translation_key) === translationKey)
+  ));
 }
 
 function extractAiAmount(message: string) {
@@ -80,29 +87,32 @@ function extractAiAmount(message: string) {
 
 function inferExpenseConcept(message: string) {
   const rules: Array<[RegExp, string]> = [
-    [/pedidos\s?ya/i, "PedidosYa"], [/\bute\b/i, "UTE"], [/\bantel\b/i, "Antel"],
+    [/\bpedidos?\s*ya\b/i, "PedidosYa"], [/\brappi\b/i, "Rappi"], [/\buber\s*eats\b/i, "Uber Eats"],
+    [/\bute\b/i, "UTE"], [/\bantel\b/i, "Antel"],
     [/\buber\b/i, "Uber"], [/\bnetflix\b/i, "Netflix"], [/\bspotify\b/i, "Spotify"],
     [/\binternet\b/i, "Internet"], [/\bfarmacia\b/i, "Farmacia"], [/\bropa\b/i, "Ropa"],
-    [/\bcelular\b/i, "Celular"], [/\bsupermercado\b/i, "Supermercado"]
+    [/\bcelular\b/i, "Celular"], [/\bsupermercado\b/i, "Supermercado"],
+    [/\bpeluquer[ií]a\b|\bpeluquero\b|\bbarber[ií]a\b|\bsal[oó]n de belleza\b/i, "Peluquería"],
+    [/\bmanicura\b|\bmanicure\b|\bpedicura\b|\bpedicure\b|\best[eé]tica\b/i, "Cuidado personal"]
   ];
   return rules.find(([pattern]) => pattern.test(message))?.[1] || "";
 }
 
 function inferExpenseCategory(message: string, concept: string) {
-  const text = `${message} ${concept}`;
-  if (/pedidos\s?ya|comida|restaurante|supermercado/i.test(text)) return "comida";
+  const text = normalizedText(`${message} ${concept}`);
+  if (/\bpedidos?\s*ya\b|\brappi\b|\buber\s*eats\b|\bdelivery\b|\bpedido\b|\bcomida\b|\brestaurante\b|\bsupermercado\b|\bpizzeria\b|\bhamburgueseria\b|\bcafeteria\b/.test(text)) return "comida";
   if (/\bute\b|\bantel\b|internet|alquiler|servicios?/i.test(text)) return "hogar y servicios";
   if (/\buber\b|taxi|ómnibus|omnibus|transporte/i.test(text)) return "transporte";
   if (/netflix|spotify|suscripci[oó]n/i.test(text)) return "suscripciones";
-  if (/farmacia|medicamento|salud/i.test(text)) return "salud";
+  if (/farmacia|medicamento|salud|peluquer[ií]a|peluquero|barber[ií]a|sal[oó]n de belleza|manicura|manicure|pedicura|pedicure|est[eé]tica|cuidado personal/i.test(text)) return "salud";
   if (/ropa|celular|compr[eé]|compras?/i.test(text)) return "compras";
   return "";
 }
 
 function inferPaymentMethod(message: string) {
   if (/efectivo/i.test(message)) return "cash";
-  if (/d[eé]bito/i.test(message)) return "debit_card";
-  if (/visa|mastercard?|cr[eé]dito|tarjeta/i.test(message)) return "credit_card";
+  if (/d[eé]bito|\bvisa\b/i.test(message)) return "debit_card";
+  if (/mastercard?|cr[eé]dito|tarjeta/i.test(message)) return "credit_card";
   if (/transferencia/i.test(message)) return "bank_transfer";
   if (/mercado\s?pago|billetera/i.test(message)) return "digital_wallet";
   return "";
@@ -130,7 +140,9 @@ function incomeSourceIcon(label: string) {
 function chooseCategory(categories: Category[], type: "income" | "expense", label?: string) {
   const source = categories.filter((category) => category.type === type);
   const normalized = String(label || "").toLowerCase();
-  return source.find((category) => normalized.includes(category.name.toLowerCase())) || source[0];
+  return source.find((category) => normalized.includes(category.name.toLowerCase()))
+    || (type === "income" ? source.find((category) => (category.translationKey || category.translation_key) === "income.salary") : undefined)
+    || source[0];
 }
 
 type InitialFormData = Partial<{ amount: string; merchant: string; categoryId: string; accountId: string; paymentMethod: string; date: string; note: string; installments: string; frequency: string }>;
@@ -145,6 +157,8 @@ export function AddScreen({ initialMode = "menu", initialData }: { initialMode?:
   const [incomeSourceListOpen, setIncomeSourceListOpen] = useState(false);
   const [incomeSourceModalOpen, setIncomeSourceModalOpen] = useState(false);
   const [incomeDestination, setIncomeDestination] = useState("");
+  const [incomeDestinationOpen, setIncomeDestinationOpen] = useState(false);
+  const [incomeFrequencyOpen, setIncomeFrequencyOpen] = useState(false);
   const [customIncomeDestination, setCustomIncomeDestination] = useState("");
   const [note, setNote] = useState("");
   const [date, setDate] = useState(todayInput());
@@ -152,8 +166,9 @@ export function AddScreen({ initialMode = "menu", initialData }: { initialMode?:
   const [categoryId, setCategoryId] = useState("");
   const [categoryListOpen, setCategoryListOpen] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState("");
+  const [paymentMethodOpen, setPaymentMethodOpen] = useState(false);
   const [customPaymentMethod, setCustomPaymentMethod] = useState("");
-  const [recurring, setRecurring] = useState(false);
+  const [recurring, setRecurring] = useState(initialMode === "income" || initialMode === "expense");
   const [recurrenceFrequency, setRecurrenceFrequency] = useState<(typeof incomeRecurrenceFrequencies)[number]>("monthly");
   const [nextDueDate, setNextDueDate] = useState(nextDate(todayInput(), "monthly"));
   const [reminderEnabled, setReminderEnabled] = useState(true);
@@ -165,6 +180,7 @@ export function AddScreen({ initialMode = "menu", initialData }: { initialMode?:
   const [newCategoryName, setNewCategoryName] = useState("");
   const [newCategoryIcon, setNewCategoryIcon] = useState<(typeof categoryIcons)[number]>("utensils");
   const [installments, setInstallments] = useState("3");
+  const [installmentsOpen, setInstallmentsOpen] = useState(false);
   const [creditCardName, setCreditCardName] = useState("");
   const [creditCardModalOpen, setCreditCardModalOpen] = useState(false);
   const [newCreditCardName, setNewCreditCardName] = useState("");
@@ -175,7 +191,11 @@ export function AddScreen({ initialMode = "menu", initialData }: { initialMode?:
   const [goalSaved, setGoalSaved] = useState("");
   const [goalTargetDate, setGoalTargetDate] = useState("");
   const [aiText, setAiText] = useState("");
+  const [aiDetailDraft, setAiDetailDraft] = useState("");
+  const [aiMentionedDate, setAiMentionedDate] = useState(false);
   const [proposal, setProposal] = useState<AiProposal | null>(null);
+  const [proposalExpanded, setProposalExpanded] = useState(false);
+  const [proposalEditing, setProposalEditing] = useState(false);
 
   const currency: Currency = accounts.find((account) => account.id === accountId)?.currency || profile?.primary_currency || "UYU";
   const expenseCategories = useMemo(() => categories.filter((category) => category.type === "expense"), [categories]);
@@ -192,6 +212,28 @@ export function AddScreen({ initialMode = "menu", initialData }: { initialMode?:
     void loadAccounts();
     void loadCategories();
   }, [loadAccounts, loadCategories]);
+
+  useFocusEffect(useCallback(() => {
+    if (mode !== "ai") return;
+    setAiText("");
+    setAiDetailDraft("");
+    setAiMentionedDate(false);
+    setProposal(null);
+    setProposalExpanded(false);
+    setProposalEditing(false);
+    setAmount("");
+    setMerchant("");
+    setNote("");
+    setDate(todayInput());
+    setAccountId("");
+    setCategoryId("");
+    setPaymentMethod("");
+    setInstallments("3");
+    setFirstInstallmentDate(todayInput());
+    setPaymentCategory("Servicios");
+    setGoalSaved("");
+    setGoalTargetDate("");
+  }, [mode]));
 
   useEffect(() => {
     if (!initialData) return;
@@ -211,11 +253,28 @@ export function AddScreen({ initialMode = "menu", initialData }: { initialMode?:
   }, [accountId, accounts, mode]);
 
   useEffect(() => {
+    if (mode === "income" && !incomeDestination) selectIncomeDestination("cash");
+  }, [incomeDestination, mode]);
+
+  useEffect(() => {
+    if ((mode === "expense" || mode === "goal") && !paymentMethod) setPaymentMethod("cash");
+  }, [mode, paymentMethod]);
+
+  useEffect(() => {
     if (mode !== "income" && mode !== "expense") return;
     const type = mode;
     const category = chooseCategory(categories, type, merchant);
-    if (category && !categories.some((item) => item.id === categoryId && item.type === type)) setCategoryId(category.id);
+    if (category && !categories.some((item) => item.id === categoryId && item.type === type)) {
+      setCategoryId(category.id);
+      if (type === "income" && !merchant.trim()) setMerchant(incomeSourceLabel(category));
+    }
   }, [categories, categoryId, merchant, mode]);
+
+  useEffect(() => {
+    if (mode !== "installment" || categoryId) return;
+    const category = expenseCategories.find((item) => normalizedText(item.name) === "comida") || expenseCategories[0];
+    if (category) setCategoryId(category.id);
+  }, [categoryId, expenseCategories, mode]);
 
   function resetForm() {
     setAmount("");
@@ -385,6 +444,7 @@ export function AddScreen({ initialMode = "menu", initialData }: { initialMode?:
     try {
       const category = await createCategory({ name: newCategoryName.trim(), type: "expense", icon: newCategoryIcon, color: "gray" });
       setCategoryId(category.id);
+      if (mode === "expense") setMerchant(category.name);
       setCategoryModalOpen(false);
       setNewCategoryName("");
     } catch (error) {
@@ -466,7 +526,7 @@ export function AddScreen({ initialMode = "menu", initialData }: { initialMode?:
         name: merchant.trim(),
         saved: amountValue(goalSaved),
         target,
-        targetDate: goalTargetDate ? toIsoDate(goalTargetDate) : null
+        targetDate: toIsoDate(date)
       });
       resetForm();
       router.replace("/(tabs)/add");
@@ -480,6 +540,7 @@ export function AddScreen({ initialMode = "menu", initialData }: { initialMode?:
 
   function interpretWithAi() {
     const lower = aiText.toLowerCase();
+    const mentionedDate = /\b(?:hoy|ayer|mañana|lunes|martes|miércoles|miercoles|jueves|viernes|sábado|sabado|domingo)\b|\b\d{1,2}[\/-]\d{1,2}(?:[\/-]\d{2,4})?\b|\bd[ií]a\s+\d{1,2}\b/i.test(aiText);
     const value = extractAiAmount(aiText);
     const isGoal = /quiero ahorrar|meta|objetivo/.test(lower);
     const isInstallment = /\bcuotas?\b/.test(lower) && /compr[eé]|comprar/.test(lower);
@@ -488,6 +549,7 @@ export function AddScreen({ initialMode = "menu", initialData }: { initialMode?:
     const nextMode: AiProposal["mode"] = isGoal ? "goal" : isInstallment ? "installment" : isPayment ? "payment" : isIncome ? "income" : "expense";
     const typeLabel = nextMode === "expense" ? "Gasto" : nextMode === "income" ? "Ingreso" : nextMode === "installment" ? "Compra en cuotas" : nextMode === "payment" ? "Pago programado" : "Meta";
     setAmount(value ? String(value) : "");
+    setAiMentionedDate(mentionedDate);
     setDate(/ayer/.test(lower) ? new Date(Date.now() - 86_400_000).toISOString().slice(0, 10) : todayInput());
     setNote("");
     setRecurring(/cada semana|semanal|todos los meses|mensual|cada año|anual/.test(lower));
@@ -506,6 +568,7 @@ export function AddScreen({ initialMode = "menu", initialData }: { initialMode?:
     const categoryName = inferExpenseCategory(aiText, detectedConcept);
     const detectedCategory = findCategoryByName(categories, "expense", categoryName);
     setCategoryId(detectedCategory?.id || "");
+    setAiDetailDraft(nextMode === "expense" ? detectedCategory?.name || "" : detectedConcept);
     const detectedPayment = inferPaymentMethod(aiText);
     setPaymentMethod(detectedPayment);
     const detectedAccount = accounts.find((item) => lower.includes(item.name.toLowerCase()))
@@ -515,13 +578,23 @@ export function AddScreen({ initialMode = "menu", initialData }: { initialMode?:
     const incomeSource = /freelance|trabajo/i.test(aiText) ? "Freelance" : /sueldo|salario/i.test(aiText) ? "Sueldo" : /venta|vend[ií]/i.test(aiText) ? "Venta" : /regalo/i.test(aiText) ? "Regalo" : /transferencia/i.test(aiText) ? "Transferencia externa" : "";
     if (nextMode === "income") {
       setMerchant(incomeSource);
+      setAiDetailDraft(incomeSource);
       const incomeCategory = findCategoryByName(categories, "income", incomeSource === "Sueldo" ? "salario" : incomeSource.toLowerCase());
       setCategoryId(incomeCategory?.id || chooseCategory(categories, "income", incomeSource)?.id || "");
     }
-    if (nextMode === "payment") { setFrequency("monthly"); setReminderDaysBefore(1); setPaymentCategory(categoryName ? normalizedCategoryName(categoryName) : ""); }
-    if (nextMode === "goal") setGoalTargetDate("");
-    const autoCompleted = [value ? "Monto" : "", detectedConcept || incomeSource ? (nextMode === "income" ? "Fuente" : "Comercio o concepto") : "", detectedCategory ? "Categoría" : "", detectedPayment ? "Medio de pago" : "", "Fecha", detectedAccount || accounts[0] ? (nextMode === "income" ? "Cuenta de destino" : "") : ""].filter(Boolean);
+    if (nextMode === "payment") { setFrequency("monthly"); setReminderDaysBefore(1); setPaymentCategory(categoryName ? normalizedCategoryName(categoryName) : ""); setAiDetailDraft(detectedConcept); }
+    if (nextMode === "goal") { setGoalTargetDate(""); setAiDetailDraft(detectedConcept); }
+    const autoCompleted = [value ? "Monto" : "", detectedConcept || incomeSource ? (nextMode === "income" ? "Fuente" : "Comercio o concepto") : "", detectedCategory ? "Categoría" : "", detectedPayment ? "Medio de pago" : "", mentionedDate ? "Fecha" : "", detectedAccount || accounts[0] ? (nextMode === "income" ? "Cuenta de destino" : "") : ""].filter(Boolean);
     setProposal({ mode: nextMode, typeLabel, autoCompleted });
+    setProposalExpanded(true);
+    setProposalEditing(false);
+  }
+
+  function discardProposal() {
+    setProposal(null);
+    setProposalExpanded(false);
+    setProposalEditing(false);
+    setAiDetailDraft("");
   }
 
   async function confirmProposal() {
@@ -535,8 +608,19 @@ export function AddScreen({ initialMode = "menu", initialData }: { initialMode?:
 
   function correctProposal() {
     if (!proposal) return;
-    const params = { amount, merchant, categoryId, accountId, paymentMethod, date, note, installments, frequency };
-    router.push({ pathname: `/(tabs)/add-${proposal.mode}` as any, params });
+    setProposalExpanded(true);
+    setProposalEditing(true);
+  }
+
+  function updateAiDetail(value: string) {
+    setAiDetailDraft(value);
+    if (proposal?.mode === "expense") {
+      const matchedCategory = findCategoryByName(categories, "expense", value);
+      setCategoryId(matchedCategory?.id || "");
+      if (!merchant.trim() || merchant === aiDetailDraft) setMerchant(value);
+      return;
+    }
+    setMerchant(value);
   }
 
   const proposalComplete = proposal?.mode === "expense"
@@ -552,57 +636,66 @@ export function AddScreen({ initialMode = "menu", initialData }: { initialMode?:
             : false;
 
   const proposalPendingFields = proposal?.mode === "expense"
-    ? [!amountValue(amount) && "Monto", !merchant.trim() && "Comercio o concepto", !categoryId && "Categoría", !paymentMethod && "Medio de pago", !date && "Fecha"].filter(Boolean)
+    ? [!amountValue(amount) && "Monto", !merchant.trim() && "Comercio o concepto", !categoryId && "Categoría", !paymentMethod && "Medio de pago", !aiMentionedDate && "Fecha"].filter(Boolean)
     : proposal?.mode === "income"
-      ? [!amountValue(amount) && "Monto", !merchant.trim() && "Fuente", !accountId && "Dónde recibiste el dinero", !date && "Fecha"].filter(Boolean)
-      : [];
+      ? [!amountValue(amount) && "Monto", !merchant.trim() && "Fuente", !accountId && "Dónde recibiste el dinero", !aiMentionedDate && "Fecha"].filter(Boolean)
+      : proposal?.mode === "installment"
+        ? [!amountValue(amount) && "Monto", !merchant.trim() && "Comercio", !categoryId && "Categoría", !accountId && "Tarjeta", !Number(installments) && "Cantidad de cuotas", !aiMentionedDate && "Fecha de la primera cuota"].filter(Boolean)
+        : proposal?.mode === "payment"
+          ? [!amountValue(amount) && "Monto", !merchant.trim() && "Concepto", !paymentCategory.trim() && "Categoría", !aiMentionedDate && "Fecha"].filter(Boolean)
+          : proposal?.mode === "goal"
+            ? [!amountValue(amount) && "Monto objetivo", !merchant.trim() && "Nombre de la meta"].filter(Boolean)
+            : [];
+
+  const proposalCategory = categories.find((category) => category.id === categoryId)?.name;
+  const proposalDate = proposal?.mode === "goal" ? goalTargetDate : aiMentionedDate ? (proposal?.mode === "installment" ? firstInstallmentDate : date) : "";
+  const proposalDetailLabel = proposal?.mode === "income" ? "Fuente" : proposal?.mode === "goal" ? "Meta" : proposal?.mode === "payment" ? "Concepto" : proposal?.mode === "installment" ? "Comercio" : "Categoría";
+  const proposalDetailValue = proposal?.mode === "income" || proposal?.mode === "goal" || proposal?.mode === "payment" || proposal?.mode === "installment" ? merchant : proposalCategory || merchant;
 
   return (
-    <ScreenContainer>
-      <Header title={mode === "income" ? "Agregar ingreso" : mode === "expense" ? "Agregar gasto" : mode === "installment" ? "Compra en cuotas" : mode === "goal" ? "Agregar meta" : "Agregar"} back={mode !== "menu"} onBack={() => router.replace("/(tabs)/add")} />
+    <ScreenContainer backgroundColor={mode === "menu" ? "#191919" : mode === "income" || mode === "expense" || mode === "installment" || mode === "goal" || mode === "ai" ? "#1C1C1B" : undefined} style={mode === "menu" ? styles.menuScreen : mode === "income" || mode === "expense" || mode === "installment" || mode === "goal" || mode === "ai" ? styles.incomeScreen : undefined}>
+      {mode === "income" || mode === "expense" || mode === "installment" || mode === "goal" || mode === "ai" ? <FormHeader title={mode === "income" ? "Agregar Ingreso" : mode === "expense" ? "Agregar Gasto" : mode === "installment" ? "Compra en cuotas" : mode === "goal" ? "Agregar Meta" : "Agregar con IA"} /> : mode !== "menu" ? <Header title="Agregar" back onBack={() => router.replace("/(tabs)/add")} /> : null}
       {mode === "menu" ? (
-        <View style={styles.actions}>
-          <Action icon={<Minus color={colors.white} size={21} />} title="Gasto" onPress={() => router.push("/(tabs)/add-expense")} />
-          <Action icon={<Plus color={colors.white} size={21} />} title="Ingreso" onPress={() => router.push("/(tabs)/add-income")} />
-          <Action icon={<CreditCard color={colors.white} size={21} />} title="Compra en cuotas" onPress={() => router.push("/(tabs)/add-installment")} />
-          <Action icon={<PiggyBank color={colors.white} size={21} />} title="Meta" onPress={() => router.push("/(tabs)/add-goal")} />
-          <Action icon={<Brain color={colors.white} size={21} />} title="Registrar con IA" onPress={() => router.push("/(tabs)/add-ai")} />
+        <View style={styles.menuContent}>
+          <AnimatedMenuGlow />
+          <Text style={styles.menuTitle}>Agregar</Text>
+          <View style={styles.actions}>
+            <Action title="Gasto" onPress={() => router.push("/(tabs)/add-expense")} />
+            <Action title="Ingreso" onPress={() => router.push("/(tabs)/add-income")} />
+            <Action title={"Compra\nen cuotas"} onPress={() => router.push("/(tabs)/add-installment")} />
+            <Action title="Metas" onPress={() => router.push("/(tabs)/add-goal")} />
+            <Action title={"Registrar\ncon IA"} onPress={() => router.push("/(tabs)/add-ai")} />
+          </View>
         </View>
       ) : null}
 
       {mode === "expense" ? (
-        <View style={styles.form}>
-          <AmountInput currency={currency} error={errors.amount} value={amount} onChangeText={(value) => { setAmount(value); setErrors((current) => ({ ...current, amount: "" })); }} />
-          <Input error={errors.merchant} label="Comercio o concepto *" value={merchant} onChangeText={(value) => { setMerchant(value); setErrors((current) => ({ ...current, merchant: "" })); }} />
-          <Text style={styles.label}>Categoría *</Text>
-          <View style={styles.wrap}>
-            {visibleExpenseCategories.map((category) => <CategoryChip category={category} key={category.id} active={categoryId === category.id} onPress={() => { setCategoryId(category.id); setErrors((current) => ({ ...current, category: "" })); }} />)}
-            <Chip active={false} label="Más cat." onPress={() => setCategoryListOpen(true)} />
-            <Pressable accessibilityLabel="Crear categoría" accessibilityRole="button" onPress={() => setCategoryModalOpen(true)} style={styles.createCategoryButton}><Plus color={colors.white} size={20} /></Pressable>
-          </View>
+        <View style={styles.incomeForm}>
+          <IncomeAmountInput currency={currency} error={errors.amount} value={amount} onChangeText={(value) => { setAmount(value); setErrors((current) => ({ ...current, amount: "" })); }} />
+          <IncomeDropdown label="Categoría*" open={categoryListOpen} onToggle={() => setCategoryListOpen((value) => !value)} value={expenseCategories.find((item) => item.id === categoryId) ? normalizedCategoryName(expenseCategories.find((item) => item.id === categoryId)!.name) : "Seleccionar categoría"}>
+            {expenseCategories.map((category) => <IncomeDropdownOption key={category.id} label={normalizedCategoryName(category.name)} onPress={() => { setCategoryId(category.id); setMerchant(normalizedCategoryName(category.name)); setCategoryListOpen(false); setErrors((current) => ({ ...current, category: "", merchant: "" })); }} />)}
+            <IncomeDropdownOption label="Agregar opción" onPress={() => { setCategoryListOpen(false); setCategoryModalOpen(true); }} />
+          </IncomeDropdown>
           {errors.category ? <Text style={styles.errorText}>{errors.category}</Text> : null}
-          <View>
-            <Text style={styles.label}>Medio de pago *</Text>
-            <View style={styles.wrap}>{paymentMethods.map(([value, label]) => <Chip active={paymentMethod === value} key={value} label={label} onPress={() => { setPaymentMethod(value); setErrors((current) => ({ ...current, paymentMethod: "" })); }} />)}</View>
+          <View><IncomeDropdown label="Medio de pago*" open={paymentMethodOpen} onToggle={() => setPaymentMethodOpen((value) => !value)} value={paymentMethods.find(([value]) => value === paymentMethod)?.[1] || "Efectivo"}>
+            {paymentMethods.map(([value, label]) => <IncomeDropdownOption key={value} label={label} onPress={() => { setPaymentMethod(value); setPaymentMethodOpen(false); setErrors((current) => ({ ...current, paymentMethod: "" })); }} />)}
+          </IncomeDropdown>
             {paymentMethod === "other" ? <Input error={errors.customPaymentMethod} label="Especificar medio de pago *" value={customPaymentMethod} onChangeText={(value) => { setCustomPaymentMethod(value); setErrors((current) => ({ ...current, customPaymentMethod: "" })); }} /> : null}
             {errors.paymentMethod ? <Text style={styles.errorText}>{errors.paymentMethod}</Text> : null}
           </View>
-          <DatePicker error={errors.date} label="Fecha *" value={date} onChange={(value) => { setDate(value); setErrors((current) => ({ ...current, date: "" })); if (recurring) setNextDueDate(nextDate(value, recurrenceFrequency)); }} />
-          <Input label="Nota (opcional)" value={note} onChangeText={setNote} />
-          <SwitchField active={recurring} label="Este gasto se repite" meta="FinFlow te recordará el próximo pago." onChange={toggleRecurring} />
+          <DatePicker error={errors.date} income label="Fecha*" value={date} onChange={(value) => { setDate(value); setErrors((current) => ({ ...current, date: "" })); if (recurring) setNextDueDate(nextDate(value, recurrenceFrequency)); }} />
+          <IncomeNoteInput value={note} onChangeText={setNote} />
+          <IncomeSwitchField active={recurring} label="Este gasto se repite" meta="FinFlow puede recordarte cuando esperas recibirlo nuevamente." onChange={toggleRecurring} />
           {recurring ? (
-            <View style={styles.morePanel}>
-              <Text style={styles.label}>Frecuencia *</Text>
-              <View style={styles.wrap}>{recurrenceFrequencies.map((item) => <Chip active={recurrenceFrequency === item} key={item} label={item === "weekly" ? "Semanal" : item === "monthly" ? "Mensual" : "Anual"} onPress={() => { setRecurrenceFrequency(item); setNextDueDate(nextDate(date, item)); }} />)}</View>
-              <DatePicker error={errors.nextDueDate} label="Próximo vencimiento *" value={nextDueDate} onChange={setNextDueDate} />
-              <SwitchField active={reminderEnabled} label="Recordarme 24 horas antes" onChange={setReminderEnabled} />
+            <View style={styles.incomeRecurring}>
+              <IncomeDropdown label="Frecuencia*" open={incomeFrequencyOpen} onToggle={() => setIncomeFrequencyOpen((value) => !value)} value={recurrenceFrequency === "weekly" ? "Semanal" : recurrenceFrequency === "monthly" ? "Mensual" : "Anual"}>
+                {recurrenceFrequencies.map((item) => <IncomeDropdownOption key={item} label={item === "weekly" ? "Semanal" : item === "monthly" ? "Mensual" : "Anual"} onPress={() => { setRecurrenceFrequency(item); setNextDueDate(nextDate(date, item)); setIncomeFrequencyOpen(false); }} />)}
+              </IncomeDropdown>
+              <DatePicker error={errors.nextDueDate} income label="Fecha*" value={nextDueDate} onChange={setNextDueDate} />
+              <IncomeSwitchField active={reminderEnabled} label="Recordarme 24 horas antes" onChange={setReminderEnabled} red />
             </View>
           ) : null}
-          <View>
-            <Text style={styles.label}>Adjuntar comprobante (opcional)</Text>
-            <Chip active={Boolean(receiptUrl)} label={receiptName || "Seleccionar imagen o archivo"} onPress={attachReceipt} />
-          </View>
-          <PrimaryButton disabled={loading || submitting} onPress={() => saveMovement("expense")}>{loading || submitting ? "Guardando..." : "Guardar gasto"}</PrimaryButton>
+          <Pressable accessibilityRole="button" disabled={loading || submitting} onPress={() => saveMovement("expense")} style={[styles.incomeSave, (loading || submitting) && styles.incomeSaveDisabled]}><Text style={styles.incomeSaveText}>{loading || submitting ? "Guardando..." : "Guardar"}</Text></Pressable>
         </View>
       ) : null}
 
@@ -613,56 +706,60 @@ export function AddScreen({ initialMode = "menu", initialData }: { initialMode?:
         onIcon={setNewCategoryIcon}
         onName={setNewCategoryName}
         onSave={saveCustomCategory}
-        visible={categoryModalOpen}
+        visible={categoryModalOpen && mode !== "expense" && mode !== "installment"}
       />
-      <CategoryListModal categories={expenseCategories} onClose={() => setCategoryListOpen(false)} onSelect={(category) => { setCategoryId(category.id); setCategoryListOpen(false); setErrors((current) => ({ ...current, category: "" })); }} selected={categoryId} visible={categoryListOpen} />
-      <CategoryModal icon={newCategoryIcon} name={newCategoryName} onClose={() => setIncomeSourceModalOpen(false)} onIcon={setNewCategoryIcon} onName={setNewCategoryName} onSave={saveCustomIncomeSource} title="Nueva fuente" visible={incomeSourceModalOpen} />
-      <CategoryListModal categories={incomeCategories} itemLabel={incomeSourceLabel} onClose={() => setIncomeSourceListOpen(false)} onSelect={(category) => { selectIncomeSource(category); setIncomeSourceListOpen(false); }} selected={categoryId} title="Más fuentes" visible={incomeSourceListOpen} />
+      <CategoryListModal categories={expenseCategories} onClose={() => setCategoryListOpen(false)} onSelect={(category) => { setCategoryId(category.id); setCategoryListOpen(false); setErrors((current) => ({ ...current, category: "" })); }} selected={categoryId} visible={categoryListOpen && mode !== "expense" && mode !== "installment"} />
+      <IncomeCategoryModal name={newCategoryName} onClose={() => setCategoryModalOpen(false)} onName={setNewCategoryName} onSave={saveCustomCategory} visible={categoryModalOpen && mode === "expense"} />
+      <IncomeCategoryModal name={newCategoryName} onClose={() => setCategoryModalOpen(false)} onName={setNewCategoryName} onSave={saveCustomCategory} visible={categoryModalOpen && mode === "installment"} />
+      <IncomeCategoryModal name={newCategoryName} onClose={() => setIncomeSourceModalOpen(false)} onName={setNewCategoryName} onSave={saveCustomIncomeSource} visible={incomeSourceModalOpen} />
       <SimpleNameModal label="Nombre de la tarjeta" name={newCreditCardName} onClose={() => setCreditCardModalOpen(false)} onName={setNewCreditCardName} onSave={saveCreditCard} title="Nueva tarjeta" visible={creditCardModalOpen} />
 
       {mode === "income" ? (
-        <View style={styles.form}>
-          <AmountInput currency={currency} error={errors.amount} value={amount} onChangeText={(value) => { setAmount(value); setErrors((current) => ({ ...current, amount: "" })); }} />
-          <Text style={styles.label}>Fuente *</Text>
-          <View style={styles.wrap}>{visibleIncomeSources.map((category) => <SourceChip active={categoryId === category.id} category={category} key={category.id} onPress={() => selectIncomeSource(category)} />)}</View>
-          <View style={styles.wrap}><Chip active={false} label="Más fuentes" onPress={() => setIncomeSourceListOpen(true)} /><Pressable accessibilityLabel="Crear fuente" accessibilityRole="button" onPress={() => setIncomeSourceModalOpen(true)} style={styles.createCategoryButton}><Plus color={colors.white} size={20} /></Pressable></View>
+        <View style={styles.incomeForm}>
+          <IncomeAmountInput currency={currency} error={errors.amount} value={amount} onChangeText={(value) => { setAmount(value); setErrors((current) => ({ ...current, amount: "" })); }} />
+          <IncomeDropdown label="Categoría*" open={incomeSourceListOpen} onToggle={() => setIncomeSourceListOpen((value) => !value)} value={incomeCategories.find((item) => item.id === categoryId) ? incomeSourceLabel(incomeCategories.find((item) => item.id === categoryId)!) : "Seleccionar categoría"}>
+            {incomeCategories.map((category) => <IncomeDropdownOption key={category.id} label={incomeSourceLabel(category)} onPress={() => { selectIncomeSource(category); setIncomeSourceListOpen(false); }} />)}
+            <IncomeDropdownOption label="Agregar opción" onPress={() => { setIncomeSourceListOpen(false); setIncomeSourceModalOpen(true); }} />
+          </IncomeDropdown>
           {errors.merchant ? <Text style={styles.errorText}>{errors.merchant}</Text> : null}
-          <Text style={styles.label}>Dónde recibiste el dinero *</Text>
-          <View style={styles.wrap}>{incomeDestinations.map(([value, label]) => <Chip active={incomeDestination === value} key={value} label={label} onPress={() => selectIncomeDestination(value)} />)}</View>
+          <IncomeDropdown label="Donde recibiste el dinero*" open={incomeDestinationOpen} onToggle={() => setIncomeDestinationOpen((value) => !value)} value={incomeDestinations.find(([value]) => value === incomeDestination)?.[1] || "Efectivo"}>
+            {incomeDestinations.map(([value, label]) => <IncomeDropdownOption key={value} label={label} onPress={() => { selectIncomeDestination(value); setIncomeDestinationOpen(false); }} />)}
+          </IncomeDropdown>
           {incomeDestination === "bank_account" ? <AccountPicker accounts={accounts.filter((account) => account.type === "bank" || account.type === "savings")} selected={accountId} onSelect={setAccountId} title="Cuenta guardada (opcional)" /> : null}
           {incomeDestination === "digital_wallet" ? <AccountPicker accounts={accounts.filter((account) => account.type === "wallet")} selected={accountId} onSelect={setAccountId} title="Billetera guardada (opcional)" /> : null}
           {incomeDestination === "other" ? <Input error={errors.customIncomeDestination} label="Especificar dónde lo recibiste *" value={customIncomeDestination} onChangeText={(value) => { setCustomIncomeDestination(value); setErrors((current) => ({ ...current, customIncomeDestination: "" })); }} /> : null}
           {errors.incomeDestination ? <Text style={styles.errorText}>{errors.incomeDestination}</Text> : null}
-          <DatePicker error={errors.date} label="Fecha *" value={date} onChange={(value) => { setDate(value); setErrors((current) => ({ ...current, date: "" })); if (recurring) setNextDueDate(nextDate(value, recurrenceFrequency)); }} />
-          <Input label="Nota (opcional)" value={note} onChangeText={setNote} />
-          <SwitchField active={recurring} label="Este ingreso se repite" meta="FinFlow puede recordarte cuándo esperás recibirlo nuevamente." onChange={toggleRecurring} />
-          {recurring ? <View style={styles.morePanel}>
-            <Text style={styles.label}>Frecuencia *</Text>
-            <View style={styles.wrap}>{incomeRecurrenceFrequencies.map((item) => <Chip active={recurrenceFrequency === item} key={item} label={item === "weekly" ? "Semanal" : item === "fortnightly" ? "Quincenal" : item === "monthly" ? "Mensual" : "Anual"} onPress={() => { setRecurrenceFrequency(item); setNextDueDate(nextDate(date, item)); }} />)}</View>
+          <DatePicker error={errors.date} income label="Fecha*" value={date} onChange={(value) => { setDate(value); setErrors((current) => ({ ...current, date: "" })); if (recurring) setNextDueDate(nextDate(value, recurrenceFrequency)); }} />
+          <IncomeNoteInput value={note} onChangeText={setNote} />
+          <IncomeSwitchField active={recurring} label="Este ingreso se repite" meta="FinFlow puede recordarte cuando esperas recibirlo nuevamente." onChange={toggleRecurring} red />
+          {recurring ? <View style={styles.incomeRecurring}>
+            <IncomeDropdown label="Frecuencia*" open={incomeFrequencyOpen} onToggle={() => setIncomeFrequencyOpen((value) => !value)} value={recurrenceFrequency === "weekly" ? "Semanal" : recurrenceFrequency === "fortnightly" ? "Quincenal" : recurrenceFrequency === "monthly" ? "Mensual" : "Anual"}>
+              {incomeRecurrenceFrequencies.map((item) => <IncomeDropdownOption key={item} label={item === "weekly" ? "Semanal" : item === "fortnightly" ? "Quincenal" : item === "monthly" ? "Mensual" : "Anual"} onPress={() => { setRecurrenceFrequency(item); setNextDueDate(nextDate(date, item)); setIncomeFrequencyOpen(false); }} />)}
+            </IncomeDropdown>
             {errors.recurrenceFrequency ? <Text style={styles.errorText}>{errors.recurrenceFrequency}</Text> : null}
-            <DatePicker error={errors.nextDueDate} label="Próxima fecha esperada *" value={nextDueDate} onChange={setNextDueDate} />
-            <SwitchField active={reminderEnabled} label="Recordarme 24 horas antes" onChange={setReminderEnabled} />
+            <DatePicker error={errors.nextDueDate} income label="Fecha*" value={nextDueDate} onChange={setNextDueDate} />
+            <IncomeSwitchField active={reminderEnabled} label="Recordarme 24 horas antes" onChange={setReminderEnabled} red />
           </View> : null}
-          <PrimaryButton disabled={loading || submitting} onPress={() => saveMovement("income")}>{loading || submitting ? "Guardando..." : "Guardar ingreso"}</PrimaryButton>
+          <Pressable accessibilityRole="button" disabled={loading || submitting} onPress={() => saveMovement("income")} style={[styles.incomeSave, (loading || submitting) && styles.incomeSaveDisabled]}><Text style={styles.incomeSaveText}>{loading || submitting ? "Guardando..." : "Guardar"}</Text></Pressable>
         </View>
       ) : null}
 
       {mode === "installment" ? (
-        <View style={styles.form}>
-          <Input label="Comercio o concepto *" value={merchant} onChangeText={setMerchant} />
-          <AmountInput currency={currency} value={amount} onChangeText={setAmount} />
-          <Text style={styles.label}>Tarjeta de crédito *</Text>
-          <View style={styles.wrap}>{creditCardAccounts.map((card) => <IconChip Icon={CreditCard} active={accountId === card.id} key={card.id} label={card.name} onPress={() => { setAccountId(card.id); setCreditCardName(card.name); }} />)}<Pressable accessibilityLabel="Agregar tarjeta" accessibilityRole="button" onPress={() => setCreditCardModalOpen(true)} style={styles.createCategoryButton}><Plus color={colors.white} size={20} /></Pressable></View>
-          <Input label="Cantidad de cuotas *" value={installments} onChangeText={(value) => setInstallments(value.replace(/\D/g, ""))} />
-          <View style={styles.wrap}>{[3, 6, 10, 12].map((item) => <Chip active={Number(installments) === item} key={item} label={String(item)} onPress={() => setInstallments(String(item))} />)}</View>
-          {amountValue(amount) > 0 && Number(installments) > 0 ? <Text style={styles.lead}>{installments} cuotas de {formatMoney(Math.floor((amountValue(amount) / Number(installments)) * 100) / 100, currency, false)}{amountValue(amount) % Number(installments) ? "; la última se ajusta para completar el total" : ""}</Text> : null}
-          <DatePicker label="Primera cuota *" value={firstInstallmentDate} onChange={setFirstInstallmentDate} />
-          <Text style={styles.label}>Categoría *</Text>
-          <View style={styles.wrap}>{visibleExpenseCategories.map((category) => <CategoryChip active={categoryId === category.id} category={category} key={category.id} onPress={() => setCategoryId(category.id)} />)}<Chip active={false} label="Más cat." onPress={() => setCategoryListOpen(true)} /><Pressable accessibilityLabel="Crear categoría" accessibilityRole="button" onPress={() => setCategoryModalOpen(true)} style={styles.createCategoryButton}><Plus color={colors.white} size={20} /></Pressable></View>
-          <Text style={styles.label}>Recordatorio *</Text>
-          <View style={styles.wrap}>{reminders.map((item) => <Chip key={item} active={reminderDaysBefore === item} label={item === 0 ? "El mismo día" : item === 1 ? "1 día antes" : `${item} días antes`} onPress={() => setReminderDaysBefore(item)} />)}</View>
-          <Input label="Nota (opcional)" value={note} onChangeText={setNote} />
-          <PrimaryButton disabled={loading || submitting} onPress={saveInstallment}>{loading || submitting ? "Guardando..." : "Guardar compra en cuotas"}</PrimaryButton>
+        <View style={styles.incomeForm}>
+          <IncomeAmountInput currency={currency} value={amount} onChangeText={setAmount} />
+          <IncomeSingleInput label="Comercio*" value={merchant} onChangeText={setMerchant} />
+          <IncomeDropdown label="Categoría*" open={categoryListOpen} onToggle={() => setCategoryListOpen((value) => !value)} value={expenseCategories.find((item) => item.id === categoryId) ? normalizedCategoryName(expenseCategories.find((item) => item.id === categoryId)!.name) : "Seleccionar categoría"}>
+            {expenseCategories.map((category) => <IncomeDropdownOption key={category.id} label={normalizedCategoryName(category.name)} onPress={() => { setCategoryId(category.id); setCategoryListOpen(false); }} />)}
+            <IncomeDropdownOption label="Agregar opción" onPress={() => { setCategoryListOpen(false); setCategoryModalOpen(true); }} />
+          </IncomeDropdown>
+          <View><Text style={styles.incomeLabel}>Tarjeta de credito*</Text><View style={styles.installmentCards}>{creditCardAccounts.map((card) => <Pressable key={card.id} onPress={() => { setAccountId(card.id); setCreditCardName(card.name); }} style={[styles.installmentCardChoice, accountId === card.id && styles.installmentCardSelected]}><Text style={styles.installmentCardText}>{card.name}</Text></Pressable>)}<Pressable accessibilityLabel="Agregar tarjeta" accessibilityRole="button" onPress={() => setCreditCardModalOpen(true)} style={styles.installmentAddCard}><Plus color={colors.white} size={24} /></Pressable></View></View>
+          <IncomeDropdown label="Cantidad de cuotas*" open={installmentsOpen} onToggle={() => setInstallmentsOpen((value) => !value)} value={installments}>
+            {[3, 6, 10, 12].map((item) => <IncomeDropdownOption key={item} label={String(item)} onPress={() => { setInstallments(String(item)); setInstallmentsOpen(false); }} />)}
+          </IncomeDropdown>
+          <DatePicker income label="Primera cuota*" value={firstInstallmentDate} onChange={setFirstInstallmentDate} />
+          <IncomeNoteInput value={note} onChangeText={setNote} />
+          <IncomeSwitchField active={reminderDaysBefore === 1} label="Recordarme proxima cuota" onChange={(value) => setReminderDaysBefore(value ? 1 : 0)} red />
+          <Pressable accessibilityRole="button" disabled={loading || submitting} onPress={saveInstallment} style={[styles.incomeSave, (loading || submitting) && styles.incomeSaveDisabled]}><Text style={[styles.incomeSaveText, styles.installmentSaveText]}>{loading || submitting ? "Guardando..." : "Guardar"}</Text></Pressable>
         </View>
       ) : null}
 
@@ -677,57 +774,52 @@ export function AddScreen({ initialMode = "menu", initialData }: { initialMode?:
           <View style={styles.wrap}>{reminders.map((item) => <Chip key={item} active={reminderDaysBefore === item} label={item === 0 ? "El mismo día" : `${item} días antes`} onPress={() => setReminderDaysBefore(item)} />)}</View>
           <Input label="Categoría" value={paymentCategory} onChangeText={setPaymentCategory} />
           <AccountPicker accounts={accounts} selected={accountId} onSelect={setAccountId} title="Cuenta" />
-          <PrimaryButton disabled={loading || submitting} onPress={savePayment}>{loading || submitting ? "Guardando..." : "Guardar pago programado"}</PrimaryButton>
+          <Pressable accessibilityRole="button" disabled={loading || submitting} onPress={savePayment} style={[styles.incomeSave, (loading || submitting) && styles.incomeSaveDisabled]}><Text style={styles.incomeSaveText}>{loading || submitting ? "Guardando..." : "Guardar pago programado"}</Text></Pressable>
         </View>
       ) : null}
 
       {mode === "goal" ? (
-        <View style={styles.form}>
-          <Input error={errors.goalName} label="Nombre de la meta *" placeholder="Ej.: Viaje, computadora, fondo de emergencia" value={merchant} onChangeText={(value) => { setMerchant(value); setErrors((current) => ({ ...current, goalName: "" })); }} />
-          <AmountInput currency={currency} error={errors.goalTarget} label="Monto objetivo *" value={amount} onChangeText={(value) => { setAmount(value); setErrors((current) => ({ ...current, goalTarget: "" })); }} />
-          <AmountInput currency={currency} label="Ya tengo ahorrado (opcional)" value={goalSaved} onChangeText={setGoalSaved} />
-          <DatePicker label="Fecha objetivo (opcional)" minimumDate={todayInput()} optional value={goalTargetDate} onChange={setGoalTargetDate} />
-          <PrimaryButton disabled={loading || submitting} onPress={saveGoal}>{loading || submitting ? "Guardando..." : "Guardar meta"}</PrimaryButton>
+        <View style={styles.goalForm}>
+          <GoalAmountsInput currency={currency} saved={goalSaved} target={amount} onSavedChange={setGoalSaved} onTargetChange={(value) => { setAmount(value); setErrors((current) => ({ ...current, goalTarget: "" })); }} />
+          {errors.goalTarget ? <Text style={styles.errorText}>{errors.goalTarget}</Text> : null}
+          <IncomeSingleInput label="Nombre de la meta*" value={merchant} onChangeText={(value) => { setMerchant(value); setErrors((current) => ({ ...current, goalName: "" })); }} />
+          {errors.goalName ? <Text style={styles.errorText}>{errors.goalName}</Text> : null}
+          <IncomeDropdown label="Medio de pago*" open={paymentMethodOpen} onToggle={() => setPaymentMethodOpen((value) => !value)} value={paymentMethods.find(([value]) => value === paymentMethod)?.[1] || "Efectivo"}>
+            {paymentMethods.map(([value, label]) => <IncomeDropdownOption key={value} label={label} onPress={() => { setPaymentMethod(value); setPaymentMethodOpen(false); }} />)}
+          </IncomeDropdown>
+          <DatePicker income label="Fecha*" minimumDate={todayInput()} value={date} onChange={setDate} />
+          <Pressable accessibilityRole="button" disabled={loading || submitting} onPress={saveGoal} style={[styles.incomeSave, (loading || submitting) && styles.incomeSaveDisabled]}><Text style={styles.incomeSaveText}>{loading || submitting ? "Guardando..." : "Guardar"}</Text></Pressable>
         </View>
       ) : null}
 
       {mode === "ai" ? (
-        <View style={styles.form}>
-          <Text style={styles.lead}>FinFlow arma una ficha y espera tu confirmación.</Text>
-          <Input label="Mensaje" placeholder="Gasté 820 pesos en PedidosYa ayer con la Visa." value={aiText} onChangeText={setAiText} />
-          <PrimaryButton onPress={interpretWithAi}>Preparar ficha</PrimaryButton>
+        <View style={styles.aiForm}>
+          <Text style={styles.aiLead}>FinFlow arma una ficha y espera tu confirmación.</Text>
+          <View><Text style={styles.aiLabel}>Mensaje*</Text><TextInput multiline onChangeText={setAiText} placeholder="Gasté 800 pesos en PedidosYa ayer con la Visa" placeholderTextColor="rgba(255,255,255,0.7)" style={styles.aiMessageInput} textAlignVertical="center" value={aiText} /></View>
+          <Pressable accessibilityRole="button" onPress={interpretWithAi} style={styles.incomeSave}><Text style={styles.incomeSaveText}>Preparar ficha</Text></Pressable>
           {proposal ? (
-            <View style={styles.proposal}>
-              <Text style={styles.proposalTitle}>Revisá los datos</Text>
-              <Text style={styles.proposalLine}>Tipo: {proposal.typeLabel}</Text>
-              {proposal.autoCompleted?.length ? <Text style={styles.proposalLine}>Completado automáticamente: {proposal.autoCompleted.join(", ")}.</Text> : null}
-              {proposalPendingFields.length ? <Text style={styles.errorText}>Necesita confirmación: {proposalPendingFields.join(", ")}.</Text> : null}
-              <AmountInput currency={currency} label={proposal.mode === "goal" ? "Monto objetivo *" : "Monto *"} value={amount} onChangeText={setAmount} />
-              {proposal.mode === "expense" ? <>
-                <Input label="Comercio o concepto *" value={merchant} onChangeText={setMerchant} />
-                <Text style={styles.label}>Categoría *</Text>
-                <View style={styles.wrap}>{visibleExpenseCategories.map((category) => <CategoryChip active={categoryId === category.id} category={category} key={category.id} onPress={() => setCategoryId(category.id)} />)}<Chip active={false} label="Más cat." onPress={() => setCategoryListOpen(true)} /></View>
-                <Text style={styles.label}>Medio de pago *</Text>
-                <View style={styles.wrap}>{paymentMethods.map(([value, label]) => <Chip active={paymentMethod === value} key={value} label={label} onPress={() => setPaymentMethod(value)} />)}</View>
-                <DatePicker label="Fecha *" value={date} onChange={setDate} />
-                <Input label="Nota (opcional)" value={note} onChangeText={setNote} />
-                <SwitchField active={recurring} label="Este gasto se repite" meta="FinFlow te recordará el próximo pago." onChange={toggleRecurring} />
-                {recurring ? <View style={styles.morePanel}><Text style={styles.label}>Frecuencia *</Text><View style={styles.wrap}>{recurrenceFrequencies.map((item) => <Chip active={recurrenceFrequency === item} key={item} label={item === "weekly" ? "Semanal" : item === "monthly" ? "Mensual" : "Anual"} onPress={() => { setRecurrenceFrequency(item); setNextDueDate(nextDate(date, item)); }} />)}</View><DatePicker label="Próximo vencimiento *" value={nextDueDate} onChange={setNextDueDate} /><SwitchField active={reminderEnabled} label="Recordarme 24 horas antes" onChange={setReminderEnabled} /></View> : null}
-              </> : null}
-              {proposal.mode === "income" ? <>
-                <Text style={styles.label}>Fuente *</Text><View style={styles.wrap}>{incomeSources.map((source) => <Chip active={merchant === source} key={source} label={source} onPress={() => setMerchant(source)} />)}</View>
-                <AccountPicker accounts={accounts} selected={accountId} onSelect={setAccountId} title="Dónde recibiste el dinero *" />
-                <DatePicker label="Fecha *" value={date} onChange={setDate} />
-                <Input label="Nota (opcional)" value={note} onChangeText={setNote} />
-              </> : null}
-              {proposal.mode === "installment" ? <><Input label="Comercio o concepto *" value={merchant} onChangeText={setMerchant} /><Input label="Cantidad de cuotas *" value={installments} onChangeText={(value) => setInstallments(value.replace(/\D/g, ""))} />{amountValue(amount) && Number(installments) ? <Text style={styles.lead}>{installments} cuotas de {formatMoney(amountValue(amount) / Number(installments), currency, false)}</Text> : null}<DatePicker label="Primera cuota *" value={firstInstallmentDate} onChange={setFirstInstallmentDate} /><Text style={styles.label}>Categoría *</Text><View style={styles.wrap}>{visibleExpenseCategories.map((category) => <CategoryChip active={categoryId === category.id} category={category} key={category.id} onPress={() => setCategoryId(category.id)} />)}</View></> : null}
-              {proposal.mode === "payment" ? <><Input label="Concepto *" value={merchant} onChangeText={setMerchant} /><Input label="Categoría *" value={paymentCategory} onChangeText={setPaymentCategory} /><DatePicker label="Próximo vencimiento *" value={date} onChange={setDate} /><SwitchField active={reminderDaysBefore === 1} label="Recordarme 24 horas antes" onChange={(value) => setReminderDaysBefore(value ? 1 : 0)} /></> : null}
-              {proposal.mode === "goal" ? <><Input label="Nombre de la meta *" value={merchant} onChangeText={setMerchant} /><AmountInput currency={currency} label="Ya tengo ahorrado (opcional)" value={goalSaved} onChangeText={setGoalSaved} /><DatePicker label="Fecha objetivo (opcional)" minimumDate={todayInput()} optional value={goalTargetDate} onChange={setGoalTargetDate} /></> : null}
-              {!proposalComplete ? <Text style={styles.errorText}>Completá los campos obligatorios pendientes para confirmar.</Text> : null}
-              <PrimaryButton disabled={!proposalComplete || loading || submitting} onPress={confirmProposal}>{loading || submitting ? "Guardando..." : "Confirmar"}</PrimaryButton>
-              <Pressable accessibilityRole="button" onPress={correctProposal} style={styles.secondaryButton}>
-                <Text style={styles.secondaryText}>Corregir</Text>
+            <View style={styles.aiReview}>
+              <Pressable accessibilityRole="button" onPress={() => setProposalExpanded((value) => !value)} style={styles.aiReviewHeader}>
+                <View style={styles.aiReviewIcon}>{proposalExpanded ? <ChevronDown color={colors.white} size={16} /> : <ArrowRight color={colors.white} size={16} />}</View>
+                <Text style={styles.aiReviewTitle}>Revisá los datos</Text>
               </Pressable>
+              {proposalExpanded ? (
+                <View style={styles.aiReviewBody}>
+                  <Text style={styles.aiReviewMuted}>Completado automáticamente</Text>
+                  <Text style={styles.aiReviewLine}>Tipo: {proposal.typeLabel}</Text>
+                  <View style={styles.aiInlineRow}><Text style={styles.aiReviewLine}>Monto: </Text>{proposalEditing && !amountValue(amount) ? <TextInput autoFocus keyboardType="decimal-pad" onChangeText={(value) => setAmount(cleanAmount(value))} placeholder="Escribí el monto" placeholderTextColor="rgba(255,255,255,0.45)" style={styles.aiInlineValue} value={amount} /> : <Text style={styles.aiReviewLine}>{amountValue(amount) ? formatMoney(amountValue(amount), currency, false) : "Sin indicar"}</Text>}</View>
+                  <View style={styles.aiInlineRow}><Text style={styles.aiReviewLine}>{proposalDetailLabel}: </Text>{proposalEditing && !proposalDetailValue ? <TextInput onChangeText={updateAiDetail} placeholder="Escribí el dato" placeholderTextColor="rgba(255,255,255,0.45)" style={styles.aiInlineValue} value={aiDetailDraft} /> : <Text style={styles.aiReviewLine}>{proposalDetailValue || "Sin indicar"}</Text>}</View>
+                  <View style={styles.aiInlineRow}><Text style={styles.aiReviewLine}>Fecha: </Text>{proposalEditing && !proposalDate ? <TextInput keyboardType="numbers-and-punctuation" onChangeText={(value) => { setDate(value); setAiMentionedDate(Boolean(value.trim())); }} placeholder="AAAA-MM-DD" placeholderTextColor="rgba(255,255,255,0.45)" style={styles.aiInlineValue} value={aiMentionedDate ? date : ""} /> : <Text style={styles.aiReviewLine}>{proposalDate ? new Date(`${proposalDate}T12:00:00`).toLocaleDateString("es-UY") : "Sin indicar"}</Text>}</View>
+                  {proposal.mode === "expense" ? <Text style={styles.aiReviewLine}>Método de pago: {paymentMethods.find(([value]) => value === paymentMethod)?.[1] || "Sin indicar"}</Text> : null}
+                  {proposal.mode === "expense" ? <Text style={styles.aiReviewLine}>Cuota: No</Text> : null}
+                  {proposalPendingFields.length ? <Text style={styles.aiMissingNotice}>Faltó indicar: {proposalPendingFields.join(", ").toLocaleLowerCase("es-UY")}.</Text> : null}
+                  <View style={styles.aiReviewActions}>
+                    <Pressable accessibilityLabel="Editar datos" accessibilityRole="button" onPress={correctProposal} style={styles.aiReviewActionButton}><Pencil color="#1C1C1B" size={22} strokeWidth={2.5} /></Pressable>
+                    <Pressable accessibilityLabel="Descartar ficha" accessibilityRole="button" onPress={discardProposal} style={styles.aiReviewActionButton}><Trash2 color="#1C1C1B" size={23} strokeWidth={2.5} /></Pressable>
+                  </View>
+                  <Pressable accessibilityRole="button" disabled={!proposalComplete || proposalPendingFields.length > 0 || loading || submitting} onPress={confirmProposal} style={[styles.aiConfirmButton, (!proposalComplete || proposalPendingFields.length > 0 || loading || submitting) && styles.aiReviewActionDisabled]}><Text style={styles.aiConfirmText}>{submitting ? "Guardando..." : "Confirmar"}</Text></Pressable>
+                </View>
+              ) : null}
             </View>
           ) : null}
         </View>
@@ -740,13 +832,40 @@ export default function Add() {
   return <AddScreen initialMode="menu" />;
 }
 
-function Action({ icon, onPress, title }: { icon: React.ReactNode; onPress: () => void; title: string }) {
+function Action({ onPress, title }: { onPress: () => void; title: string }) {
   return (
     <Pressable accessibilityRole="button" onPress={onPress} style={styles.action}>
-      {icon}
+      <View style={styles.actionArrow}><ArrowUpRight color={colors.white} size={22} strokeWidth={1.8} /></View>
       <Text style={styles.actionTitle}>{title}</Text>
     </Pressable>
   );
+}
+
+function AnimatedMenuGlow() {
+  const grain = useMemo(() => {
+    const random = (seed: number) => {
+      const value = Math.sin(seed * 12.9898) * 43758.5453;
+      return value - Math.floor(value);
+    };
+    return Array.from({ length: 220 }, (_, index) => ({
+      left: random(index + 7) * 100,
+      opacity: 0.018 + random(index + 43) * 0.022,
+      size: 0.5 + random(index + 79) * 0.55,
+      top: random(index + 19) * 100
+    }));
+  }, []);
+
+  return <View pointerEvents="none" style={styles.menuGlow}>
+    <LiquidGradientBackground />
+    <LinearGradient colors={["#191919", "#191919", "rgba(25,25,25,0.99)", "rgba(25,25,25,0.7)", "rgba(25,25,25,0)"]} end={{ x: 0.5, y: 1 }} locations={[0, 0.58, 0.7, 0.86, 1]} start={{ x: 0.5, y: 0 }} style={StyleSheet.absoluteFill} />
+    <LinearGradient colors={["rgba(25,25,25,0.86)", "rgba(25,25,25,0.68)", "rgba(25,25,25,0.24)", "rgba(25,25,25,0)"]} end={{ x: 1, y: 0.68 }} locations={[0, 0.5, 0.84, 1]} start={{ x: 0, y: 0.68 }} style={StyleSheet.absoluteFill} />
+    <LinearGradient colors={["rgba(16,0,0,0)", "rgba(52,4,1,0.78)", "rgba(108,20,4,0.92)", "rgba(166,49,11,0.96)", "rgba(198,139,43,0.96)"]} end={{ x: 0.96, y: 0.84 }} locations={[0, 0.4, 0.6, 0.77, 0.9]} start={{ x: 0.46, y: 0.5 }} style={StyleSheet.absoluteFill} />
+    <View style={styles.menuGrain}>{grain.map((dot, index) => <View key={index} style={[styles.menuGrainDot, { height: dot.size, left: `${dot.left}%`, opacity: dot.opacity, top: `${dot.top}%`, width: dot.size }]} />)}</View>
+  </View>;
+}
+
+function FormHeader({ title }: { title: string }) {
+  return <View style={styles.incomeHeader}><Pressable accessibilityLabel="Volver" accessibilityRole="button" onPress={() => router.replace("/(tabs)/add")} style={styles.incomeBack}><ArrowLeft color={colors.white} size={16} /></Pressable><Text style={styles.incomeHeaderTitle}>{title}</Text></View>;
 }
 
 function AccountPicker({ accounts, error, onSelect, selected, title }: { accounts: Array<{ id: string; name: string }>; error?: string; onSelect: (value: string) => void; selected: string; title: string }) {
@@ -762,6 +881,65 @@ function AccountPicker({ accounts, error, onSelect, selected, title }: { account
 function AmountInput({ currency = "UYU", error, label = "Monto *", onChangeText, value }: { currency?: Currency; error?: string; label?: string; onChangeText: (value: string) => void; value: string }) {
   const symbol = currency === "UYU" ? "$U" : currency === "USD" ? "US$" : "€";
   return <View><Text style={styles.label}>{label}</Text><TextInput keyboardType="decimal-pad" onChangeText={(text) => onChangeText(cleanAmount(text))} placeholder={`${symbol} 0,00`} placeholderTextColor={colors.transparentWhite} style={styles.amountInput} value={value} />{error ? <Text style={styles.errorText}>{error}</Text> : null}</View>;
+}
+
+function GoalAmountsInput({ currency, onSavedChange, onTargetChange, saved, target }: { currency: Currency; onSavedChange: (value: string) => void; onTargetChange: (value: string) => void; saved: string; target: string }) {
+  const symbol = currency === "UYU" ? "$U" : currency === "USD" ? "US$" : "€";
+  const symbolWidth = currency === "USD" ? 57 : currency === "UYU" ? 43 : 22;
+  const amountColumn = (label: string, value: string, onChange: (value: string) => void) => {
+    const displayedValue = value || "0,00";
+    const inputWidth = Math.min(112, Math.max(76, displayedValue.length * 18));
+    const blockWidth = symbolWidth + 4 + inputWidth;
+    return <View style={styles.goalAmountColumn}><View style={{ width: blockWidth }}>
+      <Text numberOfLines={1} style={styles.goalAmountLabel}>{label}</Text>
+      <View style={styles.goalAmountRow}><Text style={[styles.goalAmountSymbol, { width: symbolWidth }]}>{symbol}</Text><TextInput keyboardType="decimal-pad" onChangeText={(text) => onChange(cleanAmount(text))} placeholder="0,00" placeholderTextColor={colors.white} style={[styles.goalAmountInput, { width: inputWidth }]} value={value} /></View>
+    </View></View>;
+  };
+  return <View style={styles.goalAmountCard}>
+    <AmountLavaBackground />
+    <View style={styles.goalAmountContent}>
+      {amountColumn("Monto objetivo*", target, onTargetChange)}
+      {amountColumn("Ya tengo ahorrado", saved, onSavedChange)}
+    </View>
+  </View>;
+}
+
+function IncomeAmountInput({ currency, error, onChangeText, value }: { currency: Currency; error?: string; onChangeText: (value: string) => void; value: string }) {
+  const symbol = currency === "UYU" ? "$U" : currency === "USD" ? "US$" : "€";
+  const displayedValue = value || "0,00";
+  const symbolWidth = currency === "USD" ? 92 : currency === "UYU" ? 72 : 34;
+  const inputWidth = Math.min(230, Math.max(112, displayedValue.length * 29));
+  const amountBlockWidth = symbolWidth + inputWidth;
+  return <View><View style={styles.incomeAmountCard}>
+    <AmountLavaBackground />
+    <View style={styles.incomeAmountContent}><View style={[styles.incomeAmountBlock, { width: amountBlockWidth }]}><Text style={styles.incomeAmountLabel}>Monto</Text>
+        <View style={styles.incomeAmountRow}><Text style={[styles.incomeAmountSymbol, { width: symbolWidth }]}>{symbol}</Text><TextInput keyboardType="decimal-pad" onChangeText={(text) => onChangeText(cleanAmount(text))} placeholder="0,00" placeholderTextColor={colors.white} style={[styles.incomeAmountInput, { width: inputWidth }]} value={value} /></View>
+      </View></View>
+  </View>{error ? <Text style={styles.errorText}>{error}</Text> : null}</View>;
+}
+
+function IncomeDropdown({ children, label, onToggle, open, value }: { children: React.ReactNode; label: string; onToggle: () => void; open: boolean; value: string }) {
+  return <View><Text style={styles.incomeLabel}>{label}</Text><Pressable accessibilityRole="button" onPress={onToggle} style={styles.incomeSelect}><Text numberOfLines={1} style={styles.incomeSelectText}>{value}</Text><ChevronDown color={colors.white} size={23} /></Pressable>{open ? <View style={styles.incomeOptions}>{children}</View> : null}</View>;
+}
+
+function IncomeDropdownOption({ label, onPress }: { label: string; onPress: () => void }) {
+  return <Pressable accessibilityRole="button" onPress={onPress} style={styles.incomeOption}><Text style={styles.incomeOptionText}>{label}</Text></Pressable>;
+}
+
+function IncomeNoteInput({ onChangeText, value }: { onChangeText: (value: string) => void; value: string }) {
+  return <View><Text style={styles.incomeLabel}>Nota</Text><TextInput multiline onChangeText={onChangeText} style={styles.incomeNote} textAlignVertical="top" value={value} /></View>;
+}
+
+function IncomeSingleInput({ label, onChangeText, value }: { label: string; onChangeText: (value: string) => void; value: string }) {
+  return <View><Text style={styles.incomeLabel}>{label}</Text><TextInput onChangeText={onChangeText} style={styles.incomeSelect} value={value} /></View>;
+}
+
+function IncomeSwitchField({ active, label, meta, onChange, red = false }: { active: boolean; label: string; meta?: string; onChange: (value: boolean) => void | Promise<void>; red?: boolean }) {
+  return <View style={styles.incomeSwitchRow}><View style={styles.switchCopy}><Text style={styles.incomeSwitchLabel}>{label}</Text>{meta ? <Text style={styles.incomeSwitchMeta}>{meta}</Text> : null}</View><Switch onValueChange={onChange} thumbColor={active ? "#A33227" : "#D9D9D9"} trackColor={{ false: "#5A5A58", true: "#BB3C2E" }} value={active} /></View>;
+}
+
+function IncomeCategoryModal({ name, onClose, onName, onSave, visible }: { name: string; onClose: () => void; onName: (value: string) => void; onSave: () => void; visible: boolean }) {
+  return <Modal animationType="fade" onRequestClose={onClose} transparent visible={visible}><View style={styles.modalBackdrop}><View style={styles.incomeCategoryModal}><Text style={styles.proposalTitle}>Agregar categoría</Text><Input autoFocus label="Nombre" onChangeText={onName} value={name} /><Pressable disabled={!name.trim()} onPress={onSave} style={[styles.incomeSave, !name.trim() && styles.incomeSaveDisabled]}><Text style={styles.incomeSaveText}>Agregar</Text></Pressable><Pressable onPress={onClose} style={styles.secondaryButton}><Text style={styles.secondaryText}>Cancelar</Text></Pressable></View></View></Modal>;
 }
 
 function Chip({ active, label, onPress }: { active: boolean; label: string; onPress: () => void }) {
@@ -806,7 +984,7 @@ function Input({ error, label, ...props }: { error?: string; label: string } & R
   );
 }
 
-function DatePicker({ error, label, minimumDate, onChange, optional = false, value }: { error?: string; label: string; minimumDate?: string; onChange: (value: string) => void; optional?: boolean; value: string }) {
+function DatePicker({ error, income = false, label, minimumDate, onChange, optional = false, value }: { error?: string; income?: boolean; label: string; minimumDate?: string; onChange: (value: string) => void; optional?: boolean; value: string }) {
   const [open, setOpen] = useState(false);
   const selectedDate = value ? new Date(`${value}T12:00:00`) : new Date();
   function handleChange(event: DateTimePickerEvent, selected?: Date) {
@@ -819,8 +997,8 @@ function DatePicker({ error, label, minimumDate, onChange, optional = false, val
   }
   return (
     <View>
-      <Text style={styles.label}>{label}</Text>
-      <Pressable accessibilityRole="button" onPress={() => setOpen(true)} style={[styles.input, styles.dateInput]}>
+      <Text style={income ? styles.incomeLabel : styles.label}>{label}</Text>
+      <Pressable accessibilityRole="button" onPress={() => setOpen(true)} style={[styles.input, styles.dateInput, income && styles.incomeSelect]}>
         <Text style={styles.inputText}>{value ? new Date(`${value}T12:00:00`).toLocaleDateString("es-UY", { day: "2-digit", month: "2-digit", year: "numeric" }) : optional ? "Sin fecha" : new Date().toLocaleDateString("es-UY", { day: "2-digit", month: "2-digit", year: "numeric" })}</Text>
         <CalendarDays color={colors.transparentWhite} size={18} />
       </Pressable>
@@ -836,7 +1014,7 @@ function Toggle({ active, label, onPress }: { active: boolean; label: string; on
 }
 
 function SwitchField({ active, label, meta, onChange }: { active: boolean; label: string; meta?: string; onChange: (value: boolean) => void | Promise<void> }) {
-  return <View style={styles.switchRow}><View style={styles.switchCopy}><Text style={styles.switchLabel}>{label}</Text>{meta ? <Text style={styles.switchMeta}>{meta}</Text> : null}</View><Switch onValueChange={onChange} value={active} /></View>;
+  return <View style={styles.switchRow}><View style={styles.switchCopy}><Text style={styles.switchLabel}>{label}</Text>{meta ? <Text style={styles.switchMeta}>{meta}</Text> : null}</View><Switch onValueChange={onChange} thumbColor={active ? "#A33227" : "#D9D9D9"} trackColor={{ false: "#5A5A58", true: "#BB3C2E" }} value={active} /></View>;
 }
 
 function CategoryModal({ icon, name, onClose, onIcon, onName, onSave, title = "Nueva categoría", visible }: { icon: typeof categoryIcons[number]; name: string; onClose: () => void; onIcon: (value: typeof categoryIcons[number]) => void; onName: (value: string) => void; onSave: () => void; title?: string; visible: boolean }) {
@@ -853,28 +1031,40 @@ function SimpleNameModal({ label, name, onClose, onName, onSave, title, visible 
 
 const styles = StyleSheet.create({
   action: {
+    backgroundColor: "#595958",
+    aspectRatio: 1.07,
+    borderRadius: 28,
+    justifyContent: "flex-end",
+    overflow: "hidden",
+    paddingBottom: 18,
+    paddingHorizontal: 17,
+    position: "relative",
+    width: "46.7%"
+  },
+  actionArrow: {
     alignItems: "center",
-    backgroundColor: colors.appGrayDark,
-    borderColor: colors.appGrayBorder,
-    borderRadius: 8,
-    borderWidth: 1,
-    gap: spacing.sm,
-    minHeight: 94,
+    backgroundColor: "#1C1C1B",
+    borderRadius: 21,
+    height: 42,
     justifyContent: "center",
-    padding: spacing.md,
-    width: "48%"
+    position: "absolute",
+    right: 14,
+    top: 14,
+    width: 42
   },
   actions: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: spacing.sm,
-    marginTop: spacing.xl
+    gap: 22,
+    marginTop: 32
   },
   actionTitle: {
     ...typography.body,
     color: colors.white,
+    fontSize: 22,
     fontWeight: "800",
-    textAlign: "center"
+    lineHeight: 21,
+    textAlign: "left"
   },
   active: {
     backgroundColor: colors.white,
@@ -890,6 +1080,134 @@ const styles = StyleSheet.create({
     fontSize: 52,
     minHeight: 78,
     paddingVertical: 0
+  },
+  aiForm: {
+    gap: 26,
+    marginTop: 30
+  },
+  aiLabel: {
+    ...typography.body,
+    color: "rgba(255,255,255,0.78)",
+    fontSize: 15,
+    lineHeight: 20,
+    marginBottom: 11
+  },
+  aiLead: {
+    ...typography.body,
+    color: "rgba(255,255,255,0.78)",
+    fontSize: 15,
+    lineHeight: 21
+  },
+  aiMessageInput: {
+    ...typography.body,
+    backgroundColor: "#5A5A59",
+    borderRadius: 14,
+    color: colors.white,
+    fontSize: 15,
+    lineHeight: 20,
+    minHeight: 52,
+    paddingHorizontal: 17,
+    paddingVertical: 12
+  },
+  aiReview: {
+    marginHorizontal: -17,
+    marginTop: 22
+  },
+  aiReviewHeader: {
+    alignItems: "center",
+    backgroundColor: "#595958",
+    flexDirection: "row",
+    minHeight: 46,
+    paddingHorizontal: 20
+  },
+  aiReviewIcon: {
+    alignItems: "center",
+    backgroundColor: "#1C1C1B",
+    borderRadius: 15,
+    height: 30,
+    justifyContent: "center",
+    marginRight: 18,
+    width: 30
+  },
+  aiReviewTitle: {
+    ...typography.body,
+    color: colors.white,
+    fontSize: 15,
+    fontWeight: "600"
+  },
+  aiReviewBody: {
+    gap: 8,
+    paddingHorizontal: 20,
+    paddingTop: 14
+  },
+  aiReviewMuted: {
+    ...typography.body,
+    color: "rgba(255,255,255,0.78)",
+    fontSize: 15,
+    marginBottom: 4
+  },
+  aiReviewLine: {
+    ...typography.body,
+    color: "rgba(255,255,255,0.78)",
+    fontSize: 15,
+    lineHeight: 19
+  },
+  aiInlineRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    minHeight: 24
+  },
+  aiInlineValue: {
+    ...typography.body,
+    borderBottomColor: "rgba(255,255,255,0.45)",
+    borderBottomWidth: 1,
+    color: "rgba(255,255,255,0.9)",
+    flex: 1,
+    fontSize: 15,
+    lineHeight: 19,
+    minHeight: 28,
+    padding: 0
+  },
+  aiMissingNotice: {
+    ...typography.body,
+    color: colors.negative,
+    fontSize: 15,
+    lineHeight: 19,
+    marginTop: 6
+  },
+  aiReviewActions: {
+    flexDirection: "row",
+    gap: 6,
+    marginTop: 12
+  },
+  aiReviewActionButton: {
+    alignItems: "center",
+    backgroundColor: "#D7D7D7",
+    borderRadius: 12,
+    height: 52,
+    justifyContent: "center",
+    width: 52
+  },
+  aiReviewActionDisabled: {
+    opacity: 0.38
+  },
+  aiConfirmButton: {
+    alignItems: "center",
+    backgroundColor: "#BDBDBD",
+    borderRadius: 28,
+    justifyContent: "center",
+    minHeight: 48
+  },
+  aiConfirmText: {
+    ...typography.button,
+    color: "#1C1C1B",
+    fontWeight: "800"
+  },
+  aiCorrectText: {
+    ...typography.body,
+    color: "rgba(255,255,255,0.78)",
+    fontSize: 15,
+    textAlign: "center"
   },
   chip: {
     borderColor: colors.appGrayBorder,
@@ -913,9 +1231,247 @@ const styles = StyleSheet.create({
     gap: spacing.md,
     marginTop: spacing.xl
   },
+  goalAmountCard: {
+    borderRadius: 28,
+    height: 162,
+    overflow: "hidden"
+  },
+  goalAmountColumn: {
+    alignItems: "center",
+    flex: 1,
+    minWidth: 0
+  },
+  goalAmountContent: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: "center",
+    flexDirection: "row"
+  },
+  goalAmountInput: {
+    ...typography.display,
+    color: colors.white,
+    fontSize: 34,
+    fontWeight: "700",
+    lineHeight: 40,
+    minHeight: 45,
+    paddingHorizontal: 3,
+    paddingVertical: 0
+  },
+  goalAmountLabel: {
+    ...typography.body,
+    color: "rgba(255,255,255,0.8)",
+    fontSize: 12,
+    lineHeight: 18
+  },
+  goalAmountRow: {
+    alignItems: "center",
+    flexDirection: "row"
+  },
+  goalAmountSymbol: {
+    ...typography.display,
+    color: colors.white,
+    fontSize: 34,
+    fontWeight: "700",
+    lineHeight: 40,
+    marginRight: 4
+  },
+  goalForm: {
+    gap: 22,
+    marginTop: 30
+  },
+  menuContent: {
+    flex: 1,
+    position: "relative",
+    zIndex: 0
+  },
+  menuGlow: {
+    bottom: -180,
+    left: -20,
+    overflow: "hidden",
+    position: "absolute",
+    right: -20,
+    top: -28,
+    zIndex: 0
+  },
+  menuGrain: {
+    ...StyleSheet.absoluteFillObject
+  },
+  menuGrainDot: {
+    backgroundColor: colors.white,
+    borderRadius: 1,
+    position: "absolute"
+  },
+  menuScreen: {
+    backgroundColor: "#191919",
+    paddingHorizontal: 20,
+    paddingTop: 28
+  },
+  menuTitle: {
+    ...typography.title,
+    color: colors.white,
+    fontSize: 22,
+    fontWeight: "500",
+    lineHeight: 25
+  },
+  incomeScreen: {
+    backgroundColor: "#1C1C1B",
+    paddingBottom: 56,
+    paddingHorizontal: 17,
+    paddingTop: 20
+  },
+  incomeHeader: { alignItems: "center", flexDirection: "row", minHeight: 46 },
+  incomeBack: { alignItems: "center", height: 40, justifyContent: "center", width: 20 },
+  incomeHeaderTitle: { ...typography.title, color: colors.white, marginLeft: 3 },
+  incomeForm: {
+    gap: 22,
+    marginTop: 30
+  },
+  incomeAmountCard: {
+    borderRadius: 28,
+    height: 162,
+    overflow: "hidden"
+  },
+  incomeAmountContent: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: "center",
+    justifyContent: "center"
+  },
+  incomeAmountBlock: { alignSelf: "center" },
+  incomeAmountLabel: {
+    ...typography.body,
+    color: "rgba(255,255,255,0.78)",
+    fontSize: 15,
+    lineHeight: 19,
+    textAlign: "left"
+  },
+  incomeAmountRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "flex-start"
+  },
+  incomeAmountSymbol: {
+    ...typography.display,
+    color: colors.white,
+    fontSize: 50,
+    fontWeight: "700",
+    lineHeight: 62
+  },
+  incomeAmountInput: {
+    ...typography.display,
+    color: colors.white,
+    fontSize: 50,
+    fontWeight: "700",
+    lineHeight: 62,
+    minHeight: 66,
+    paddingHorizontal: 0,
+    paddingVertical: 0,
+  },
+  incomeLabel: {
+    ...typography.body,
+    color: "rgba(255,255,255,0.74)",
+    fontSize: 15,
+    lineHeight: 19,
+    marginBottom: 10
+  },
+  incomeSelect: {
+    alignItems: "center",
+    backgroundColor: "#5A5A59",
+    borderColor: "transparent",
+    borderRadius: 14,
+    borderWidth: 0,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    minHeight: 48,
+    paddingHorizontal: 16
+  },
+  incomeSelectText: {
+    ...typography.body,
+    color: colors.white,
+    flex: 1,
+    fontSize: 15
+  },
+  incomeOptions: {
+    backgroundColor: "#4D4D4C",
+    borderRadius: 12,
+    marginTop: 6,
+    overflow: "hidden"
+  },
+  incomeOption: {
+    borderBottomColor: "rgba(255,255,255,0.1)",
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    minHeight: 46,
+    justifyContent: "center",
+    paddingHorizontal: 16
+  },
+  incomeOptionText: {
+    ...typography.body,
+    color: colors.white,
+    fontSize: 15
+  },
+  incomeNote: {
+    ...typography.body,
+    backgroundColor: "#5A5A59",
+    borderRadius: 14,
+    color: colors.white,
+    minHeight: 82,
+    padding: 14
+  },
+  incomeSwitchRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 16,
+    minHeight: 50
+  },
+  incomeSwitchLabel: {
+    ...typography.body,
+    color: colors.white,
+    fontSize: 15,
+    fontWeight: "700"
+  },
+  incomeSwitchMeta: {
+    ...typography.label,
+    color: "rgba(255,255,255,0.68)",
+    fontSize: 12,
+    lineHeight: 15,
+    marginTop: 3,
+    maxWidth: 280
+  },
+  incomeRecurring: {
+    gap: 20
+  },
+  incomeSave: {
+    alignItems: "center",
+    backgroundColor: "#BDBDBD",
+    borderRadius: 30,
+    justifyContent: "center",
+    marginTop: 8,
+    minHeight: 52
+  },
+  incomeSaveDisabled: {
+    opacity: 0.52
+  },
+  incomeSaveText: {
+    ...typography.button,
+    color: "#1C1C1B",
+    fontSize: 15,
+    fontWeight: "800"
+  },
+  incomeCategoryModal: {
+    backgroundColor: "#3F403B",
+    borderColor: colors.appGrayBorder,
+    borderRadius: 14,
+    borderWidth: 1,
+    gap: 16,
+    padding: 24
+  },
+  installmentCards: { alignItems: "center", flexDirection: "row", flexWrap: "wrap", gap: 10 },
+  installmentAddCard: { alignItems: "center", backgroundColor: "#5A5A59", borderRadius: 27, height: 54, justifyContent: "center", width: 54 },
+  installmentCardChoice: { backgroundColor: "#5A5A59", borderRadius: 14, justifyContent: "center", minHeight: 48, paddingHorizontal: 16 },
+  installmentCardSelected: { borderColor: "#B7362B", borderWidth: 2 },
+  installmentCardText: { ...typography.body, color: colors.white },
+  installmentSaveText: { color: colors.white, fontWeight: "800" },
   errorText: {
     ...typography.label,
-    color: "#E65C50",
+    color: colors.negative,
     marginTop: spacing.xs
   },
   colorChoice: {
@@ -1025,7 +1581,7 @@ const styles = StyleSheet.create({
   proposalTitle: {
     ...typography.title,
     color: colors.white,
-    fontSize: 20
+    fontSize: 22
   },
   secondaryButton: {
     alignItems: "center",

@@ -6,5 +6,5 @@ import { aiChatSchema } from "../validators/aiValidators";
 
 export async function chat(req: FinFlowRequest, res: Response) {
   const body = parseBody(aiChatSchema, req.body);
-  res.json(await answerFinancialQuestion(req.user!.mongoId, body.message));
+  res.json(await answerFinancialQuestion(req.user!.mongoId, body.message, body.history));
 }

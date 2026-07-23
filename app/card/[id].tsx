@@ -107,7 +107,6 @@ const styles = StyleSheet.create({
   sectionTitle: {
     ...typography.title,
     color: colors.white,
-    fontSize: 20,
     marginTop: spacing.xl
   },
   title: {

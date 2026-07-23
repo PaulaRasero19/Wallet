@@ -26,7 +26,7 @@ const styles = StyleSheet.create({
   title: {
     ...typography.body,
     color: colors.white,
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: "700",
     lineHeight: 17
   }

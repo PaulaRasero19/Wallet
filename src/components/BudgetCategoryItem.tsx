@@ -32,8 +32,7 @@ const styles = StyleSheet.create({
   },
   name: {
     ...typography.body,
-    color: colors.black,
-    fontSize: 14
+    color: colors.black
   },
   amount: {
     ...typography.label,

@@ -11,7 +11,7 @@ function amountFrom(text: string) {
 
 function categoryFrom(text: string): BudgetCategory | "Salary" | "Freelance" | "Other" {
   if (/cobr|salario|sueldo|ingres/i.test(text)) return "Salary";
-  if (/merienda|cafe|caf[eé]|pedido|comida|super/i.test(text)) return "Food";
+  if (/merienda|cafe|caf[eé]|pedidos?\s*ya|rappi|uber\s*eats|delivery|pedido|comida|restaurante|super/i.test(text)) return "Food";
   if (/stm|bondi|bus|uber|taxi/i.test(text)) return "Transport";
   if (/notebook|ropa|compra|shopping/i.test(text)) return "Shopping";
   if (/alquiler|gastos comunes/i.test(text)) return "Housing";
@@ -19,6 +19,9 @@ function categoryFrom(text: string): BudgetCategory | "Salary" | "Freelance" | "
 }
 
 function merchantFrom(text: string) {
+  if (/pedidos?\s*ya/i.test(text)) return "PedidosYa";
+  if (/rappi/i.test(text)) return "Rappi";
+  if (/uber\s*eats/i.test(text)) return "Uber Eats";
   if (/antel/i.test(text)) return "Antel";
   if (/notebook/i.test(text)) return "Notebook";
   if (/merienda/i.test(text)) return "Merienda";

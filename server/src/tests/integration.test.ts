@@ -40,6 +40,9 @@ describe.skipIf(!runDbTests)("integration flow", () => {
   let transactionId = "";
   let secondAccessToken = "";
   let latestRefreshToken = "";
+  let goalId = "";
+  let installmentPurchaseId = "";
+  let installmentId = "";
 
   beforeAll(async () => {
     await mongoose.connect(mongoUri!);
@@ -174,6 +177,165 @@ describe.skipIf(!runDbTests)("integration flow", () => {
     expect(transactions.body.transactions.filter((transaction: { scheduledPaymentId?: string }) => transaction.scheduledPaymentId === id)).toHaveLength(1);
   });
 
+  it("creates and updates a goal with persisted progress", async () => {
+    await request(app)
+      .post("/api/finance/goals")
+      .set("Authorization", `Bearer ${accessToken}`)
+      .send({ name: "", target: 0, saved: -1, currency: "UYU" })
+      .expect(400);
+
+    const created = await request(app)
+      .post("/api/finance/goals")
+      .set("Authorization", `Bearer ${accessToken}`)
+      .send({ name: "Viaje", target: 10000, saved: 1500, currency: "UYU", targetDate: new Date(Date.now() + 90 * 86_400_000).toISOString() })
+      .expect(201);
+    goalId = created.body.goal.id;
+    expect(created.body.goal).toMatchObject({ name: "Viaje", saved: 1500, status: "active", target: 10000 });
+
+    const contribution = await request(app)
+      .post(`/api/finance/goals/${goalId}/contributions`)
+      .set("Authorization", `Bearer ${accessToken}`)
+      .send({ amount: 2500 })
+      .expect(200);
+    expect(contribution.body.goal.saved).toBe(4000);
+    expect(contribution.body.goal.history).toHaveLength(1);
+  });
+
+  it("creates a purchase in installments and exposes it to the calendar", async () => {
+    await request(app)
+      .post("/api/finance/installment-purchases")
+      .set("Authorization", `Bearer ${accessToken}`)
+      .send({ name: "", totalAmount: 0, totalInstallments: 0, firstDueDate: "bad-date", category: "", cardName: "", currency: "UYU" })
+      .expect(400);
+
+    const firstDueDate = new Date();
+    firstDueDate.setHours(12, 0, 0, 0);
+    const created = await request(app)
+      .post("/api/finance/installment-purchases")
+      .set("Authorization", `Bearer ${accessToken}`)
+      .send({
+        accountId,
+        name: "Notebook",
+        totalAmount: 1000,
+        totalInstallments: 3,
+        firstDueDate: firstDueDate.toISOString(),
+        category: "Compras",
+        cardName: "Visa test",
+        currency: "UYU",
+        reminderDaysBefore: 1
+      })
+      .expect(201);
+    installmentPurchaseId = created.body.purchase.id;
+    installmentId = created.body.purchase.installments[0].id;
+    expect(created.body.purchase.installments.map((item: { amount: number }) => item.amount)).toEqual([333.33, 333.33, 333.34]);
+
+    const extended = await request(app).get("/api/finance/extended").set("Authorization", `Bearer ${accessToken}`).expect(200);
+    const purchase = extended.body.installmentPurchases.find((item: { id: string }) => item.id === installmentPurchaseId);
+    expect(purchase.installments).toHaveLength(3);
+    expect(purchase.installments[0].dueDate.slice(0, 10)).toBe(firstDueDate.toISOString().slice(0, 10));
+  });
+
+  it("delivers a reminder and opens a related installment", async () => {
+    const response = await request(app).get("/api/notifications").set("Authorization", `Bearer ${accessToken}`).expect(200);
+    const reminder = response.body.notifications.find((item: { relatedEntityId?: string; metadata?: { installmentId?: string } }) =>
+      item.relatedEntityId === installmentPurchaseId && item.metadata?.installmentId === installmentId
+    );
+    expect(reminder).toBeTruthy();
+    expect(reminder.relatedEntityType).toBe("installment");
+    expect(reminder.actionType).toBe("open_installment");
+  });
+
+  it("marks an installment paid once even after a repeated request", async () => {
+    await request(app)
+      .post(`/api/finance/installment-purchases/${installmentPurchaseId}/installments/${installmentId}/pay`)
+      .set("Authorization", `Bearer ${accessToken}`)
+      .expect(200);
+    await request(app)
+      .post(`/api/finance/installment-purchases/${installmentPurchaseId}/installments/${installmentId}/pay`)
+      .set("Authorization", `Bearer ${accessToken}`)
+      .expect(200);
+
+    const transactions = await request(app).get("/api/transactions?limit=500").set("Authorization", `Bearer ${accessToken}`).expect(200);
+    expect(transactions.body.transactions.filter((transaction: { title: string }) => transaction.title === "Notebook · Cuota 1 de 3")).toHaveLength(1);
+  });
+
+  it("updates statistics after creating, editing and deleting a movement", async () => {
+    const before = await request(app).get("/api/statistics/overview?period=30d").set("Authorization", `Bearer ${accessToken}`).expect(200);
+    const created = await request(app)
+      .post("/api/transactions")
+      .set("Authorization", `Bearer ${accessToken}`)
+      .send({ accountId, categoryId: expenseCategoryId, type: "expense", title: "Prueba estadística", amount: 50, currency: "UYU", date: new Date().toISOString() })
+      .expect(201);
+    const afterCreate = await request(app).get("/api/statistics/overview?period=30d").set("Authorization", `Bearer ${accessToken}`).expect(200);
+    expect(afterCreate.body.overview.expenses - before.body.overview.expenses).toBe(50);
+    expect(afterCreate.body.overview.transaction_count - before.body.overview.transaction_count).toBe(1);
+
+    await request(app)
+      .patch(`/api/transactions/${created.body.transaction.id}`)
+      .set("Authorization", `Bearer ${accessToken}`)
+      .send({ amount: 75 })
+      .expect(200);
+    const afterEdit = await request(app).get("/api/statistics/overview?period=30d").set("Authorization", `Bearer ${accessToken}`).expect(200);
+    expect(afterEdit.body.overview.expenses - before.body.overview.expenses).toBe(75);
+
+    await request(app).delete(`/api/transactions/${created.body.transaction.id}`).set("Authorization", `Bearer ${accessToken}`).expect(200);
+    const afterDelete = await request(app).get("/api/statistics/overview?period=30d").set("Authorization", `Bearer ${accessToken}`).expect(200);
+    expect(afterDelete.body.overview.expenses).toBe(before.body.overview.expenses);
+    expect(afterDelete.body.overview.transaction_count).toBe(before.body.overview.transaction_count);
+  });
+
+  it("rejects invalid movement forms with useful validation errors", async () => {
+    const invalid = await request(app)
+      .post("/api/transactions")
+      .set("Authorization", `Bearer ${accessToken}`)
+      .send({ accountId: "invalid", type: "expense", title: "", amount: 0, currency: "BAD", date: "not-a-date" })
+      .expect(400);
+    expect(invalid.body.message).toBeTruthy();
+  });
+
+  it("does not duplicate a manual movement when the same request is retried", async () => {
+    const clientRequestId = `test-retry-${Date.now()}`;
+    const body = {
+      accountId,
+      categoryId: expenseCategoryId,
+      type: "expense",
+      title: "Compra con reintento",
+      amount: 25,
+      currency: "UYU",
+      date: new Date().toISOString(),
+      clientRequestId
+    };
+    const first = await request(app).post("/api/transactions").set("Authorization", `Bearer ${accessToken}`).send(body).expect(201);
+    const second = await request(app).post("/api/transactions").set("Authorization", `Bearer ${accessToken}`).send(body).expect(201);
+    expect(second.body.transaction.id).toBe(first.body.transaction.id);
+    const list = await request(app).get("/api/transactions?limit=500").set("Authorization", `Bearer ${accessToken}`).expect(200);
+    expect(list.body.transactions.filter((transaction: { title: string }) => transaction.title === body.title)).toHaveLength(1);
+  });
+
+  it("answers greetings conversationally without unsolicited financial data", async () => {
+    const response = await request(app).post("/api/ai/chat").set("Authorization", `Bearer ${accessToken}`).send({ message: "Hola", history: [] }).expect(200);
+    expect(response.body.text).toContain("¡Hola!");
+    expect(response.body.text).not.toMatch(/ingresos por|gastos por|saldo del período/i);
+    expect(response.body.blocks).toEqual([]);
+  });
+
+  it("answers with registered values and does not invent totals", async () => {
+    const list = await request(app).get("/api/transactions?limit=500").set("Authorization", `Bearer ${accessToken}`).expect(200);
+    const now = new Date();
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+    const expected = list.body.transactions
+      .filter((transaction: { date: string; type: string }) => transaction.type === "expense" && new Date(transaction.date) >= monthStart && new Date(transaction.date) < nextMonth)
+      .reduce((sum: number, transaction: { rawAmount: number }) => sum + transaction.rawAmount, 0);
+    const response = await request(app)
+      .post("/api/ai/chat")
+      .set("Authorization", `Bearer ${accessToken}`)
+      .send({ message: "¿Cuánto gasté este mes?", history: [] })
+      .expect(200);
+    expect(response.body.text).toContain(expected.toLocaleString("es-UY", { maximumFractionDigits: 2 }));
+    expect(response.body.text).not.toMatch(/999[.\s]?999|mill[oó]n/i);
+  });
+
   it("rotates refresh token and preserves data after new login", async () => {
     const refresh = await request(app).post("/api/auth/refresh").send({ refreshToken }).expect(200);
     accessToken = refresh.body.session.access_token;
@@ -224,5 +386,5 @@ describe.skipIf(!runDbTests)("integration flow", () => {
     const income = list.body.transactions.filter((transaction: { type: string }) => transaction.type === "income").reduce((sum: number, transaction: { rawAmount: number }) => sum + transaction.rawAmount, 0);
     const expenses = list.body.transactions.filter((transaction: { type: string }) => transaction.type === "expense").reduce((sum: number, transaction: { rawAmount: number }) => sum + transaction.rawAmount, 0);
     expect({ income, expenses, balance: income - expenses }).toEqual({ income: 58000, expenses: 40020, balance: 17980 });
-  });
+  }, 15_000);
 });

@@ -60,7 +60,7 @@ const styles = StyleSheet.create({
   account: {
     ...typography.label,
     color: "rgba(255,255,255,0.68)",
-    fontSize: 11,
+    fontSize: 12,
     lineHeight: 13,
     marginTop: 1,
     maxWidth: 126,
@@ -79,7 +79,7 @@ const styles = StyleSheet.create({
   date: {
     ...typography.label,
     color: "rgba(255,255,255,0.68)",
-    fontSize: 11,
+    fontSize: 12,
     lineHeight: 13
   },
   dot: {
@@ -93,7 +93,7 @@ const styles = StyleSheet.create({
     color: "rgba(255,255,255,0.72)"
   },
   expense: {
-    color: "#E65C50"
+    color: colors.negative
   },
   handle: {
     alignSelf: "center",
@@ -104,7 +104,7 @@ const styles = StyleSheet.create({
     width: 46
   },
   income: {
-    color: "#66C86D"
+    color: colors.positive
   },
   incomeDot: {
     backgroundColor: "rgba(180,180,176,0.92)"
@@ -119,7 +119,7 @@ const styles = StyleSheet.create({
   merchant: {
     ...typography.body,
     color: colors.white,
-    fontSize: 13,
+    fontSize: 15,
     fontWeight: "700",
     lineHeight: 16
   },
@@ -140,7 +140,7 @@ const styles = StyleSheet.create({
   title: {
     ...typography.title,
     color: colors.white,
-    fontSize: 19,
+    fontSize: 22,
     lineHeight: 24
   },
   viewAll: {

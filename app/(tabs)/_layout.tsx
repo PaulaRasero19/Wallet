@@ -1,13 +1,14 @@
 import { useEffect } from "react";
 import { Text, View } from "react-native";
 import { Tabs } from "expo-router";
-import { router } from "expo-router";
+import { router, usePathname } from "expo-router";
 import { FloatingTabBar } from "../../src/components/navigation/FloatingTabBar";
 import { useSessionStore } from "../../src/store/useSessionStore";
 import { colors } from "../../src/theme";
 
 export default function TabLayout() {
   const { profile, status } = useSessionStore();
+  const pathname = usePathname();
 
   useEffect(() => {
     if (status === "loading") return;
@@ -31,7 +32,7 @@ export default function TabLayout() {
   }
 
   return (
-    <Tabs tabBar={(props) => <FloatingTabBar {...props} />} screenOptions={{ headerShown: false, sceneStyle: { backgroundColor: colors.black } }}>
+    <Tabs tabBar={(props) => pathname.endsWith("/ai") || pathname.endsWith("/add-income") || pathname.endsWith("/add-expense") || pathname.endsWith("/add-payment") || pathname.endsWith("/add-installment") || pathname.endsWith("/add-goal") || pathname.endsWith("/add-ai") ? null : <FloatingTabBar {...props} />} screenOptions={{ headerShown: false, sceneStyle: { backgroundColor: colors.black } }}>
       <Tabs.Screen name="overview" options={{ title: "Inicio" }} />
       <Tabs.Screen name="transactions" options={{ title: "Movimientos" }} />
       <Tabs.Screen name="add" options={{ title: "Agregar" }} />

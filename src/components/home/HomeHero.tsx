@@ -90,7 +90,7 @@ const styles = StyleSheet.create({
   hello: {
     ...typography.body,
     color: colors.white,
-    fontSize: 13,
+    fontSize: 12,
     lineHeight: 16
   },
   hero: {
@@ -107,7 +107,7 @@ const styles = StyleSheet.create({
   subtitle: {
     ...typography.body,
     color: colors.white,
-    fontSize: 14,
+    fontSize: 15,
     lineHeight: 18,
     marginTop: 6,
     textAlign: "center"

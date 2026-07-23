@@ -71,6 +71,8 @@ function goalDTO(goal: InstanceType<typeof Goal>) {
     target_date: goal.targetDate ? isoDate(goal.targetDate) : null,
     status: goal.status,
     accent: goal.accent,
+    createdAt: goal.createdAt.toISOString(),
+    created_at: goal.createdAt.toISOString(),
     history: goal.history
   };
 }
@@ -257,6 +259,23 @@ export async function addMoneyToGoal(userId: Types.ObjectId, id: string, amount:
   goal.history.push({ month: new Date().toISOString().slice(0, 7), saved: goal.saved, target: goal.target });
   await goal.save();
   return goalDTO(goal);
+}
+
+export async function updateGoal(userId: Types.ObjectId, id: string, input: Record<string, any>) {
+  const goal = await Goal.findOne({ _id: id, userId });
+  if (!goal) throw new AppError("Meta no encontrada.", 404, "GOAL_NOT_FOUND");
+  if (input.name !== undefined) goal.name = input.name;
+  if (input.target !== undefined) goal.target = input.target;
+  if (input.saved !== undefined) goal.saved = input.saved;
+  if (input.targetDate !== undefined) goal.targetDate = input.targetDate;
+  goal.status = input.status || (goal.saved >= goal.target ? "completed" : "active");
+  await goal.save();
+  return goalDTO(goal);
+}
+
+export async function deleteGoal(userId: Types.ObjectId, id: string) {
+  const goal = await Goal.findOneAndDelete({ _id: id, userId });
+  if (!goal) throw new AppError("Meta no encontrada.", 404, "GOAL_NOT_FOUND");
 }
 
 export async function createInstallmentPurchase(userId: Types.ObjectId, input: Record<string, any>) {

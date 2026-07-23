@@ -20,9 +20,9 @@ const styles = StyleSheet.create({
   amount: {
     ...typography.value,
     color: colors.white,
-    fontSize: 61,
+    fontSize: 70,
     fontWeight: "700",
-    lineHeight: 68,
+    lineHeight: 78,
     textAlign: "center"
   },
   subtitle: {
@@ -35,7 +35,7 @@ const styles = StyleSheet.create({
   },
   wrap: {
     alignItems: "center",
-    marginTop: 34,
+    marginTop: 105,
     paddingHorizontal: 32
   }
 });

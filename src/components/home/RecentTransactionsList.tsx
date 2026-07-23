@@ -55,7 +55,7 @@ const styles = StyleSheet.create({
   account: {
     ...typography.label,
     color: "rgba(255,255,255,0.66)",
-    fontSize: 10,
+    fontSize: 12,
     lineHeight: 12,
     marginTop: 2,
     maxWidth: 112,
@@ -93,17 +93,17 @@ const styles = StyleSheet.create({
     fontWeight: "700"
   },
   expense: {
-    color: "#FF5A3A"
+    color: colors.negative
   },
   flag: {
     ...typography.label,
     color: "rgba(255,255,255,0.46)",
-    fontSize: 10,
+    fontSize: 12,
     lineHeight: 12,
     marginTop: 1
   },
   income: {
-    color: "#69D06F"
+    color: colors.positive
   },
   incomeDot: {
     backgroundColor: "rgba(255,255,255,0.54)"
@@ -117,7 +117,7 @@ const styles = StyleSheet.create({
   meta: {
     ...typography.label,
     color: "rgba(255,255,255,0.62)",
-    fontSize: 11,
+    fontSize: 12,
     lineHeight: 13
   },
   right: {
@@ -133,7 +133,7 @@ const styles = StyleSheet.create({
   title: {
     ...typography.body,
     color: colors.white,
-    fontSize: 13,
+    fontSize: 15,
     fontWeight: "700",
     lineHeight: 16
   }

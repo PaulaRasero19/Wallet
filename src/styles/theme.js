@@ -6,8 +6,8 @@ export const colors = {
   primary: "#2563EB",
   primaryDark: "#1D4ED8",
   border: "#E5E7EB",
-  success: "#16A34A",
-  danger: "#DC2626",
+  success: "#649B3E",
+  danger: "#913430",
   warning: "#F59E0B"
 };
 

@@ -52,8 +52,7 @@ const styles = StyleSheet.create({
     gap: spacing.sm
   },
   title: {
-    ...typography.title,
-    fontSize: 18
+    ...typography.title
   },
   iconButton: {
     alignItems: "center",

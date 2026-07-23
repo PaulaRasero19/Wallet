@@ -101,6 +101,7 @@ export async function createTransactionApi(input: {
   };
   scheduledPaymentId?: string;
   receiptUrl?: string;
+  clientRequestId?: string;
 }) {
   return apiRequest<TransactionResponse>("/transactions", { body: input, method: "POST", requireAuth: true });
 }
@@ -147,6 +148,14 @@ export async function createGoalApi(input: { name: string; target: number; saved
 
 export async function addGoalMoneyApi(id: string, amount: number) {
   return (await apiRequest<GoalResponse>(`/finance/goals/${id}/contributions`, { body: { amount }, method: "POST", requireAuth: true })).goal;
+}
+
+export async function updateGoalApi(id: string, input: Partial<Pick<Goal, "name" | "target" | "saved" | "targetDate" | "status">>) {
+  return (await apiRequest<GoalResponse>(`/finance/goals/${id}`, { body: input, method: "PATCH", requireAuth: true })).goal;
+}
+
+export async function deleteGoalApi(id: string) {
+  await apiRequest<void>(`/finance/goals/${id}`, { method: "DELETE", requireAuth: true });
 }
 
 export async function createInstallmentPurchaseApi(input: {

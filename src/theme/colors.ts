@@ -14,6 +14,8 @@ export const colors = {
   blue: "#164CFF",
   lime: "#B8DC36",
   lavender: "#A99BEF",
+  negative: "#913430",
+  positive: "#649B3E",
   cream: "#F7F4EF",
   white: "#FFFFFF",
   transparentWhite: "rgba(255,255,255,0.72)",

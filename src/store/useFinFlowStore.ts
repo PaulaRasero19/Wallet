@@ -4,10 +4,12 @@ import {
   fetchNotifications,
   markAllNotificationsReadApi,
   markNotificationReadApi,
+  scheduleLocalPaymentNotifications,
   snoozeNotificationApi
 } from "../services/notificationsService";
 import {
   addGoalMoneyApi,
+  deleteGoalApi,
   createAccountApi,
   createCategoryApi,
   createRecurringPaymentApi,
@@ -23,6 +25,7 @@ import {
   fetchTransactions,
   markInstallmentPaidApi,
   markRecurringPaymentPaidApi,
+  updateGoalApi,
   updateTransactionApi
 } from "../services/financeService";
 import {
@@ -65,6 +68,7 @@ type TransactionInput = {
   };
   scheduledPaymentId?: string;
   receiptUrl?: string;
+  clientRequestId?: string;
 };
 
 type TransferInput = {
@@ -169,7 +173,8 @@ type FinFlowState = {
   addTask: (task: Omit<Task, "id">) => void;
   addGoal: (goal: Omit<Goal, "id">) => void;
   addGoalMoney: (goalId: string, amount: number) => Promise<void>;
-  deleteGoal: (goalId: string) => void;
+  updateGoal: (goalId: string, input: Partial<Pick<Goal, "name" | "target" | "saved" | "targetDate" | "status">>) => Promise<void>;
+  deleteGoal: (goalId: string) => Promise<void>;
   addEvent: (event: Omit<PlannerEvent, "id">) => void;
   toggleEventDone: (eventId: string) => void;
   deleteEvent: (eventId: string) => void;
@@ -295,7 +300,11 @@ export const useFinFlowStore = create<FinFlowState>()((set, get) => {
     createTransaction: async (input) => {
       set({ loading: true, error: null, errors: null });
       try {
-        const result = await createTransactionApi(input);
+        const request = {
+          ...input,
+          clientRequestId: input.clientRequestId || `mobile-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
+        };
+        const result = await createTransactionApi(request);
         const transactions = [result.transaction, ...get().transactions];
         const accounts = result.account ? get().accounts.map((account) => (account.id === result.account?.id ? result.account : account)) : get().accounts;
         set({ accounts, transactions, balance: getBalance(accounts), loading: false });
@@ -326,6 +335,15 @@ export const useFinFlowStore = create<FinFlowState>()((set, get) => {
       try {
         const payment = await createRecurringPaymentApi(input);
         set({ recurringPayments: [...get().recurringPayments, payment], loading: false });
+        if (input.notificationsEnabled !== false) {
+          await scheduleLocalPaymentNotifications({
+            body: `${payment.merchant} por ${payment.amount.toLocaleString("es-UY")} vence el ${new Date(payment.nextChargeDate).toLocaleDateString("es-UY")}.`,
+            data: { id: payment.id, relatedEntityId: payment.id, relatedEntityType: "payment" },
+            dueDate: payment.nextChargeDate,
+            reminderDaysBefore: payment.reminderDaysBefore ?? 1,
+            title: `${payment.merchant} vence pronto`
+          }).catch(() => undefined);
+        }
         await get().loadNotifications("pending");
         return payment;
       } catch (error) {
@@ -477,7 +495,20 @@ export const useFinFlowStore = create<FinFlowState>()((set, get) => {
         fail(error);
       }
     },
-    deleteGoal: () => set({ error: "Metas queda para el siguiente bloque.", errors: "Metas queda para el siguiente bloque." }),
+    updateGoal: async (goalId, input) => {
+      set({ loading: true, error: null, errors: null });
+      try {
+        const goal = await updateGoalApi(goalId, input);
+        set({ goals: get().goals.map((item) => item.id === goalId ? goal : item), loading: false });
+      } catch (error) { fail(error); }
+    },
+    deleteGoal: async (goalId) => {
+      set({ loading: true, error: null, errors: null });
+      try {
+        await deleteGoalApi(goalId);
+        set({ goals: get().goals.filter((item) => item.id !== goalId), loading: false });
+      } catch (error) { fail(error); }
+    },
     addEvent: () => set({ error: "Planner queda para el siguiente bloque.", errors: "Planner queda para el siguiente bloque." }),
     toggleEventDone: (eventId) => set((state) => ({ events: state.events.map((event) => (event.id === eventId ? { ...event, done: !event.done } : event)) })),
     deleteEvent: (eventId) => set((state) => ({ events: state.events.filter((event) => event.id !== eventId) })),

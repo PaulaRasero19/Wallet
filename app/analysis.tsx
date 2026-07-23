@@ -126,7 +126,6 @@ const styles = StyleSheet.create({
   title: {
     ...typography.title,
     color: colors.white,
-    fontSize: 20,
     marginBottom: spacing.sm
   }
 });

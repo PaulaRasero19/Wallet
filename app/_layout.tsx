@@ -1,6 +1,7 @@
 import "react-native-gesture-handler";
 import { useEffect } from "react";
-import { Stack } from "expo-router";
+import { router, Stack } from "expo-router";
+import * as Notifications from "expo-notifications";
 import { StatusBar } from "expo-status-bar";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { useFinFlowStore } from "../src/store/useFinFlowStore";
@@ -15,6 +16,21 @@ export default function RootLayout() {
     clearFinancialData();
     void initialize();
   }, [clearFinancialData, initialize]);
+
+  useEffect(() => {
+    const subscription = Notifications.addNotificationResponseReceivedListener((response) => {
+      const data = response.notification.request.content.data;
+      const type = String(data.relatedEntityType || "");
+      const id = String(data.relatedEntityId || data.id || "");
+      if (!id) return;
+      if (type === "payment") router.push({ pathname: "/payment/[id]", params: { id } });
+      if (type === "installment") router.push({ pathname: "/installment/[id]", params: { id, installmentId: String(data.installmentId || "") } });
+      if (type === "card") router.push({ pathname: "/card/[id]", params: { id } });
+      if (type === "transaction") router.push({ pathname: "/transaction/[id]", params: { id } });
+      if (type === "goal") router.push({ pathname: "/goal/[id]", params: { id } });
+    });
+    return () => subscription.remove();
+  }, []);
 
   return (
     <GestureHandlerRootView style={{ backgroundColor: colors.black, flex: 1 }}>

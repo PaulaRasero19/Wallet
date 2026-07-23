@@ -41,7 +41,7 @@ Rutas secundarias:
 - Agregar: flujo progresivo para gasto, ingreso, transferencia, compra en cuotas, pago proximo y registro con IA confirmable.
 - Plan: Mes, Metas, Tarjetas y Calendario financiero.
 - IA: chat autenticado con respuestas basadas en cuentas, movimientos, metas, tarjetas, cuotas y vencimientos.
-- Notificaciones: centro filtrable, acciones de leer, posponer, completar y apertura de entidad relacionada.
+- Notificaciones: centro agrupado por fecha, persistencia, apertura de entidad relacionada, recordatorios locales y registro push.
 - Perfil/Ajustes: perfil, finanzas, notificaciones, IA, seguridad, tarjetas y general.
 
 ## Modelos
@@ -136,7 +136,7 @@ No exponer `MONGODB_URI`, JWT secrets, `GEMINI_API_KEY` ni credenciales de Whats
 
 ## IA
 
-`POST /api/ai/chat` carga datos del usuario autenticado desde MongoDB y responde con texto y bloques visuales. Si Gemini no esta configurado, el backend usa respuestas deterministicas calculadas con datos reales. La IA puede preparar fichas o acciones, pero la app siempre exige confirmacion antes de guardar.
+`POST /api/ai/chat` carga un contexto financiero minimizado del usuario autenticado desde MongoDB. Si Gemini no esta configurado o falla, el backend usa respuestas deterministicas calculadas con datos reales. El flujo "Agregar con IA" interpreta lenguaje natural localmente y siempre exige confirmacion antes de guardar.
 
 ## Notificaciones, Push y WhatsApp
 
@@ -146,7 +146,7 @@ No exponer `MONGODB_URI`, JWT secrets, `GEMINI_API_KEY` ni credenciales de Whats
 - WhatsApp Business Platform esta preparado como provider opcional.
 - Con `WHATSAPP_ENABLED=false`, la app muestra que WhatsApp no esta configurado y el backend no intenta enviar mensajes.
 
-## Cuenta de Presentacion
+## Cuenta de presentación
 
 La cuenta de presentacion es una cuenta normal con autenticacion real y datos persistidos en MongoDB. Configurar:
 
@@ -163,12 +163,28 @@ npm run server:seed:sample-user
 
 Los usuarios nuevos empiezan vacios y no reciben datos de presentacion.
 
-## Ejecutar
+Valores locales por defecto:
+
+```text
+Email: usuario@gmail.com
+Contraseña: Usuario.123
+```
+
+Son credenciales exclusivas para evaluación local.
+
+## Ejecutar localmente
 
 ```bash
 npm install
 npm install --prefix server
+npm run server:seed:sample-user
 npm run dev
+```
+
+MongoDB puede iniciarse con:
+
+```bash
+docker compose up -d mongodb
 ```
 
 Separado:
@@ -194,6 +210,17 @@ npm run server:test
 ```
 
 Si `MONGODB_URI` no esta configurado, `/health` funciona y los endpoints `/api/*` responden `DATABASE_DISCONNECTED`.
+
+## Documentación de entrega
+
+- Memoria final: `docs/ENTREGA_FINAL.md`
+- Guía reproducible: `docs/GUIA_EVALUACION.md`
+- Reporte de 27 pruebas: `docs/REPORTE_TESTING.md`
+- IA y prompts: `docs/PROMPTS_IA.md`
+- Seguridad: `docs/API_KEYS_SEGURIDAD.md`
+- Estrategia: `docs/ESTRATEGIA_COMUNICACION.md`
+- Automatización opcional: `docs/AUTOMATIZACION.md`
+- Guía para piezas que debe producir la autora: `docs/GUIA_PIEZAS_PENDIENTES.md`
 
 ## Seguridad
 

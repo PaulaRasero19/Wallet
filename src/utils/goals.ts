@@ -22,3 +22,19 @@ export function suggestedMonthlySaving(goal: Pick<Goal, "saved" | "target" | "ta
   if (!months) return null;
   return Math.max(0, goal.target - goal.saved) / months;
 }
+
+export function sortGoalsForHome(goals: Goal[]) {
+  return [...goals].sort((a, b) => {
+    const aDate = a.targetDate || a.target_date;
+    const bDate = b.targetDate || b.target_date;
+    const aTime = aDate ? new Date(aDate).getTime() : Number.POSITIVE_INFINITY;
+    const bTime = bDate ? new Date(bDate).getTime() : Number.POSITIVE_INFINITY;
+    if (aTime !== bTime) return aTime - bTime;
+    const progress = cappedGoalProgress(b.saved, b.target) - cappedGoalProgress(a.saved, a.target);
+    if (progress) return progress;
+    const aCreated = new Date(a.createdAt || a.created_at || 0).getTime();
+    const bCreated = new Date(b.createdAt || b.created_at || 0).getTime();
+    if (aCreated !== bCreated) return bCreated - aCreated;
+    return b.id.localeCompare(a.id);
+  });
+}

@@ -232,7 +232,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     ...typography.title,
     color: colors.white,
-    fontSize: 19,
+    fontSize: 22,
     lineHeight: 23
   },
   sheet: {

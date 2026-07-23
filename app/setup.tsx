@@ -487,7 +487,7 @@ const styles = StyleSheet.create({
   currencySymbol: {
     ...typography.title,
     color: colors.white,
-    fontSize: 24
+    fontSize: 22
   },
   activeText: {
     color: colors.black

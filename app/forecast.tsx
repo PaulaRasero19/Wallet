@@ -140,7 +140,7 @@ const styles = StyleSheet.create({
   question: {
     ...typography.display,
     color: colors.white,
-    fontSize: 30,
+    fontSize: 34,
     marginTop: spacing.xl
   },
   summary: {

@@ -36,4 +36,22 @@ Gracias por sumarte. FinFlow esta pensado para ayudarte a entender tu presupuest
 
 ## Estado en esta entrega
 
-El flujo esta documentado como estrategia opcional. La app actual no requiere backend ni base de datos para ser evaluada.
+El flujo está documentado como estrategia opcional y **no se presenta como implementado**. El MVP de FinFlow sí utiliza backend y MongoDB para sus funcionalidades principales, pero no depende de n8n, Google Sheets ni email marketing para ser evaluado.
+
+## Cómo podría implementarse
+
+1. Agregar a la landing un formulario con consentimiento.
+2. Enviar nombre y email a un webhook de n8n.
+3. Validar y normalizar la entrada.
+4. Guardar el lead en Google Sheets.
+5. Enviar un email de bienvenida.
+6. Registrar fecha, origen y estado del contacto.
+7. Permitir baja de futuras comunicaciones.
+
+## Privacidad
+
+- Captar únicamente los datos necesarios.
+- Explicar para qué se utilizarán.
+- No enviar información financiera de la app al flujo de marketing.
+- No guardar API keys en la landing.
+- Incorporar consentimiento y mecanismo de baja.

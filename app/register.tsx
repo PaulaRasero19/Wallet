@@ -2,6 +2,7 @@ import { useRef, useState } from "react";
 import { Alert, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { Eye, EyeOff } from "lucide-react-native";
 import { router } from "expo-router";
+import { LinearGradient } from "expo-linear-gradient";
 import { Header } from "../src/components/Header";
 import { InputField } from "../src/components/InputField";
 import { PrimaryButton } from "../src/components/PrimaryButton";
@@ -99,10 +100,18 @@ export default function Register() {
   const canSubmit = status !== "loading";
 
   return (
-    <ScreenContainer style={styles.content}>
+    <ScreenContainer backgroundColor="#1C1C1B" style={styles.content}>
       <Header title={t("auth.register")} back />
+      <LinearGradient colors={["#280000", "#A51208", "#EC4205", "#D8B600"]} end={{ x: 1, y: 1 }} start={{ x: 0, y: 0 }} style={styles.accent}>
+        <Text style={styles.accentEyebrow}>EMPEZÁ HOY</Text>
+        <Text style={styles.accentTitle}>Ordená tu plata{"\n"}a tu manera.</Text>
+      </LinearGradient>
       <View style={styles.form}>
-        <Text style={styles.title}>Crear tu cuenta</Text>
+        <View style={styles.intro}>
+          <Text style={styles.title}>Creá tu cuenta</Text>
+          <Text style={styles.subtitle}>Solo necesitamos estos datos para preparar tu experiencia.</Text>
+        </View>
+        <Text style={styles.label}>{t("auth.name")}</Text>
         <InputField
           inputRef={nameInputRef}
           accessibilityLabel={t("auth.name")}
@@ -116,10 +125,12 @@ export default function Register() {
           onSubmitEditing={() => emailInputRef.current?.focus()}
           placeholder={t("auth.name")}
           returnKeyType="next"
+          style={styles.input}
           textContentType="name"
           value={name}
         />
         {errors.name ? <Text style={styles.message}>{errors.name}</Text> : null}
+        <Text style={styles.label}>{t("auth.email")}</Text>
         <InputField
           inputRef={emailInputRef}
           accessibilityLabel={t("auth.email")}
@@ -136,10 +147,12 @@ export default function Register() {
           onSubmitEditing={() => passwordInputRef.current?.focus()}
           placeholder={t("auth.email")}
           returnKeyType="next"
+          style={styles.input}
           textContentType="emailAddress"
           value={email}
         />
         {errors.email ? <Text style={styles.message}>{errors.email}</Text> : null}
+        <Text style={styles.label}>{t("auth.password")}</Text>
         <View style={styles.passwordWrap}>
           <InputField
             inputRef={passwordInputRef}
@@ -156,15 +169,16 @@ export default function Register() {
             placeholder={t("auth.password")}
             returnKeyType="next"
             secureTextEntry={!showPassword}
-            style={styles.passwordInput}
+            style={[styles.input, styles.passwordInput]}
             textContentType="password"
             value={password}
           />
           <Pressable accessibilityLabel={showPassword ? t("auth.hidePassword") : t("auth.showPassword")} accessibilityRole="button" onPress={() => setShowPassword((current) => !current)} style={styles.eyeButton}>
-            {showPassword ? <EyeOff color={colors.grayDark} size={20} /> : <Eye color={colors.grayDark} size={20} />}
+            {showPassword ? <EyeOff color={colors.white} size={20} /> : <Eye color={colors.white} size={20} />}
           </Pressable>
         </View>
         {errors.password ? <Text style={styles.message}>{errors.password}</Text> : null}
+        <Text style={styles.label}>{t("auth.confirmPassword")}</Text>
         <View style={styles.passwordWrap}>
           <InputField
             inputRef={confirmPasswordInputRef}
@@ -179,17 +193,18 @@ export default function Register() {
             placeholder={t("auth.confirmPassword")}
             returnKeyType="done"
             secureTextEntry={!showConfirmPassword}
-            style={styles.passwordInput}
+            style={[styles.input, styles.passwordInput]}
             textContentType="password"
             value={confirmPassword}
           />
           <Pressable accessibilityLabel={showConfirmPassword ? t("auth.hidePassword") : t("auth.showPassword")} accessibilityRole="button" onPress={() => setShowConfirmPassword((current) => !current)} style={styles.eyeButton}>
-            {showConfirmPassword ? <EyeOff color={colors.grayDark} size={20} /> : <Eye color={colors.grayDark} size={20} />}
+            {showConfirmPassword ? <EyeOff color={colors.white} size={20} /> : <Eye color={colors.white} size={20} />}
           </Pressable>
         </View>
         {errors.confirmPassword ? <Text style={styles.message}>{errors.confirmPassword}</Text> : null}
         {errors.form ? <Text style={styles.message}>{errors.form}</Text> : null}
-        <PrimaryButton disabled={!canSubmit} onPress={submit}>{status === "loading" ? t("common.loading") : t("auth.register")}</PrimaryButton>
+        <Text style={styles.terms}>Al continuar aceptás que FinFlow organice la información financiera que vos decidas registrar.</Text>
+        <PrimaryButton disabled={!canSubmit} onPress={submit} style={styles.primary}>{status === "loading" ? t("common.loading") : t("auth.register")}</PrimaryButton>
       </View>
     </ScreenContainer>
   );
@@ -197,19 +212,58 @@ export default function Register() {
 
 const styles = StyleSheet.create({
   content: {
-    gap: spacing.xl
+    gap: spacing.lg
   },
-  form: {
-    gap: spacing.md
+  accent: {
+    borderRadius: 34,
+    height: 170,
+    justifyContent: "flex-end",
+    overflow: "hidden",
+    padding: spacing.lg
   },
-  title: {
+  accentEyebrow: {
+    ...typography.label,
+    color: colors.transparentWhite,
+    fontWeight: "700",
+    letterSpacing: 1.8
+  },
+  accentTitle: {
     ...typography.display,
     color: colors.white,
-    marginBottom: spacing.md
+    fontSize: 34,
+    lineHeight: 37,
+    marginTop: spacing.xs
+  },
+  form: {
+    gap: spacing.sm
+  },
+  intro: {
+    gap: spacing.xs,
+    marginBottom: spacing.sm
+  },
+  title: {
+    ...typography.title,
+    color: colors.white
+  },
+  subtitle: {
+    ...typography.body,
+    color: colors.transparentWhite
+  },
+  label: {
+    ...typography.label,
+    color: colors.transparentWhite,
+    fontWeight: "700",
+    marginTop: spacing.xs
+  },
+  input: {
+    backgroundColor: "#595958",
+    borderColor: "transparent",
+    borderRadius: 22,
+    minHeight: 58
   },
   message: {
     ...typography.body,
-    color: "#ff4b1f"
+    color: colors.negative
   },
   passwordWrap: {
     position: "relative"
@@ -226,5 +280,14 @@ const styles = StyleSheet.create({
     top: 0,
     width: 52,
     zIndex: 2
+  },
+  terms: {
+    ...typography.label,
+    color: colors.transparentWhite,
+    marginTop: spacing.sm
+  },
+  primary: {
+    marginTop: spacing.sm,
+    minHeight: 58
   }
 });

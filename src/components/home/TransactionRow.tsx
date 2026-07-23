@@ -50,7 +50,7 @@ const styles = StyleSheet.create({
   account: {
     ...typography.label,
     color: "rgba(255,255,255,0.66)",
-    fontSize: 11,
+    fontSize: 12,
     lineHeight: 13,
     marginTop: 2,
     maxWidth: 130,
@@ -69,24 +69,24 @@ const styles = StyleSheet.create({
   date: {
     ...typography.label,
     color: "rgba(255,255,255,0.66)",
-    fontSize: 11,
+    fontSize: 12,
     lineHeight: 13,
     marginTop: 1
   },
   expense: {
-    color: "#E65C50"
+    color: colors.negative
   },
   flags: {
     ...typography.label,
     color: "rgba(255,255,255,0.42)",
-    fontSize: 10,
+    fontSize: 12,
     lineHeight: 12,
     marginTop: 2,
     maxWidth: 130,
     textAlign: "right"
   },
   income: {
-    color: "#66C86D"
+    color: colors.positive
   },
   main: {
     flex: 1,
@@ -95,7 +95,7 @@ const styles = StyleSheet.create({
   merchant: {
     ...typography.body,
     color: colors.white,
-    fontSize: 13,
+    fontSize: 15,
     fontWeight: "800",
     lineHeight: 16
   },

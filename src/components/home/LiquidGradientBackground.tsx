@@ -111,7 +111,7 @@ half4 main(float2 p) {
   float bottomWarmth = smoothstep(0.08, 1.02, warped.y + (lowA - 0.5) * 0.2);
   float rightWarmth = smoothstep(0.0, 0.88, screen.x + (lowB - 0.5) * 0.16);
 
-  float3 black = float3(0.011765, 0.003922, 0.007843);
+  float3 black = float3(0.109804, 0.109804, 0.105882);
   float3 burgundyColor = float3(0.525490, 0.074510, 0.003922);
   float3 redColor = float3(0.843137, 0.286275, 0.007843);
   float3 yellowColor = float3(0.992157, 0.772549, 0.231373);
@@ -193,7 +193,7 @@ export function LiquidGradientBackground() {
 
 const styles = StyleSheet.create({
   fallback: {
-    backgroundColor: "#030102"
+    backgroundColor: "#1C1C1B"
   },
   grain: {
     ...StyleSheet.absoluteFillObject

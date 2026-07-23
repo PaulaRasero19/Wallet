@@ -141,6 +141,8 @@ export type Goal = {
   target_date?: string | null;
   status?: "active" | "completed" | "paused";
   accent: AccentColor;
+  createdAt?: string;
+  created_at?: string;
 };
 
 export type RecurringPayment = {

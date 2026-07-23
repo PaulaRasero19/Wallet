@@ -1,4 +1,6 @@
-# Piezas de comunicacion digital
+# Borradores de contenido para piezas de comunicación digital
+
+> Estos textos son insumos editoriales. No sustituyen las piezas visuales finales que debe producir y exportar la autora. La guía de formatos y entregables está en `docs/GUIA_PIEZAS_PENDIENTES.md`.
 
 ## Post 1 - Instagram
 

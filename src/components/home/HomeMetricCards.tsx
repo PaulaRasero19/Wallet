@@ -70,8 +70,8 @@ function formatPercent(value: number) {
 }
 
 function colorForTone(tone: InsightTone) {
-  if (tone === "positive") return "#5EBA43";
-  if (tone === "negative") return "#B73732";
+  if (tone === "positive") return colors.positive;
+  if (tone === "negative") return colors.negative;
   return "rgba(255,255,255,0.72)";
 }
 
@@ -123,7 +123,7 @@ const styles = StyleSheet.create({
   meta: {
     ...typography.label,
     color: "rgba(255,255,255,0.76)",
-    fontSize: 14,
+    fontSize: 15,
     lineHeight: 18
   },
   incomeTitle: {
@@ -144,7 +144,7 @@ const styles = StyleSheet.create({
   smallMeta: {
     ...typography.label,
     color: "rgba(255,255,255,0.82)",
-    fontSize: 11,
+    fontSize: 12,
     lineHeight: 13
   },
   row: {
@@ -180,7 +180,7 @@ const styles = StyleSheet.create({
   smallTitle: {
     ...typography.body,
     color: colors.white,
-    fontSize: 14.5,
+    fontSize: 15,
     fontWeight: "600",
     lineHeight: 19,
     paddingRight: 0

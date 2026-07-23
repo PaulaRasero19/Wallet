@@ -1,18 +1,18 @@
 import { useEffect, useMemo, useState } from "react";
-import { Modal, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { Modal, Pressable, StyleSheet, Text, TextInput, useWindowDimensions, View } from "react-native";
 import { router } from "expo-router";
-import { BookOpen, Circle, Filter, Heart, Home, PawPrint, Search, ShoppingBag, Ticket, TramFront, Utensils, Zap } from "lucide-react-native";
-import { Header } from "../../src/components/Header";
+import { LinearGradient } from "expo-linear-gradient";
+import Svg, { Circle as SvgCircle, Path } from "react-native-svg";
+import { ArrowDown, ArrowUp, Search } from "lucide-react-native";
 import { ScreenContainer } from "../../src/components/ScreenContainer";
 import { useFinFlowStore } from "../../src/store/useFinFlowStore";
 import { useSessionStore } from "../../src/store/useSessionStore";
 import { colors, spacing, typography } from "../../src/theme";
-import { Account, Category, Transaction, TransactionType } from "../../src/types/finflow";
-import { calculateMovementSummary } from "../../src/utils/movementSummary";
+import { Account, Currency, Transaction, TransactionType } from "../../src/types/finflow";
 import { formatMoney } from "../../src/utils/money";
+import { resolveMovementCategory } from "../../src/utils/transactionCategoryPresentation";
 
-const mainFilters = ["Todos", "Gastos", "Ingresos", "Transferencias"] as const;
-type MainFilter = (typeof mainFilters)[number];
+type MovementPeriod = "day" | "month" | "year";
 
 type AdvancedFilters = {
   accountId: string;
@@ -62,14 +62,7 @@ function initials(value: string) {
 }
 
 function groupLabel(date: string) {
-  const today = new Date();
   const target = new Date(date);
-  const startToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-  const startTarget = new Date(target.getFullYear(), target.getMonth(), target.getDate());
-  const diffDays = Math.round((startToday.getTime() - startTarget.getTime()) / 86400000);
-  if (diffDays === 0) return "Hoy";
-  if (diffDays === 1) return "Ayer";
-  if (diffDays >= 0 && diffDays <= 7) return "Esta semana";
   return target.toLocaleDateString("es-UY", { month: "long", year: "numeric" });
 }
 
@@ -88,10 +81,51 @@ function canOpenTransaction(transaction: Transaction) {
   return Boolean(transactionId(transaction));
 }
 
+function periodBounds(reference: Date, period: MovementPeriod, previous = false) {
+  if (period === "day") {
+    const start = new Date(reference.getFullYear(), reference.getMonth(), reference.getDate() - (previous ? 1 : 0));
+    return { start, end: new Date(start.getFullYear(), start.getMonth(), start.getDate() + 1) };
+  }
+  if (period === "year") {
+    const year = reference.getFullYear() - (previous ? 1 : 0);
+    return { start: new Date(year, 0, 1), end: new Date(year + 1, 0, 1) };
+  }
+  const month = reference.getMonth() - (previous ? 1 : 0);
+  const start = new Date(reference.getFullYear(), month, 1);
+  return { start, end: new Date(start.getFullYear(), start.getMonth() + 1, 1) };
+}
+
+function isInMovementPeriod(value: string, reference: Date, period: MovementPeriod) {
+  const { start, end } = periodBounds(reference, period);
+  const time = new Date(value).getTime();
+  return time >= start.getTime() && time < end.getTime();
+}
+
+function isInPreviousMovementPeriod(value: string, reference: Date, period: MovementPeriod) {
+  const { start, end } = periodBounds(reference, period, true);
+  const time = new Date(value).getTime();
+  return time >= start.getTime() && time < end.getTime();
+}
+
+function movementTotals(items: Transaction[]) {
+  return items.reduce((totals, transaction) => {
+    const amount = positiveAmount(transaction);
+    if (transaction.type === "income" || transaction.type === "refund") totals.income += amount;
+    else if (transaction.type === "expense") totals.expenses += amount;
+    totals.balance = totals.income - totals.expenses;
+    return totals;
+  }, { balance: 0, expenses: 0, income: 0 });
+}
+
+function percentageChange(current: number, previous: number) {
+  if (previous === 0) return current === 0 ? 0 : current > 0 ? 100 : -100;
+  return ((current - previous) / Math.abs(previous)) * 100;
+}
+
 export default function Transactions() {
   const { accounts, categories, loadAccounts, loadCategories, loadTransactions, transactions } = useFinFlowStore();
-  const { authUser, profile } = useSessionStore();
-  const [filter, setFilter] = useState<MainFilter>("Todos");
+  const { profile } = useSessionStore();
+  const [period, setPeriod] = useState<MovementPeriod>("month");
   const [query, setQuery] = useState("");
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [advanced, setAdvanced] = useState<AdvancedFilters>(initialAdvanced);
@@ -106,22 +140,21 @@ export default function Transactions() {
   const categoryById = useMemo(() => new Map(categories.map((category) => [category.id, category])), [categories]);
   const now = new Date();
   const currency = profile?.primary_currency || "UYU";
-  const monthSummary = calculateMovementSummary({
-    selectedMonth: now,
-    transactions,
-    userId: authUser?.id
-  });
-  const monthlyExpenses = monthSummary.netExpenses;
-  const monthlyIncome = monthSummary.actualIncome;
-  const monthlyBalance = monthSummary.balance;
+  const periodTransactions = useMemo(() => transactions.filter((transaction) => isInMovementPeriod(transaction.date, now, period)), [period, transactions]);
+  const previousPeriodTransactions = useMemo(() => transactions.filter((transaction) => isInPreviousMovementPeriod(transaction.date, now, period)), [period, transactions]);
+  const periodSummary = movementTotals(periodTransactions);
+  const previousSummary = movementTotals(previousPeriodTransactions);
+  const performance = percentageChange(periodSummary.balance, previousSummary.balance);
 
   const visible = useMemo(() => {
     const normalized = query.trim().toLowerCase();
     const min = advanced.minAmount ? Number(advanced.minAmount.replace(",", ".")) : null;
     const max = advanced.maxAmount ? Number(advanced.maxAmount.replace(",", ".")) : null;
 
-    return transactions.filter((transaction) => {
+    return periodTransactions.filter((transaction) => {
       const account = accountById.get(transaction.account_id || transaction.accountId || "");
+      const category = categoryById.get(transaction.category_id || transaction.categoryId || "");
+      const movementCategory = resolveMovementCategory(transaction, category);
       const amount = positiveAmount(transaction);
       const haystack = [
         transaction.title,
@@ -131,17 +164,15 @@ export default function Transactions() {
         account?.name,
         account?.type,
         transaction.paymentMethod,
-        transaction.payment_method
+        transaction.payment_method,
+        movementCategory.label
       ]
         .map((value) => String(value || "").toLowerCase())
         .join(" ");
 
       if (normalized && !haystack.includes(normalized)) return false;
-      if (filter === "Gastos" && transaction.type !== "expense") return false;
-      if (filter === "Ingresos" && transaction.type !== "income") return false;
-      if (filter === "Transferencias" && transaction.type !== "transfer") return false;
       if (advanced.accountId && (transaction.account_id || transaction.accountId) !== advanced.accountId) return false;
-      if (advanced.category && !String(transaction.category || "").toLowerCase().includes(advanced.category.toLowerCase())) return false;
+      if (advanced.category && !movementCategory.label.toLowerCase().includes(advanced.category.toLowerCase())) return false;
       if (!isWithinDate(transaction.date, advanced.dateFrom, advanced.dateTo)) return false;
       if (advanced.installments && !transaction.installment) return false;
       if (advanced.recurring && !(transaction.isRecurring || transaction.is_recurring)) return false;
@@ -150,7 +181,7 @@ export default function Transactions() {
       if (max !== null && amount > max) return false;
       return true;
     });
-  }, [accountById, advanced, filter, query, transactions]);
+  }, [accountById, advanced, categoryById, periodTransactions, query]);
 
   const grouped = useMemo(() => {
     const groups: Array<{ title: string; data: Transaction[] }> = [];
@@ -164,38 +195,33 @@ export default function Transactions() {
   }, [visible]);
 
   return (
-    <ScreenContainer>
-      <Header title="Movimientos" />
+    <ScreenContainer backgroundColor="#1C1C1B" style={styles.screenContent}>
+      <Text style={styles.screenTitle}>Movimientos</Text>
+      <View style={styles.periodSelector}>
+        {([["day", "Día"], ["month", "Mes"], ["year", "Año"]] as const).map(([value, label]) => <Pressable accessibilityRole="button" key={value} onPress={() => setPeriod(value)} style={[styles.periodOption, period === value && styles.activePeriod]}><Text style={[styles.periodText, period === value && styles.activePeriodText]}>{label}</Text></Pressable>)}
+      </View>
       <View style={styles.summary}>
-        <Text style={styles.month}>{now.toLocaleDateString("es-UY", { month: "long", year: "numeric" })}</Text>
         <View style={styles.summaryRows}>
-          <Summary label="Gastos" tone="expense" value={formatMoney(monthlyExpenses, currency, false)} />
-          <Summary label="Ingresos" tone="income" value={formatMoney(monthlyIncome, currency, false)} />
-          <Summary label="Balance" tone={monthlyBalance >= 0 ? "income" : "expense"} value={formatMoney(monthlyBalance, currency, true)} />
+          <Summary label="Gastos" tone="expense" value={formatMoney(periodSummary.expenses, currency, false)} />
+          <Summary label="Ingresos" tone="income" value={formatMoney(periodSummary.income, currency, false)} />
+          <Summary label="Balance" tone={periodSummary.balance >= 0 ? "income" : "expense"} value={formatMoney(periodSummary.balance, currency, false)} />
         </View>
       </View>
 
+      <MovementPerformanceChart balance={periodSummary.balance} currency={currency} performance={performance} transactions={periodTransactions} />
+
       <View style={styles.searchWrap}>
-        <Search color={colors.transparentWhite} size={18} />
         <TextInput
           autoCapitalize="none"
           onChangeText={setQuery}
-          placeholder="Buscar comercio, categoría o nota"
+          placeholder="Buscar"
           placeholderTextColor={colors.grayMedium}
           style={styles.search}
           value={query}
         />
-        <Pressable accessibilityRole="button" onPress={() => setAdvancedOpen(true)} style={styles.filterButton}>
-          <Filter color={colors.white} size={18} />
+        <Pressable accessibilityLabel="Abrir filtros" accessibilityRole="button" onPress={() => setAdvancedOpen(true)} style={styles.filterButton}>
+          <Search color={colors.white} size={22} />
         </Pressable>
-      </View>
-
-      <View style={styles.filters}>
-        {mainFilters.map((item) => (
-          <Pressable accessibilityRole="button" key={item} onPress={() => setFilter(item)} style={[styles.filter, filter === item && styles.activeFilter]}>
-            <Text style={[styles.filterText, filter === item && styles.activeFilterText]}>{item}</Text>
-          </Pressable>
-        ))}
       </View>
 
       <View style={styles.list}>
@@ -207,7 +233,6 @@ export default function Transactions() {
               {group.data.map((transaction) => (
                 <TransactionRow
                   account={accountById.get(transaction.account_id || transaction.accountId || "")}
-                  category={categoryById.get(transaction.category_id || transaction.categoryId || "")}
                   key={transaction.id}
                   onPress={() => {
                     const id = transactionId(transaction);
@@ -235,50 +260,86 @@ export default function Transactions() {
   );
 }
 
+function MovementPerformanceChart({ balance, currency, performance, transactions }: { balance: number; currency: Currency; performance: number; transactions: Transaction[] }) {
+  const { width: screenWidth } = useWindowDimensions();
+  const width = Math.min(470, screenWidth - 32);
+  const height = 215;
+  const sorted = [...transactions].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+  let running = movementTotals(sorted).income;
+  const allValues = [running, ...sorted.map((transaction) => {
+    const amount = positiveAmount(transaction);
+    if (transaction.type === "expense") running -= amount;
+    return running;
+  })];
+  if (allValues.length === 1) allValues.push(0);
+  const values = allValues.length <= 5 ? allValues : Array.from({ length: 5 }, (_, index) => allValues[Math.round(index * (allValues.length - 1) / 4)]);
+  const minimum = Math.min(...values);
+  const maximum = Math.max(...values);
+  const range = Math.max(1, maximum - minimum);
+  const left = 20;
+  const right = width - 20;
+  const top = 68;
+  const bottom = height - 56;
+  const points = values.map((value, index) => ({
+    x: left + (index / Math.max(1, values.length - 1)) * (right - left),
+    y: bottom - ((value - minimum) / range) * (bottom - top)
+  }));
+  const path = points.map((point, index) => `${index ? "L" : "M"} ${point.x.toFixed(1)} ${point.y.toFixed(1)}`).join(" ");
+  const positive = performance >= 0;
+  const Trend = positive ? ArrowUp : ArrowDown;
+
+  return (
+    <LinearGradient colors={["#210000", "#B81708", "#E84905", "#E0B900"]} end={{ x: 1, y: 1 }} start={{ x: 0, y: 0 }} style={styles.performanceCard}>
+      <View style={styles.performanceHeader}>
+        <Text style={styles.performanceLabel}>Rendimiento</Text>
+      </View>
+      <Text style={styles.performanceBalance}>{formatMoney(balance, currency, false)}</Text>
+      <View style={styles.performanceChange}>
+        <Trend color={positive ? colors.positive : colors.negative} size={15} strokeWidth={3} />
+        <Text style={[styles.performancePercent, positive ? styles.income : styles.expense]}>{Math.abs(performance).toLocaleString("es-UY", { maximumFractionDigits: 1 })} %</Text>
+      </View>
+      <Svg height={height} style={styles.performanceSvg} width={width}>
+        <Path d={path} fill="none" stroke="#FFFFFF" strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.4} />
+        {points.map((point, index) => <SvgCircle cx={point.x} cy={point.y} fill="#FFFFFF" key={`${point.x}-${index}`} r={index === points.length - 1 ? 5 : 3.5} />)}
+      </Svg>
+    </LinearGradient>
+  );
+}
+
 function Summary({ label, tone, value }: { label: string; tone: "income" | "expense"; value: string }) {
   return (
-    <View>
+    <View style={styles.summaryItem}>
       <Text style={styles.summaryLabel}>{label}</Text>
       <Text style={[styles.summaryValue, tone === "income" ? styles.income : styles.expense]}>{value}</Text>
     </View>
   );
 }
 
-function TransactionRow({ account, category, onPress, transaction }: { account?: Account; category?: Category; onPress: () => void; transaction: Transaction }) {
+function TransactionRow({ account, onPress, transaction }: { account?: Account; onPress: () => void; transaction: Transaction }) {
   const title = transaction.merchant || transaction.title || "Movimiento";
   const amount = positiveAmount(transaction);
   const isIncome = transaction.type === "income";
   const isTransfer = transaction.type === "transfer";
   const amountValue = isIncome ? amount : isTransfer ? 0 : -amount;
-  const date = new Date(transaction.date).toLocaleDateString("es-UY", { day: "2-digit", month: "short" });
-  const meta = [String(transaction.category || transactionTypeLabel(transaction.type)), date, account?.name || account?.type].filter(Boolean).join(" · ");
+  const date = new Date(transaction.date).toLocaleDateString("es-UY", { day: "numeric", month: "long" });
+  const accountLabel = account?.name || account?.type || "";
   const disabled = !canOpenTransaction(transaction);
-  const CategoryIcon = categoryIcon(category?.icon);
 
   return (
     <Pressable accessibilityRole="button" disabled={disabled} onPress={onPress} style={[styles.transactionRow, disabled && styles.disabledRow]}>
-      <View style={styles.initials}>
-        <CategoryIcon color={categoryColor(category?.color)} size={19} />
-      </View>
+      <View style={[styles.initials, isIncome && styles.incomeInitials]} />
       <View style={styles.rowCopy}>
-        <Text numberOfLines={1} style={styles.rowTitle}>{title}</Text>
-        <Text numberOfLines={1} style={styles.rowMeta}>{meta}</Text>
+        <Text numberOfLines={1} style={[styles.rowTitle, isIncome && styles.incomeRowCopy]}>{title}</Text>
+        <Text numberOfLines={1} style={[styles.rowMeta, isIncome && styles.incomeRowCopy]}>{date}</Text>
       </View>
-      <Text style={[styles.amount, isIncome ? styles.income : isTransfer ? styles.neutral : styles.expense]}>
-        {isTransfer ? formatMoney(amount, transaction.currency, false) : formatMoney(amountValue, transaction.currency, true)}
-      </Text>
+      <View style={styles.rowEnd}>
+        <Text style={[styles.amount, isIncome ? styles.income : isTransfer ? styles.neutral : styles.expense]}>
+          {isTransfer ? formatMoney(amount, transaction.currency, false) : formatMoney(amountValue, transaction.currency, true)}
+        </Text>
+        {accountLabel ? <Text numberOfLines={1} style={[styles.accountLabel, isIncome && styles.incomeRowCopy]}>{accountLabel}</Text> : null}
+      </View>
     </Pressable>
   );
-}
-
-function categoryIcon(name?: string) {
-  const icons: Record<string, typeof Circle> = { book: BookOpen, heart: Heart, home: Home, paw: PawPrint, "paw-print": PawPrint, "shopping-bag": ShoppingBag, bag: ShoppingBag, ticket: Ticket, "tram-front": TramFront, bus: TramFront, "bus-front": TramFront, utensils: Utensils, zap: Zap };
-  return icons[String(name || "")] || Circle;
-}
-
-function categoryColor(value?: string) {
-  const palette: Record<string, string> = { lime: colors.lime, blue: colors.blue, orange: colors.orange, purple: colors.lavender, gray: colors.grayMedium, black: colors.white };
-  return palette[String(value || "")] || colors.white;
 }
 
 function AdvancedSheet({
@@ -366,11 +427,21 @@ const styles = StyleSheet.create({
   activeFilterText: {
     color: colors.black
   },
+  activePeriod: {
+    backgroundColor: "#5A5A59"
+  },
+  activePeriodText: {
+    fontWeight: "800"
+  },
   amount: {
-    ...typography.label,
-    fontSize: 13,
+    ...typography.body,
     fontWeight: "900",
-    minWidth: 92,
+    textAlign: "right"
+  },
+  accountLabel: {
+    ...typography.body,
+    color: colors.white,
+    marginTop: 2,
     textAlign: "right"
   },
   applyButton: {
@@ -411,7 +482,7 @@ const styles = StyleSheet.create({
   count: {
     ...typography.label,
     color: colors.transparentWhite,
-    marginBottom: spacing.md
+    marginBottom: 22
   },
   empty: {
     ...typography.body,
@@ -421,7 +492,7 @@ const styles = StyleSheet.create({
     opacity: 0.48
   },
   expense: {
-    color: "#E65C50"
+    color: colors.negative
   },
   filter: {
     borderColor: colors.appGrayBorder,
@@ -433,11 +504,9 @@ const styles = StyleSheet.create({
   },
   filterButton: {
     alignItems: "center",
-    backgroundColor: colors.appGrayDark,
-    borderRadius: 8,
-    height: 40,
+    height: 42,
     justifyContent: "center",
-    width: 40
+    width: 46
   },
   filters: {
     flexDirection: "row",
@@ -457,21 +526,25 @@ const styles = StyleSheet.create({
     ...typography.label,
     color: colors.transparentWhite,
     fontWeight: "900",
-    marginBottom: spacing.xs,
+    marginBottom: 10,
     textTransform: "uppercase"
   },
   income: {
-    color: "#66C86D"
+    color: colors.positive
+  },
+  incomeInitials: {
+    backgroundColor: "#979797"
+  },
+  incomeRowCopy: {
+    color: "#979797"
   },
   initials: {
     alignItems: "center",
-    backgroundColor: colors.appGrayDark,
-    borderColor: colors.appGrayBorder,
-    borderRadius: 20,
-    borderWidth: 1,
-    height: 40,
+    backgroundColor: "#D8D8D8",
+    borderRadius: 28,
+    height: 56,
     justifyContent: "center",
-    width: 40
+    width: 56
   },
   initialsText: {
     ...typography.label,
@@ -504,17 +577,83 @@ const styles = StyleSheet.create({
     marginTop: spacing.md
   },
   list: {
-    marginTop: spacing.lg
+    marginTop: 27,
+    paddingHorizontal: 6
   },
   modalScrim: {
     backgroundColor: "rgba(0,0,0,0.34)",
     flex: 1
   },
-  month: {
-    ...typography.title,
+  performanceBalance: {
+    ...typography.body,
+    color: "rgba(255,255,255,0.82)",
+    bottom: 13,
+    fontWeight: "700",
+    left: 20,
+    position: "absolute",
+    zIndex: 2
+  },
+  performanceCard: {
+    borderRadius: 24,
+    height: 215,
+    marginTop: 25,
+    overflow: "hidden",
+    position: "relative"
+  },
+  performanceChange: {
+    alignItems: "center",
+    flexDirection: "row",
+    bottom: 13,
+    gap: 3,
+    position: "absolute",
+    right: 18,
+    zIndex: 2
+  },
+  performanceHeader: {
+    alignItems: "flex-start",
+    flexDirection: "row",
+    justifyContent: "space-between",
+    left: 20,
+    position: "absolute",
+    right: 20,
+    top: 17,
+    zIndex: 2
+  },
+  performanceLabel: {
+    ...typography.body,
     color: colors.white,
-    fontSize: 20,
-    textTransform: "capitalize"
+    fontWeight: "700"
+  },
+  performancePercent: {
+    ...typography.body,
+    fontWeight: "900"
+  },
+  performanceSvg: {
+    bottom: 0,
+    left: 0,
+    position: "absolute"
+  },
+  periodOption: {
+    alignItems: "center",
+    borderRadius: 11,
+    flex: 1,
+    height: 44,
+    justifyContent: "center",
+    margin: 4
+  },
+  periodSelector: {
+    borderColor: "rgba(255,255,255,0.28)",
+    borderRadius: 13,
+    borderWidth: 1,
+    flexDirection: "row",
+    marginTop: 32,
+    minHeight: 54,
+    overflow: "hidden"
+  },
+  periodText: {
+    ...typography.body,
+    color: colors.white,
+    fontWeight: "700"
   },
   neutral: {
     color: colors.transparentWhite
@@ -523,15 +662,20 @@ const styles = StyleSheet.create({
     flex: 1,
     minWidth: 0
   },
+  rowEnd: {
+    alignItems: "flex-end",
+    maxWidth: "44%",
+    minWidth: 112
+  },
   rowMeta: {
-    ...typography.label,
+    ...typography.body,
     color: colors.transparentWhite,
-    marginTop: 2
+    marginTop: 1
   },
   rowTitle: {
     ...typography.body,
     color: colors.white,
-    fontWeight: "800"
+    fontWeight: "800",
   },
   search: {
     ...typography.body,
@@ -541,16 +685,22 @@ const styles = StyleSheet.create({
   },
   searchWrap: {
     alignItems: "center",
-    backgroundColor: colors.appGrayDark,
-    borderColor: colors.appGrayBorder,
-    borderRadius: 8,
-    borderWidth: 1,
+    backgroundColor: "#5A5A59",
+    borderRadius: 12,
     flexDirection: "row",
     gap: spacing.sm,
-    marginTop: spacing.lg,
-    minHeight: 50,
-    paddingLeft: spacing.md,
-    paddingRight: 5
+    marginTop: 36,
+    minHeight: 54,
+    paddingLeft: 16,
+    paddingRight: 6
+  },
+  screenContent: {
+    paddingHorizontal: 16,
+    paddingTop: 20
+  },
+  screenTitle: {
+    ...typography.title,
+    color: colors.white
   },
   sheet: {
     backgroundColor: colors.appGray,
@@ -572,7 +722,10 @@ const styles = StyleSheet.create({
     fontSize: 22
   },
   summary: {
-    marginTop: spacing.lg
+    marginTop: 18
+  },
+  summaryItem: {
+    flex: 1
   },
   summaryLabel: {
     ...typography.label,
@@ -580,9 +733,7 @@ const styles = StyleSheet.create({
   },
   summaryRows: {
     flexDirection: "row",
-    flexWrap: "wrap",
-    gap: spacing.lg,
-    marginTop: spacing.sm
+    justifyContent: "space-between"
   },
   summaryValue: {
     ...typography.body,
@@ -590,12 +741,10 @@ const styles = StyleSheet.create({
   },
   transactionRow: {
     alignItems: "center",
-    borderBottomColor: colors.appGrayBorder,
-    borderBottomWidth: 1,
     flexDirection: "row",
-    gap: spacing.md,
-    minHeight: 66,
-    paddingVertical: spacing.sm
+    gap: 11,
+    minHeight: 84,
+    paddingVertical: 9
   },
   twoColumns: {
     flexDirection: "row",

@@ -145,9 +145,25 @@ export const useSessionStore = create<SessionState>()((set, get) => ({
     }
   },
   saveProfile: async (update) => {
-    const { authUser } = get();
+    let { authUser } = get();
+
     if (!authUser) {
-      throw new Error("You must be logged in to update your profile.");
+      const restored = await getCurrentAuth();
+      authUser = restored.user;
+
+      if (restored.user) {
+        set({
+          authUser: restored.user,
+          language: restored.profile?.language || get().language,
+          profile: restored.profile,
+          session: restored.session,
+          status: "authenticated"
+        });
+      }
+    }
+
+    if (!authUser) {
+      throw new Error("Tu sesión expiró. Iniciá sesión nuevamente para continuar.");
     }
 
     const profile = await updateProfile(authUser.id, update);
@@ -163,9 +179,25 @@ export const useSessionStore = create<SessionState>()((set, get) => ({
     }
   },
   completeOnboarding: async (update) => {
-    const { authUser } = get();
+    let { authUser } = get();
+
     if (!authUser) {
-      throw new Error("You must be logged in to complete onboarding.");
+      const restored = await getCurrentAuth();
+      authUser = restored.user;
+
+      if (restored.user) {
+        set({
+          authUser: restored.user,
+          language: restored.profile?.language || get().language,
+          profile: restored.profile,
+          session: restored.session,
+          status: "authenticated"
+        });
+      }
+    }
+
+    if (!authUser) {
+      throw new Error("Tu sesión expiró. Iniciá sesión nuevamente para continuar.");
     }
 
     const profile = await completeProfileOnboarding(update);

@@ -42,8 +42,8 @@ const styles = StyleSheet.create({
   title: {
     ...typography.title,
     color: colors.white,
-    fontSize: 25,
-    lineHeight: 30,
+    fontSize: 22,
+    lineHeight: 27,
     textAlign: "center"
   },
   subtitle: {

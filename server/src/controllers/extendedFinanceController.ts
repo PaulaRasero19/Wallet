@@ -1,8 +1,8 @@
 import type { Response } from "express";
 import type { FinFlowRequest } from "../types/http";
-import { addMoneyToGoal, createGoal, createInstallmentPurchase, createRecurringPayment, getExtendedFinance, markInstallmentPaid, markRecurringPaymentPaid } from "../services/extendedFinanceService";
+import { addMoneyToGoal, createGoal, createInstallmentPurchase, createRecurringPayment, deleteGoal, getExtendedFinance, markInstallmentPaid, markRecurringPaymentPaid, updateGoal } from "../services/extendedFinanceService";
 import { objectIdSchema, parseBody } from "../validators/commonValidators";
-import { goalContributionSchema, goalSchema, installmentPurchaseSchema, recurringPaymentSchema } from "../validators/financeValidators";
+import { goalContributionSchema, goalSchema, goalUpdateSchema, installmentPurchaseSchema, recurringPaymentSchema } from "../validators/financeValidators";
 
 export async function extendedFinance(req: FinFlowRequest, res: Response) {
   const data = await getExtendedFinance(req.user!.mongoId);
@@ -23,6 +23,18 @@ export async function contributeToGoal(req: FinFlowRequest, res: Response) {
   const id = parseBody(objectIdSchema, req.params.id);
   const body = parseBody(goalContributionSchema, req.body);
   res.json({ goal: await addMoneyToGoal(req.user!.mongoId, id, body.amount) });
+}
+
+export async function changeGoal(req: FinFlowRequest, res: Response) {
+  const id = parseBody(objectIdSchema, req.params.id);
+  const body = parseBody(goalUpdateSchema, req.body);
+  res.json({ goal: await updateGoal(req.user!.mongoId, id, body) });
+}
+
+export async function destroyGoal(req: FinFlowRequest, res: Response) {
+  const id = parseBody(objectIdSchema, req.params.id);
+  await deleteGoal(req.user!.mongoId, id);
+  res.status(204).send();
 }
 
 export async function storeInstallmentPurchase(req: FinFlowRequest, res: Response) {

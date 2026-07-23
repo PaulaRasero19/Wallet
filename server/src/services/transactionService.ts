@@ -69,6 +69,7 @@ function normalizeTransaction(input: TransactionInput) {
         }
       | undefined,
     scheduledPaymentId: input.scheduledPaymentId || input.scheduled_payment_id ? String(input.scheduledPaymentId || input.scheduled_payment_id) : null,
+    clientRequestId: input.clientRequestId || input.client_request_id ? String(input.clientRequestId || input.client_request_id) : null,
     receiptUrl: input.receiptUrl || input.receipt_url ? String(input.receiptUrl || input.receipt_url) : null
   };
 }
@@ -166,6 +167,16 @@ export async function createTransaction(userId: Types.ObjectId, input: Transacti
   if (data.type === "transfer") {
     throw new AppError("Usá el endpoint de transferencias para mover dinero entre cuentas.", 400, "TRANSFER_ENDPOINT_REQUIRED");
   }
+  if (data.clientRequestId) {
+    const existing = await Transaction.findOne({ userId, clientRequestId: data.clientRequestId }).populate("categoryId");
+    if (existing) {
+      const existingAccount = await assertAccount(userId, existing.accountId.toString());
+      return {
+        transaction: transactionDTO(existing, { category: existing.categoryId as unknown as InstanceType<typeof Category> }),
+        account: accountDTO(existingAccount)
+      };
+    }
+  }
   const account = await assertAccount(userId, data.accountId);
   const category = await assertCategory(userId, data.categoryId, data.type);
   if (data.type === "expense") await validateExpenseAgainstAvailableBalance({ userId, amount: data.amount, date: data.date });
@@ -198,6 +209,7 @@ export async function createTransaction(userId: Types.ObjectId, input: Transacti
             isAntExpense,
             installment: data.installment,
             scheduledPaymentId: data.scheduledPaymentId,
+            clientRequestId: data.clientRequestId,
             receiptUrl: data.receiptUrl
           }
         ],

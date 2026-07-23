@@ -1,142 +1,302 @@
-import { useEffect, useRef, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
-import { SendHorizontal } from "lucide-react-native";
-import { Header } from "../src/components/Header";
-import { ScreenContainer } from "../src/components/ScreenContainer";
-import { askFinFlowAi, AiBlock } from "../src/services/aiService";
-import { useFinFlowStore } from "../src/store/useFinFlowStore";
+import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  Alert,
+  Animated,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View
+} from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
+import { router, useFocusEffect } from "expo-router";
+import { ChevronLeft, Plus, SendHorizontal } from "lucide-react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { clearAiChatHistory, StoredChatMessage } from "../src/services/aiChatHistory";
+import { askFinFlowAi } from "../src/services/aiService";
 import { useSessionStore } from "../src/store/useSessionStore";
 import { colors, spacing, typography } from "../src/theme";
 
 const prompts = [
   "¿Cuánto puedo gastar por día?",
   "¿En qué gasté más?",
+  "¿Cómo puedo ahorrar?",
   "¿Voy a cumplir mi meta?",
-  "¿Qué tengo comprometido?",
-  "¿Cuáles son mis gastos hormiga?",
-  "¿Cómo puedo ahorrar?"
+  "¿Cuáles son mis gastos hormiga?"
 ];
-
-type ChatMessage = {
-  id: string;
-  role: "assistant" | "user";
-  text: string;
-  blocks?: AiBlock[];
-};
 
 function makeId() {
   return `${Date.now()}-${Math.round(Math.random() * 10000)}`;
 }
 
+async function withTimeout<T>(promise: Promise<T>, milliseconds = 20_000) {
+  return Promise.race<T>([
+    promise,
+    new Promise<T>((_, reject) => setTimeout(() => reject(new Error("timeout")), milliseconds))
+  ]);
+}
+
 export default function Insights() {
   const [question, setQuestion] = useState("");
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [messages, setMessages] = useState<StoredChatMessage[]>([]);
   const [loading, setLoading] = useState(false);
+  const [sendingText, setSendingText] = useState("");
   const scrollRef = useRef<ScrollView>(null);
-  const { loadOverview } = useFinFlowStore();
   const profile = useSessionStore((state) => state.profile);
-  const firstName = String(profile?.full_name || "Lucía").split(" ")[0];
+  const authUser = useSessionStore((state) => state.authUser);
+  const firstName = String(profile?.full_name || "").trim().split(" ")[0];
+  const userId = authUser?.id || "";
+
+  useFocusEffect(useCallback(() => {
+    setMessages([]);
+    setQuestion("");
+    setLoading(false);
+    setSendingText("");
+  }, []));
 
   useEffect(() => {
-    void loadOverview("30d");
-  }, [loadOverview]);
-
-  useEffect(() => {
-    setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 80);
+    const timer = setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 80);
+    return () => clearTimeout(timer);
   }, [messages]);
 
-  async function ask(value = question) {
+  async function send(value = question, appendUser = true) {
     const text = value.trim();
-    if (!text || loading) return;
+    if (!text || loading || text === sendingText) return;
+    const userMessage: StoredChatMessage = { id: makeId(), role: "user", text, type: "message" };
+    const context = messages
+      .filter((item) => item.type !== "error")
+      .map(({ role, text: messageText }) => ({ role, text: messageText }));
     setQuestion("");
+    setSendingText(text);
     setLoading(true);
-    setMessages((current) => [...current, { id: makeId(), role: "user", text }]);
+    if (appendUser) setMessages((current) => [...current, userMessage]);
     try {
-      const response = await askFinFlowAi(text);
-      setMessages((current) => [...current, { blocks: response.blocks, id: makeId(), role: "assistant", text: response.text }]);
-    } catch (error) {
-      setMessages((current) => [
-        ...current,
-        {
-          id: makeId(),
-          role: "assistant",
-          text: error instanceof Error ? error.message : "No pude responder ahora. Probá de nuevo en unos segundos."
-        }
-      ]);
+      const response = await withTimeout(askFinFlowAi(text, context));
+      setMessages((current) => [...current, {
+        blocks: response.blocks,
+        id: makeId(),
+        role: "assistant",
+        text: response.text,
+        type: "message"
+      }]);
+    } catch {
+      setMessages((current) => [...current, {
+        id: makeId(),
+        retryText: text,
+        role: "assistant",
+        text: "No pude responder en este momento. Probá nuevamente.",
+        type: "error"
+      }]);
     } finally {
       setLoading(false);
+      setSendingText("");
     }
   }
 
+  function newConversation() {
+    Alert.alert("Nueva conversación", "¿Querés borrar solamente el historial de este chat?", [
+      { style: "cancel", text: "Cancelar" },
+      {
+        style: "destructive",
+        text: "Borrar chat",
+        onPress: () => void (async () => {
+          await clearAiChatHistory(userId);
+          setMessages([]);
+          setQuestion("");
+        })()
+      }
+    ]);
+  }
+
+  const sendDisabled = !question.trim() || loading || question.trim() === sendingText;
+  const hasConversation = messages.length > 0 || loading;
+
   return (
-    <ScreenContainer>
-      <Header title="IA FinFlow" />
-      <View style={styles.intro}>
-        <Text style={styles.introTitle}>Hola {firstName}.</Text>
-        <Text style={styles.introText}>Puedo analizar tus movimientos, tus metas, tus tarjetas y tus próximos pagos.</Text>
-      </View>
-      <View style={styles.suggestions}>
-        {prompts.map((prompt) => (
-          <Pressable accessibilityRole="button" key={prompt} onPress={() => ask(prompt)} style={styles.prompt}>
-            <Text style={styles.promptText}>{prompt}</Text>
+    <SafeAreaView edges={["top", "left", "right", "bottom"]} style={styles.safe}>
+      <LinearGradient
+        colors={["#E7C34B", "#DB7504", "#C43705", "#711007", "#130202", "#000000"]}
+        locations={[0, 0.14, 0.29, 0.43, 0.56, 0.68]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 0.72, y: 1 }}
+        style={StyleSheet.absoluteFill}
+      />
+      <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={styles.keyboard}>
+        <View style={styles.header}>
+          <Pressable accessibilityLabel="Volver" accessibilityRole="button" onPress={() => router.back()} style={styles.roundButton}>
+            <ChevronLeft color={colors.white} size={22} strokeWidth={2.2} />
           </Pressable>
-        ))}
-      </View>
-      <ScrollView ref={scrollRef} scrollEnabled={false} style={styles.thread}>
-        {messages.length ? (
-          messages.map((message) => <Bubble key={message.id} message={message} />)
-        ) : (
-          <Bubble message={{ id: "initial", role: "assistant", text: "Preguntame algo concreto. Si falta información, te lo voy a decir en vez de inventar datos." }} />
-        )}
-        {loading ? <Bubble message={{ id: "loading", role: "assistant", text: "Analizando tus datos..." }} /> : null}
-      </ScrollView>
-      <View style={styles.inputBar}>
-        <TextInput
-          accessibilityLabel="Preguntale a FinFlow"
-          autoCapitalize="sentences"
-          onChangeText={setQuestion}
-          onSubmitEditing={() => ask()}
-          placeholder="Preguntale a FinFlow..."
-          placeholderTextColor={colors.grayMedium}
-          style={styles.input}
-          value={question}
-        />
-        <Pressable accessibilityRole="button" onPress={() => ask()} style={styles.send}>
-          <SendHorizontal color={colors.black} size={18} />
-        </Pressable>
-      </View>
-    </ScreenContainer>
+          <Text style={styles.headerTitle}>IA FinFlow</Text>
+          <Pressable accessibilityLabel="Nueva conversación" accessibilityRole="button" onPress={newConversation} style={styles.roundButton}>
+            <Plus color={colors.white} size={22} strokeWidth={2.2} />
+          </Pressable>
+        </View>
+
+        {!hasConversation ? (
+          <View style={styles.welcome}>
+            <Text style={styles.welcomeTitle}>Hola{firstName ? `, ${firstName}` : ""}!</Text>
+            <Text style={styles.welcomeTitle}>¿Cómo te puedo ayudar?</Text>
+            <View style={styles.suggestions}>
+              {prompts.map((prompt) => (
+                <Pressable
+                  accessibilityRole="button"
+                  disabled={loading}
+                  key={prompt}
+                  onPress={() => void send(prompt)}
+                  style={({ pressed }) => [styles.prompt, pressed && styles.promptPressed]}
+                >
+                  <Text style={styles.promptText}>{prompt}</Text>
+                </Pressable>
+              ))}
+            </View>
+          </View>
+        ) : null}
+
+        <ScrollView
+          contentContainerStyle={styles.threadContent}
+          keyboardShouldPersistTaps="handled"
+          onContentSizeChange={() => scrollRef.current?.scrollToEnd({ animated: true })}
+          ref={scrollRef}
+          showsVerticalScrollIndicator={false}
+          style={styles.thread}
+        >
+          {messages.map((message) => (
+            <Bubble
+              key={message.id}
+              message={message}
+              onRetry={message.retryText ? () => void send(message.retryText, false) : undefined}
+            />
+          ))}
+          {loading ? <TypingBubble /> : null}
+        </ScrollView>
+
+        <View style={styles.composer}>
+          <View style={styles.inputPill}>
+            <TextInput
+              accessibilityLabel="Preguntale a FinFlow"
+              autoCapitalize="sentences"
+              editable={!loading}
+              onChangeText={setQuestion}
+              onSubmitEditing={() => void send()}
+              placeholder="Preguntale a FinFlow..."
+              placeholderTextColor="#777775"
+              returnKeyType="send"
+              style={styles.input}
+              value={question}
+            />
+          </View>
+          <Pressable
+            accessibilityRole="button"
+            disabled={sendDisabled}
+            onPress={() => void send()}
+            style={({ pressed }) => [styles.send, sendDisabled && styles.sendDisabled, pressed && !sendDisabled && styles.sendPressed]}
+          >
+            <SendHorizontal color="#1C1C1B" fill="#1C1C1B" size={19} />
+          </Pressable>
+        </View>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
 
-function Bubble({ message }: { message: ChatMessage }) {
+function Bubble({ message, onRetry }: { message: StoredChatMessage; onRetry?: () => void }) {
   const mine = message.role === "user";
+  const entrance = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.spring(entrance, {
+      damping: 18,
+      mass: 0.65,
+      stiffness: 180,
+      toValue: 1,
+      useNativeDriver: true
+    }).start();
+  }, [entrance]);
+
   return (
-    <View style={[styles.bubble, mine && styles.userBubble]}>
-      <Text style={[styles.bubbleText, mine && styles.userText]}>{message.text}</Text>
-      {message.blocks?.map((block) => (
-        <View key={block.title} style={styles.block}>
-          <Text style={styles.blockTitle}>{block.title}</Text>
-          {block.rows.map((row) => (
-            <Text key={row} style={styles.blockRow}>{row}</Text>
-          ))}
+    <Animated.View
+      style={[
+        styles.messageRow,
+        mine && styles.userMessageRow,
+        {
+          opacity: entrance,
+          transform: [
+            { translateY: entrance.interpolate({ inputRange: [0, 1], outputRange: [12, 0] }) },
+            { scale: entrance.interpolate({ inputRange: [0, 1], outputRange: [0.96, 1] }) }
+          ]
+        }
+      ]}
+    >
+      {!mine ? <View style={styles.avatar} /> : null}
+      <View style={[styles.bubble, mine ? styles.userBubble : styles.assistantBubble]}>
+        <Text style={[styles.bubbleText, mine && styles.userText]}>{message.text}</Text>
+        {message.blocks?.map((block) => (
+          <View key={block.title} style={styles.block}>
+            <Text style={[styles.blockTitle, mine && styles.userText]}>{block.title}</Text>
+            {block.rows.map((row) => <Text key={row} style={[styles.blockRow, mine && styles.userText]}>{row}</Text>)}
+          </View>
+        ))}
+        {onRetry ? (
+          <Pressable accessibilityRole="button" onPress={onRetry}>
+            <Text style={styles.retry}>Reintentar</Text>
+          </Pressable>
+        ) : null}
+      </View>
+    </Animated.View>
+  );
+}
+
+function TypingBubble() {
+  const entrance = useRef(new Animated.Value(0)).current;
+  const values = useRef([new Animated.Value(0.25), new Animated.Value(0.25), new Animated.Value(0.25)]).current;
+
+  useEffect(() => {
+    Animated.spring(entrance, { damping: 16, stiffness: 180, toValue: 1, useNativeDriver: true }).start();
+    const animation = Animated.loop(Animated.stagger(150, values.map((value) => Animated.sequence([
+      Animated.timing(value, { duration: 240, toValue: 1, useNativeDriver: true }),
+      Animated.timing(value, { duration: 240, toValue: 0.25, useNativeDriver: true })
+    ]))));
+    animation.start();
+    return () => animation.stop();
+  }, [entrance, values]);
+
+  return (
+    <Animated.View
+      accessibilityLabel="FinFlow está escribiendo"
+      style={[styles.messageRow, { opacity: entrance, transform: [{ translateY: entrance.interpolate({ inputRange: [0, 1], outputRange: [10, 0] }) }] }]}
+    >
+      <View style={styles.avatar} />
+      <View style={[styles.bubble, styles.assistantBubble, styles.typingBubble]}>
+        <View style={styles.typing}>
+          {values.map((value, index) => <Animated.Text key={index} style={[styles.typingDot, { opacity: value }]}>•</Animated.Text>)}
         </View>
-      ))}
-    </View>
+      </View>
+    </Animated.View>
   );
 }
 
 const styles = StyleSheet.create({
+  assistantBubble: {
+    backgroundColor: "#585856"
+  },
+  avatar: {
+    backgroundColor: "#E5E5E5",
+    borderRadius: 21,
+    height: 42,
+    width: 42
+  },
   block: {
-    borderTopColor: colors.appGrayBorder,
+    borderTopColor: "rgba(255,255,255,0.22)",
     borderTopWidth: 1,
     gap: 4,
-    marginTop: spacing.md,
+    marginTop: spacing.sm,
     paddingTop: spacing.sm
   },
   blockRow: {
     ...typography.label,
-    color: colors.transparentWhite
+    color: "rgba(255,255,255,0.76)"
   },
   blockTitle: {
     ...typography.label,
@@ -144,86 +304,160 @@ const styles = StyleSheet.create({
     fontWeight: "900"
   },
   bubble: {
-    alignSelf: "flex-start",
-    backgroundColor: colors.appGrayDark,
-    borderColor: colors.appGrayBorder,
-    borderRadius: 8,
-    borderWidth: 1,
-    marginTop: spacing.sm,
-    maxWidth: "92%",
-    padding: spacing.md
+    borderRadius: 22,
+    maxWidth: "82%",
+    paddingHorizontal: 16,
+    paddingVertical: 11
   },
   bubbleText: {
     ...typography.body,
     color: colors.white
   },
-  input: {
+  composer: {
+    alignItems: "flex-end",
+    flexDirection: "row",
+    gap: 8,
+    paddingBottom: 8,
+    paddingHorizontal: 22,
+    paddingTop: 10
+  },
+  header: {
+    alignItems: "center",
+    flexDirection: "row",
+    paddingHorizontal: 22,
+    paddingTop: 14
+  },
+  headerTitle: {
     ...typography.body,
     color: colors.white,
     flex: 1,
-    minHeight: 44,
-    paddingHorizontal: spacing.md
+    fontWeight: "800",
+    marginLeft: 12
   },
-  inputBar: {
-    alignItems: "center",
-    backgroundColor: colors.appGrayDark,
-    borderColor: colors.appGrayBorder,
-    borderRadius: 8,
-    borderWidth: 1,
-    flexDirection: "row",
-    gap: spacing.sm,
-    marginTop: spacing.lg,
-    padding: 4
-  },
-  intro: {
-    marginTop: spacing.lg
-  },
-  introText: {
+  input: {
     ...typography.body,
-    color: colors.transparentWhite,
-    marginTop: spacing.xs
+    color: colors.white,
+    maxHeight: 96,
+    minHeight: 44,
+    paddingHorizontal: 16,
+    paddingVertical: 10
   },
-  introTitle: {
-    ...typography.title,
-    color: colors.white
+  inputPill: {
+    backgroundColor: "#3D3D3B",
+    borderRadius: 24,
+    flex: 1,
+    justifyContent: "center",
+    minHeight: 44
+  },
+  keyboard: {
+    flex: 1
+  },
+  messageRow: {
+    alignItems: "flex-start",
+    flexDirection: "row",
+    gap: 10,
+    marginBottom: 18,
+    width: "100%"
   },
   prompt: {
-    borderColor: colors.appGrayBorder,
-    borderRadius: 8,
-    borderWidth: 1,
-    minHeight: 38,
+    backgroundColor: "rgba(82,82,80,0.88)",
+    borderRadius: 22,
+    minHeight: 42,
     justifyContent: "center",
-    paddingHorizontal: spacing.md
+    paddingHorizontal: 16
+  },
+  promptPressed: {
+    opacity: 0.72,
+    transform: [{ scale: 0.97 }]
   },
   promptText: {
+    ...typography.body,
+    color: "rgba(255,255,255,0.72)"
+  },
+  retry: {
     ...typography.label,
     color: colors.white,
-    fontWeight: "800"
+    fontWeight: "900",
+    marginTop: spacing.sm
+  },
+  roundButton: {
+    alignItems: "center",
+    backgroundColor: "#20201F",
+    borderRadius: 18,
+    height: 36,
+    justifyContent: "center",
+    width: 36
+  },
+  safe: {
+    backgroundColor: colors.black,
+    flex: 1
   },
   send: {
     alignItems: "center",
-    backgroundColor: colors.white,
-    borderRadius: 8,
-    height: 40,
+    backgroundColor: "#E5E5E5",
+    borderRadius: 22,
+    height: 44,
     justifyContent: "center",
-    width: 40
+    width: 44
+  },
+  sendDisabled: {
+    opacity: 0.42
+  },
+  sendPressed: {
+    transform: [{ scale: 0.92 }]
   },
   suggestions: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: spacing.sm,
-    marginTop: spacing.xl
+    gap: 8,
+    justifyContent: "center",
+    marginTop: 34,
+    maxWidth: 360
   },
   thread: {
-    marginTop: spacing.xl,
-    maxHeight: 380
+    flex: 1,
+    marginTop: 28
+  },
+  threadContent: {
+    flexGrow: 1,
+    paddingBottom: 18,
+    paddingHorizontal: 22
+  },
+  typing: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 3,
+    height: 22
+  },
+  typingBubble: {
+    minWidth: 66
+  },
+  typingDot: {
+    ...typography.title,
+    color: colors.white,
+    lineHeight: 22
   },
   userBubble: {
-    alignSelf: "flex-end",
-    backgroundColor: colors.white,
-    borderColor: colors.white
+    backgroundColor: "#FFFFFF"
+  },
+  userMessageRow: {
+    justifyContent: "flex-end"
   },
   userText: {
-    color: colors.black
+    color: "#1C1C1B"
+  },
+  welcome: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 20,
+    paddingTop: 142
+  },
+  welcomeTitle: {
+    ...typography.title,
+    color: colors.white,
+    fontSize: 28,
+    fontWeight: "700",
+    lineHeight: 34,
+    textAlign: "center"
   }
 });

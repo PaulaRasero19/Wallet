@@ -1,19 +1,17 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect } from "react";
 import { AppState, StyleSheet, useWindowDimensions, View } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { router } from "expo-router";
+import { LinearGradient } from "expo-linear-gradient";
 import { useFocusEffect } from "@react-navigation/native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AvailableMoney } from "../../src/components/home/AvailableMoney";
-import { HomeBalanceChart } from "../../src/components/home/HomeBalanceChart";
 import { HomeHeader } from "../../src/components/home/HomeHeader";
 import { HomeMetricCards } from "../../src/components/home/HomeMetricCards";
-import { HomeTransactionsSheet } from "../../src/components/home/HomeTransactionsSheet";
+import { HomeGoalsSheet } from "../../src/components/home/HomeTransactionsSheet";
 import { LiquidGradientBackground } from "../../src/components/home/LiquidGradientBackground";
-import { HomePeriod, periodToApi, PeriodSelector } from "../../src/components/home/PeriodSelector";
 import { useFinFlowStore } from "../../src/store/useFinFlowStore";
 import { useSessionStore } from "../../src/store/useSessionStore";
-import { colors } from "../../src/theme";
 import { overviewMetrics } from "../../src/utils/financeInsights";
 import { calculateFinancialInsights } from "../../src/utils/homeFinancialInsights";
 import { calculateCompletedMonthlyTransactions } from "../../src/utils/movementSummary";
@@ -30,7 +28,6 @@ function insightDateRange() {
 }
 
 export default function Overview() {
-  const [period, setPeriod] = useState<HomePeriod>("1W");
   const insets = useSafeAreaInsets();
   const { height } = useWindowDimensions();
   const { accounts, creditCards, events, goals, loadNotifications, loadOverview, loadTransactions, notifications, overview, recurringPayments, transactions } = useFinFlowStore();
@@ -38,7 +35,7 @@ export default function Overview() {
   const primaryCurrency = profile?.primary_currency || "UYU";
   const firstName = String(profile?.full_name || "Lucía").split(" ")[0];
   const profileMonthlyIncome = typeof profile?.monthly_income === "number" ? profile.monthly_income : null;
-  const metricsTop = Math.min(height * 0.495, 440);
+  const metricsTop = Math.min(height * 0.5, 390);
   const pendingNotifications = notifications.filter((item) => item.status === "pending").length;
 
   useEffect(() => {
@@ -51,9 +48,9 @@ export default function Overview() {
 
   useFocusEffect(useCallback(() => {
     void loadNotifications("pending");
-    void loadOverview(periodToApi(period));
+    void loadOverview();
     void loadTransactions({ ...insightDateRange(), limit: 500 });
-  }, [loadNotifications, loadOverview, loadTransactions, period]));
+  }, [loadNotifications, loadOverview, loadTransactions]));
 
   const metrics = overviewMetrics({
     accounts,
@@ -79,6 +76,7 @@ export default function Overview() {
     <View style={styles.screen}>
       <StatusBar backgroundColor="transparent" translucent style="light" />
       <LiquidGradientBackground />
+      <LinearGradient colors={["#1C1C1B", "#1C1C1B", "rgba(28,28,27,0)"]} locations={[0, 0.12, 0.38]} pointerEvents="none" style={StyleSheet.absoluteFill} />
       <View style={[styles.content, { paddingTop: insets.top }]}>
         <HomeHeader
           avatarUrl={profile?.avatar_url || profile?.avatarUrl}
@@ -89,8 +87,6 @@ export default function Overview() {
           onProfilePress={() => router.push("/profile")}
         />
         <AvailableMoney amount={monthlyTotals.balance} currency={primaryCurrency} />
-        <HomeBalanceChart currency={primaryCurrency} history={overview?.history || []} period={period} />
-        <PeriodSelector onChange={setPeriod} value={period} />
       </View>
       <View pointerEvents="none" style={[styles.metricLayer, { top: metricsTop }]}>
         <HomeMetricCards
@@ -98,7 +94,7 @@ export default function Overview() {
           insights={cardInsights}
         />
       </View>
-      <HomeTransactionsSheet accounts={accounts} transactions={transactions} />
+      <HomeGoalsSheet goals={goals} />
     </View>
   );
 }
@@ -114,7 +110,7 @@ const styles = StyleSheet.create({
     zIndex: 20
   },
   screen: {
-    backgroundColor: colors.black,
+    backgroundColor: "#1C1C1B",
     flex: 1,
     overflow: "hidden"
   }
