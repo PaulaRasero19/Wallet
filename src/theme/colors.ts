@@ -1,7 +1,7 @@
 export const colors = {
   background: "#F7F4EF",
   surface: "#FFFFFF",
-  appGray: "#55554F",
+  appGray: "#1C1C1B",
   appGrayDark: "#3F403B",
   appGraySoft: "rgba(255,255,255,0.1)",
   appGrayBorder: "rgba(255,255,255,0.16)",
@@ -11,6 +11,7 @@ export const colors = {
   grayMedium: "#8F8B84",
   grayLight: "#DED9D1",
   orange: "#FF4F18",
+  brandOrange: "#BC3426",
   blue: "#164CFF",
   lime: "#B8DC36",
   lavender: "#A99BEF",

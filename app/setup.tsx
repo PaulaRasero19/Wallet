@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
+import { ChevronDown } from "lucide-react-native";
 import { router } from "expo-router";
 import { Header } from "../src/components/Header";
 import { InputField } from "../src/components/InputField";
@@ -29,7 +30,6 @@ const goals: GoalOption[] = [
 ];
 
 const weekdays = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"];
-const monthDays = Array.from({ length: 31 }, (_, index) => index + 1);
 const totalSteps = 4;
 
 function parseMoney(value: string) {
@@ -67,8 +67,11 @@ export default function Setup() {
   const [selectedCurrency, setSelectedCurrency] = useState<CurrencyOption | null>(initialCurrency || null);
   const [income, setIncome] = useState(profile?.monthly_income ? formatNumberText(String(profile.monthly_income)) : "");
   const [incomeFrequency, setIncomeFrequency] = useState<IncomeFrequency>((profile?.income_frequency as IncomeFrequency | null) || "monthly");
+  const [frequencyOpen, setFrequencyOpen] = useState(false);
   const [payday, setPayday] = useState<number | null>(profile?.payday_day ?? profile?.payday ?? null);
+  const [paydayText, setPaydayText] = useState(profile?.payday_day || profile?.payday ? String(profile.payday_day ?? profile.payday) : "");
   const [secondPayday, setSecondPayday] = useState<number | null>(profile?.second_payday ?? null);
+  const [secondPaydayText, setSecondPaydayText] = useState(profile?.second_payday ? String(profile.second_payday) : "");
   const [paydayWeekday, setPaydayWeekday] = useState<number | null>(profile?.payday_weekday ?? null);
   const [primaryGoal, setPrimaryGoal] = useState(profile?.primary_goal || "");
   const [formMessage, setFormMessage] = useState("");
@@ -140,8 +143,8 @@ export default function Setup() {
     if (step === 2) {
       const monthlyIncome = parseMoney(income);
       if (monthlyIncome <= 0) return "Agregá tu ingreso mensual aproximado.";
-      if (incomeFrequency === "monthly" && !payday) return "Seleccioná tu fecha habitual de cobro.";
-      if (incomeFrequency === "biweekly" && (!payday || !secondPayday)) return "Seleccioná tus dos fechas habituales de cobro.";
+      if (incomeFrequency === "monthly" && !payday) return "Ingresá un día de cobro válido, del 1 al 31.";
+      if (incomeFrequency === "biweekly" && (!payday || !secondPayday)) return "Ingresá dos días de cobro válidos, del 1 al 31.";
       if (incomeFrequency === "weekly" && paydayWeekday === null) return "Seleccioná tu día habitual de cobro.";
     }
 
@@ -328,44 +331,74 @@ export default function Setup() {
             value={income}
           />
           <Text style={styles.label}>Frecuencia</Text>
-          <View style={styles.wrapRow}>
-            {incomeFrequencies.map((item) => {
-              const active = item.code === incomeFrequency;
-              return (
-                <Pressable accessibilityRole="button" key={item.code} onPress={() => setIncomeFrequency(item.code)} style={[styles.choice, active && styles.activeChoice]}>
-                  <Text style={[styles.choiceText, active && styles.activeChoiceText]}>{item.label}</Text>
-                </Pressable>
-              );
-            })}
-          </View>
+          <Pressable
+            accessibilityLabel="Seleccionar frecuencia"
+            accessibilityRole="button"
+            accessibilityState={{ expanded: frequencyOpen }}
+            onPress={() => setFrequencyOpen((current) => !current)}
+            style={styles.selectInput}
+          >
+            <Text style={styles.selectValue}>{incomeFrequencies.find((item) => item.code === incomeFrequency)?.label}</Text>
+            <ChevronDown color={colors.transparentWhite} size={24} style={frequencyOpen ? styles.chevronOpen : undefined} />
+          </Pressable>
+          {frequencyOpen ? (
+            <View style={styles.selectMenu}>
+              {incomeFrequencies.map((item) => {
+                const active = item.code === incomeFrequency;
+                return (
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: active }}
+                    key={item.code}
+                    onPress={() => {
+                      setIncomeFrequency(item.code);
+                      setFrequencyOpen(false);
+                      setFormMessage("");
+                    }}
+                    style={[styles.selectOption, active && styles.selectOptionActive]}
+                  >
+                    <Text style={[styles.selectOptionText, active && styles.selectOptionTextActive]}>{item.label}</Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          ) : null}
           {incomeFrequency === "monthly" || incomeFrequency === "biweekly" ? (
             <>
               <Text style={styles.label}>Fecha habitual de cobro</Text>
-              <View style={styles.dayGrid}>
-                {monthDays.map((day) => {
-                  const active = day === payday;
-                  return (
-                    <Pressable accessibilityRole="button" key={day} onPress={() => setPayday(day)} style={[styles.dayChoice, active && styles.activeChoice]}>
-                      <Text style={[styles.choiceText, active && styles.activeChoiceText]}>{day}</Text>
-                    </Pressable>
-                  );
-                })}
-              </View>
+              <InputField
+                accessibilityLabel="Día habitual de cobro"
+                keyboardType="number-pad"
+                maxLength={2}
+                onChangeText={(value) => {
+                  const digits = value.replace(/\D/g, "").slice(0, 2);
+                  const day = Number(digits);
+                  setPaydayText(digits);
+                  setPayday(day >= 1 && day <= 31 ? day : null);
+                  setFormMessage("");
+                }}
+                placeholder="Día del mes · del 1 al 31"
+                value={paydayText}
+              />
             </>
           ) : null}
           {incomeFrequency === "biweekly" ? (
             <>
               <Text style={styles.label}>Segunda fecha de cobro</Text>
-              <View style={styles.dayGrid}>
-                {monthDays.map((day) => {
-                  const active = day === secondPayday;
-                  return (
-                    <Pressable accessibilityRole="button" key={day} onPress={() => setSecondPayday(day)} style={[styles.dayChoice, active && styles.activeChoice]}>
-                      <Text style={[styles.choiceText, active && styles.activeChoiceText]}>{day}</Text>
-                    </Pressable>
-                  );
-                })}
-              </View>
+              <InputField
+                accessibilityLabel="Segundo día habitual de cobro"
+                keyboardType="number-pad"
+                maxLength={2}
+                onChangeText={(value) => {
+                  const digits = value.replace(/\D/g, "").slice(0, 2);
+                  const day = Number(digits);
+                  setSecondPaydayText(digits);
+                  setSecondPayday(day >= 1 && day <= 31 ? day : null);
+                  setFormMessage("");
+                }}
+                placeholder="Día del mes · del 1 al 31"
+                value={secondPaydayText}
+              />
             </>
           ) : null}
           {incomeFrequency === "weekly" ? (
@@ -500,12 +533,51 @@ const styles = StyleSheet.create({
     color: colors.transparentWhite,
     fontWeight: "700"
   },
-  wrapRow: {
+  selectInput: {
+    alignItems: "center",
+    backgroundColor: colors.appGrayDark,
+    borderColor: colors.appGrayBorder,
+    borderRadius: radii.md,
+    borderWidth: 1,
     flexDirection: "row",
-    flexWrap: "wrap",
-    gap: spacing.sm
+    justifyContent: "space-between",
+    minHeight: 58,
+    paddingHorizontal: spacing.md
   },
-  dayGrid: {
+  selectValue: {
+    ...typography.body,
+    color: colors.white
+  },
+  chevronOpen: {
+    transform: [{ rotate: "180deg" }]
+  },
+  selectMenu: {
+    backgroundColor: colors.appGrayDark,
+    borderColor: colors.appGrayBorder,
+    borderRadius: radii.md,
+    borderWidth: 1,
+    marginTop: -8,
+    overflow: "hidden"
+  },
+  selectOption: {
+    borderBottomColor: colors.appGrayBorder,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    justifyContent: "center",
+    minHeight: 50,
+    paddingHorizontal: spacing.md
+  },
+  selectOptionActive: {
+    backgroundColor: colors.white
+  },
+  selectOptionText: {
+    ...typography.body,
+    color: colors.white
+  },
+  selectOptionTextActive: {
+    color: colors.black,
+    fontWeight: "700"
+  },
+  wrapRow: {
     flexDirection: "row",
     flexWrap: "wrap",
     gap: spacing.sm
@@ -517,15 +589,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     minHeight: 40,
     paddingHorizontal: spacing.md
-  },
-  dayChoice: {
-    alignItems: "center",
-    borderColor: colors.appGrayBorder,
-    borderRadius: radii.pill,
-    borderWidth: 1,
-    height: 40,
-    justifyContent: "center",
-    width: 40
   },
   activeChoice: {
     backgroundColor: colors.white,

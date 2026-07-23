@@ -3,6 +3,7 @@
     "name": "FinFlow",
     "slug": "finflow",
     "version": "1.0.0",
+    "icon": "./assets/finflow-app-icon.png",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
     "scheme": "finflow",
@@ -11,10 +12,19 @@
     ],
     "android": {
       "package": "com.finflow.app",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/finflow-mark.png",
+        "backgroundColor": "#1C1C1B"
+      },
       "permissions": [
         "POST_NOTIFICATIONS",
         "SCHEDULE_EXACT_ALARM"
       ]
+    },
+    "splash": {
+      "image": "./assets/finflow-mark.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#111110"
     },
     "plugins": [
       "expo-notifications",

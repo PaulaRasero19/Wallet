@@ -11,7 +11,7 @@ export function PrimaryButton({ children, disabled = false, onPress, style }: { 
       onPress={onPress}
       style={({ pressed }) => [styles.button, disabled && styles.disabled, pressed && !disabled && styles.pressed, style]}
     >
-      <Text style={styles.text}>{children}</Text>
+      <Text adjustsFontSizeToFit minimumFontScale={0.86} numberOfLines={1} style={styles.text}>{children}</Text>
     </Pressable>
   );
 }

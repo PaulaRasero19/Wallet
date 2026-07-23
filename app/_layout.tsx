@@ -7,6 +7,9 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { useFinFlowStore } from "../src/store/useFinFlowStore";
 import { useSessionStore } from "../src/store/useSessionStore";
 import { colors } from "../src/theme";
+import { configureResponsiveText } from "../src/utils/configureResponsiveText";
+
+configureResponsiveText();
 
 export default function RootLayout() {
   const clearFinancialData = useFinFlowStore((state) => state.clearFinancialData);

@@ -1,50 +1,40 @@
 import { useState } from "react";
-import { Alert, StyleSheet, Text, View } from "react-native";
+import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
+import { Eye, EyeOff } from "lucide-react-native";
 import { router } from "expo-router";
-import { LinearGradient } from "expo-linear-gradient";
+import Animated, { FadeInUp } from "react-native-reanimated";
 import { Header } from "../src/components/Header";
 import { InputField } from "../src/components/InputField";
+import { PreloginLiquidBackground } from "../src/components/prelogin/PreloginLiquidBackground";
 import { PrimaryButton } from "../src/components/PrimaryButton";
-import { SecondaryButton } from "../src/components/SecondaryButton";
 import { ScreenContainer } from "../src/components/ScreenContainer";
 import { translate } from "../src/i18n";
 import { colors, spacing, typography } from "../src/theme";
 import { useSessionStore } from "../src/store/useSessionStore";
 
-type LoginErrors = {
-  email?: string;
-  password?: string;
-  form?: string;
-};
+type LoginErrors = { email?: string; password?: string; form?: string };
 
 export default function Login() {
   const { language, login, status } = useSessionStore();
   const [email, setEmail] = useState("");
   const [errors, setErrors] = useState<LoginErrors>({});
+  const [focused, setFocused] = useState<"email" | "password" | null>(null);
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const t = (key: string) => translate(language, key);
 
   function validate() {
     const nextErrors: LoginErrors = {};
     const normalizedEmail = email.trim().toLowerCase();
-
-    if (!normalizedEmail) {
-      nextErrors.email = t("auth.emailRequired");
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
-      nextErrors.email = t("auth.invalidEmail");
-    }
-
-    if (!password) {
-      nextErrors.password = t("auth.passwordRequired");
-    }
-
+    if (!normalizedEmail) nextErrors.email = t("auth.emailRequired");
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) nextErrors.email = t("auth.invalidEmail");
+    if (!password) nextErrors.password = t("auth.passwordRequired");
     setErrors(nextErrors);
     return Object.keys(nextErrors).length === 0;
   }
 
   async function submit() {
     if (!validate()) return;
-
     try {
       await login(email.trim().toLowerCase(), password);
       const nextProfile = useSessionStore.getState().profile;
@@ -57,135 +47,97 @@ export default function Login() {
   }
 
   return (
-    <ScreenContainer backgroundColor="#1C1C1B" style={styles.content}>
-      <Header title={t("auth.login")} back />
-      <LinearGradient colors={["#2A0000", "#B91909", "#F05208", "#D8B600"]} end={{ x: 1, y: 1 }} start={{ x: 0, y: 0 }} style={styles.accent}>
-        <Text style={styles.accentEyebrow}>FINFLOW</Text>
-        <Text style={styles.accentTitle}>Tu plata,{"\n"}más clara.</Text>
-      </LinearGradient>
-      <View style={styles.form}>
-        <View style={styles.intro}>
-          <Text style={styles.title}>Qué bueno verte de nuevo</Text>
-          <Text style={styles.subtitle}>Ingresá para revisar tus movimientos, pagos y metas.</Text>
-        </View>
-        <Text style={styles.label}>{t("auth.email")}</Text>
-        <InputField
-          accessibilityLabel={t("auth.email")}
-          autoCapitalize="none"
-          autoCorrect={false}
-          keyboardType="email-address"
-          onChangeText={(value) => {
-            setEmail(value.trim().toLowerCase());
-            setErrors((current) => ({ ...current, email: undefined, form: undefined }));
-          }}
-          placeholder={t("auth.email")}
-          style={styles.input}
-          value={email}
-        />
-        {errors.email ? <Text style={styles.message}>{errors.email}</Text> : null}
-        <Text style={styles.label}>{t("auth.password")}</Text>
-        <InputField
-          accessibilityLabel={t("auth.password")}
-          onChangeText={(value) => {
-            setPassword(value);
-            setErrors((current) => ({ ...current, password: undefined, form: undefined }));
-          }}
-          placeholder={t("auth.password")}
-          secureTextEntry
-          style={styles.input}
-          value={password}
-        />
-        {errors.password ? <Text style={styles.message}>{errors.password}</Text> : null}
-        {errors.form ? <Text style={styles.message}>{errors.form}</Text> : null}
-        <PrimaryButton onPress={submit} style={styles.primary}>{status === "loading" ? t("common.loading") : t("auth.login")}</PrimaryButton>
-        <SecondaryButton onPress={() => router.push("/forgot-password")} style={styles.linkButton}>{t("auth.forgot")}</SecondaryButton>
-        <View style={styles.registerRow}>
-          <Text style={styles.registerCopy}>¿Todavía no tenés cuenta?</Text>
-          <SecondaryButton onPress={() => router.push("/register")} style={styles.registerButton}>{t("auth.register")}</SecondaryButton>
-        </View>
-      </View>
-    </ScreenContainer>
+    <View style={styles.screen}>
+      <PreloginLiquidBackground variant="login" />
+      <ScreenContainer backgroundColor="transparent" style={styles.content}>
+        <Header title="" back />
+        <Animated.View entering={FadeInUp.duration(440)} style={styles.heading}>
+          <Text accessibilityRole="header" style={styles.brand}>
+            <Text style={styles.brandFin}>Fin</Text>
+            <Text style={styles.brandFlow}>Flow</Text>
+          </Text>
+          <Text style={styles.title}>Iniciar sesión</Text>
+        </Animated.View>
+
+        <Animated.View entering={FadeInUp.delay(80).duration(460)} style={styles.form}>
+          <Text style={styles.label}>Correo electrónico</Text>
+          <InputField
+            accessibilityLabel={t("auth.email")}
+            autoCapitalize="none"
+            autoCorrect={false}
+            keyboardType="email-address"
+            onBlur={() => setFocused(null)}
+            onChangeText={(value) => {
+              setEmail(value.trim().toLowerCase());
+              setErrors((current) => ({ ...current, email: undefined, form: undefined }));
+            }}
+            onFocus={() => setFocused("email")}
+            placeholder="Correo electrónico"
+            style={[styles.input, focused === "email" && styles.inputFocused]}
+            value={email}
+          />
+          {errors.email ? <Text style={styles.message}>{errors.email}</Text> : null}
+
+          <Text style={styles.label}>Contraseña</Text>
+          <View style={styles.passwordWrap}>
+            <InputField
+              accessibilityLabel={t("auth.password")}
+              onBlur={() => setFocused(null)}
+              onChangeText={(value) => {
+                setPassword(value);
+                setErrors((current) => ({ ...current, password: undefined, form: undefined }));
+              }}
+              onFocus={() => setFocused("password")}
+              placeholder="Contraseña"
+              secureTextEntry={!showPassword}
+              style={[styles.input, styles.passwordInput, focused === "password" && styles.inputFocused]}
+              value={password}
+            />
+            <Pressable accessibilityLabel={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"} accessibilityRole="button" onPress={() => setShowPassword((current) => !current)} style={styles.eyeButton}>
+              {showPassword ? <EyeOff color={colors.white} size={20} /> : <Eye color={colors.white} size={20} />}
+            </Pressable>
+          </View>
+          {errors.password ? <Text style={styles.message}>{errors.password}</Text> : null}
+          {errors.form ? <Text style={styles.message}>{errors.form}</Text> : null}
+
+          <Pressable accessibilityRole="button" onPress={() => router.push("/forgot-password")} style={styles.forgot}>
+            <Text style={styles.forgotText}>¿Olvidaste tu contraseña?</Text>
+          </Pressable>
+
+          <PrimaryButton disabled={status === "loading"} onPress={submit} style={styles.primary}>
+            {status === "loading" ? "Iniciando…" : "Iniciar sesión"}
+          </PrimaryButton>
+
+          <View style={styles.registerBlock}>
+            <Text style={styles.registerCopy}>¿No tenés una cuenta?{" "}</Text>
+            <Pressable accessibilityRole="button" hitSlop={10} onPress={() => router.replace("/register")}><Text style={styles.registerLink}>Crear cuenta</Text></Pressable>
+          </View>
+        </Animated.View>
+      </ScreenContainer>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  content: {
-    gap: spacing.lg
-  },
-  accent: {
-    borderRadius: 34,
-    height: 184,
-    justifyContent: "flex-end",
-    overflow: "hidden",
-    padding: spacing.lg
-  },
-  accentEyebrow: {
-    ...typography.label,
-    color: colors.transparentWhite,
-    fontWeight: "700",
-    letterSpacing: 1.8
-  },
-  accentTitle: {
-    ...typography.display,
-    color: colors.white,
-    fontSize: 38,
-    lineHeight: 40,
-    marginTop: spacing.xs
-  },
-  form: {
-    gap: spacing.sm
-  },
-  intro: {
-    gap: spacing.xs,
-    marginBottom: spacing.sm
-  },
-  title: {
-    ...typography.title,
-    color: colors.white
-  },
-  subtitle: {
-    ...typography.body,
-    color: colors.transparentWhite
-  },
-  label: {
-    ...typography.label,
-    color: colors.transparentWhite,
-    fontWeight: "700",
-    marginTop: spacing.xs
-  },
-  input: {
-    backgroundColor: "#595958",
-    borderColor: "transparent",
-    borderRadius: 22,
-    minHeight: 58
-  },
-  primary: {
-    marginTop: spacing.md,
-    minHeight: 58
-  },
-  linkButton: {
-    borderWidth: 0,
-    minHeight: 40
-  },
-  registerRow: {
-    alignItems: "center",
-    borderTopColor: colors.appGrayBorder,
-    borderTopWidth: 1,
-    gap: spacing.xs,
-    marginTop: spacing.sm,
-    paddingTop: spacing.md
-  },
-  registerCopy: {
-    ...typography.body,
-    color: colors.transparentWhite
-  },
-  registerButton: {
-    borderColor: colors.appGrayBorder,
-    minHeight: 46,
-    width: "100%"
-  },
-  message: {
-    ...typography.body,
-    color: colors.negative
-  }
+  screen: { backgroundColor: "#1C1C1B", flex: 1 },
+  content: { gap: spacing.md, paddingHorizontal: 30 },
+  heading: { alignItems: "center", gap: spacing.xl, marginBottom: 38, marginTop: spacing.sm },
+  brand: { ...typography.title, fontSize: 25, fontWeight: "700", letterSpacing: -0.7 },
+  brandFin: { color: colors.white, fontWeight: "800" },
+  brandFlow: { color: colors.brandOrange, fontWeight: "800" },
+  title: { ...typography.display, color: colors.white, fontSize: 34, fontWeight: "500", lineHeight: 40, textAlign: "center" },
+  form: { gap: spacing.sm },
+  label: { ...typography.label, color: colors.transparentWhite, fontSize: 13, fontWeight: "700", marginTop: spacing.xs },
+  input: { backgroundColor: "rgba(63,64,59,0.9)", borderColor: "rgba(255,255,255,0.15)", borderRadius: 20, borderWidth: 1, minHeight: 62, paddingHorizontal: 20 },
+  inputFocused: { backgroundColor: "rgba(75,75,71,0.96)", borderColor: "rgba(255,255,255,0.38)" },
+  passwordWrap: { position: "relative" },
+  passwordInput: { paddingRight: 52 },
+  eyeButton: { alignItems: "center", bottom: 0, justifyContent: "center", position: "absolute", right: 0, top: 0, width: 52 },
+  message: { ...typography.body, color: "#D65B54" },
+  forgot: { alignSelf: "flex-end", paddingVertical: spacing.xs },
+  forgotText: { ...typography.label, color: colors.transparentWhite, fontWeight: "600" },
+  primary: { backgroundColor: "#BDBDBD", marginTop: spacing.md, minHeight: 62 },
+  registerBlock: { alignItems: "center", flexDirection: "row", justifyContent: "center", marginTop: 36, paddingBottom: spacing.xl },
+  registerCopy: { ...typography.body, color: colors.transparentWhite },
+  registerLink: { ...typography.body, color: colors.white, fontWeight: "700", textDecorationLine: "underline" }
 });

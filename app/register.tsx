@@ -1,10 +1,11 @@
 import { useRef, useState } from "react";
-import { Alert, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { Alert, Keyboard, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { Eye, EyeOff } from "lucide-react-native";
 import { router } from "expo-router";
-import { LinearGradient } from "expo-linear-gradient";
+import Animated, { FadeInUp } from "react-native-reanimated";
 import { Header } from "../src/components/Header";
 import { InputField } from "../src/components/InputField";
+import { PreloginLiquidBackground } from "../src/components/prelogin/PreloginLiquidBackground";
 import { PrimaryButton } from "../src/components/PrimaryButton";
 import { ScreenContainer } from "../src/components/ScreenContainer";
 import { translate } from "../src/i18n";
@@ -28,6 +29,7 @@ export default function Register() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [errors, setErrors] = useState<RegisterErrors>({});
+  const [focused, setFocused] = useState<"name" | "email" | "password" | "confirmPassword" | null>(null);
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -90,6 +92,13 @@ export default function Register() {
         return;
       }
 
+      const { authUser, profile } = useSessionStore.getState();
+      if (!authUser || !profile) {
+        throw new Error("La cuenta se creó, pero no pudimos abrir su configuración. Iniciá sesión para continuar.");
+      }
+
+      Keyboard.dismiss();
+      await new Promise((resolve) => setTimeout(resolve, 220));
       router.replace("/setup");
     } catch (error) {
       const message = error instanceof Error ? error.message : t("auth.configMissing");
@@ -100,37 +109,40 @@ export default function Register() {
   const canSubmit = status !== "loading";
 
   return (
-    <ScreenContainer backgroundColor="#1C1C1B" style={styles.content}>
-      <Header title={t("auth.register")} back />
-      <LinearGradient colors={["#280000", "#A51208", "#EC4205", "#D8B600"]} end={{ x: 1, y: 1 }} start={{ x: 0, y: 0 }} style={styles.accent}>
-        <Text style={styles.accentEyebrow}>EMPEZÁ HOY</Text>
-        <Text style={styles.accentTitle}>Ordená tu plata{"\n"}a tu manera.</Text>
-      </LinearGradient>
-      <View style={styles.form}>
-        <View style={styles.intro}>
-          <Text style={styles.title}>Creá tu cuenta</Text>
-          <Text style={styles.subtitle}>Solo necesitamos estos datos para preparar tu experiencia.</Text>
-        </View>
-        <Text style={styles.label}>{t("auth.name")}</Text>
+    <View style={styles.screen}>
+      <PreloginLiquidBackground variant="register" />
+      <ScreenContainer backgroundColor="transparent" style={styles.content}>
+        <Header title="" back />
+        <Animated.View entering={FadeInUp.duration(440)} style={styles.heading}>
+          <Text accessibilityRole="header" style={styles.brand}>
+            <Text style={styles.brandFin}>Fin</Text>
+            <Text style={styles.brandFlow}>Flow</Text>
+          </Text>
+          <Text style={styles.title}>Crear cuenta</Text>
+        </Animated.View>
+        <Animated.View entering={FadeInUp.delay(80).duration(460)} style={styles.form}>
+        <Text style={styles.label}>Nombre</Text>
         <InputField
           inputRef={nameInputRef}
           accessibilityLabel={t("auth.name")}
           autoComplete="name"
           blurOnSubmit={false}
           editable
+          onBlur={() => setFocused(null)}
           onChangeText={(value) => {
             setName(value);
             setErrors((current) => ({ ...current, name: undefined, form: undefined }));
           }}
           onSubmitEditing={() => emailInputRef.current?.focus()}
-          placeholder={t("auth.name")}
+          onFocus={() => setFocused("name")}
+          placeholder="Nombre completo"
           returnKeyType="next"
-          style={styles.input}
+          style={[styles.input, focused === "name" && styles.inputFocused]}
           textContentType="name"
           value={name}
         />
         {errors.name ? <Text style={styles.message}>{errors.name}</Text> : null}
-        <Text style={styles.label}>{t("auth.email")}</Text>
+        <Text style={styles.label}>Correo electrónico</Text>
         <InputField
           inputRef={emailInputRef}
           accessibilityLabel={t("auth.email")}
@@ -140,19 +152,21 @@ export default function Register() {
           blurOnSubmit={false}
           editable
           keyboardType="email-address"
+          onBlur={() => setFocused(null)}
           onChangeText={(value) => {
             updateEmail(value);
             setErrors((current) => ({ ...current, email: undefined, form: undefined }));
           }}
           onSubmitEditing={() => passwordInputRef.current?.focus()}
-          placeholder={t("auth.email")}
+          onFocus={() => setFocused("email")}
+          placeholder="Correo electrónico"
           returnKeyType="next"
-          style={styles.input}
+          style={[styles.input, focused === "email" && styles.inputFocused]}
           textContentType="emailAddress"
           value={email}
         />
         {errors.email ? <Text style={styles.message}>{errors.email}</Text> : null}
-        <Text style={styles.label}>{t("auth.password")}</Text>
+        <Text style={styles.label}>Contraseña</Text>
         <View style={styles.passwordWrap}>
           <InputField
             inputRef={passwordInputRef}
@@ -161,15 +175,17 @@ export default function Register() {
             autoCorrect={false}
             blurOnSubmit={false}
             editable
+            onBlur={() => setFocused(null)}
             onChangeText={(value) => {
               setPassword(value);
               setErrors((current) => ({ ...current, password: undefined, confirmPassword: undefined, form: undefined }));
             }}
             onSubmitEditing={() => confirmPasswordInputRef.current?.focus()}
+            onFocus={() => setFocused("password")}
             placeholder={t("auth.password")}
             returnKeyType="next"
             secureTextEntry={!showPassword}
-            style={[styles.input, styles.passwordInput]}
+            style={[styles.input, styles.passwordInput, focused === "password" && styles.inputFocused]}
             textContentType="password"
             value={password}
           />
@@ -178,7 +194,7 @@ export default function Register() {
           </Pressable>
         </View>
         {errors.password ? <Text style={styles.message}>{errors.password}</Text> : null}
-        <Text style={styles.label}>{t("auth.confirmPassword")}</Text>
+        <Text style={styles.label}>Confirmar contraseña</Text>
         <View style={styles.passwordWrap}>
           <InputField
             inputRef={confirmPasswordInputRef}
@@ -186,14 +202,16 @@ export default function Register() {
             autoComplete="password"
             autoCorrect={false}
             editable
+            onBlur={() => setFocused(null)}
             onChangeText={(value) => {
               setConfirmPassword(value);
               setErrors((current) => ({ ...current, confirmPassword: undefined, form: undefined }));
             }}
+            onFocus={() => setFocused("confirmPassword")}
             placeholder={t("auth.confirmPassword")}
             returnKeyType="done"
             secureTextEntry={!showConfirmPassword}
-            style={[styles.input, styles.passwordInput]}
+            style={[styles.input, styles.passwordInput, focused === "confirmPassword" && styles.inputFocused]}
             textContentType="password"
             value={confirmPassword}
           />
@@ -203,63 +221,64 @@ export default function Register() {
         </View>
         {errors.confirmPassword ? <Text style={styles.message}>{errors.confirmPassword}</Text> : null}
         {errors.form ? <Text style={styles.message}>{errors.form}</Text> : null}
-        <Text style={styles.terms}>Al continuar aceptás que FinFlow organice la información financiera que vos decidas registrar.</Text>
-        <PrimaryButton disabled={!canSubmit} onPress={submit} style={styles.primary}>{status === "loading" ? t("common.loading") : t("auth.register")}</PrimaryButton>
-      </View>
-    </ScreenContainer>
+        <PrimaryButton disabled={!canSubmit} onPress={submit} style={styles.primary}>{status === "loading" ? "Creando cuenta…" : t("auth.register")}</PrimaryButton>
+        <View style={styles.loginBlock}>
+          <Text style={styles.loginCopy}>¿Ya tenés una cuenta?{" "}</Text>
+          <Pressable accessibilityRole="button" hitSlop={10} onPress={() => router.replace("/login")}><Text style={styles.loginLink}>Iniciar sesión</Text></Pressable>
+        </View>
+        </Animated.View>
+      </ScreenContainer>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  screen: {
+    backgroundColor: "#1C1C1B",
+    flex: 1
+  },
   content: {
-    gap: spacing.lg
+    gap: spacing.md,
+    paddingHorizontal: 30
   },
-  accent: {
-    borderRadius: 34,
-    height: 170,
-    justifyContent: "flex-end",
-    overflow: "hidden",
-    padding: spacing.lg
+  heading: {
+    alignItems: "center",
+    gap: spacing.xl,
+    marginBottom: 34,
+    marginTop: 0
   },
-  accentEyebrow: {
-    ...typography.label,
-    color: colors.transparentWhite,
-    fontWeight: "700",
-    letterSpacing: 1.8
-  },
-  accentTitle: {
-    ...typography.display,
-    color: colors.white,
-    fontSize: 34,
-    lineHeight: 37,
-    marginTop: spacing.xs
-  },
+  brand: { ...typography.title, fontSize: 25, fontWeight: "700", letterSpacing: -0.7 },
+  brandFin: { color: colors.white, fontWeight: "800" },
+  brandFlow: { color: colors.brandOrange, fontWeight: "800" },
   form: {
     gap: spacing.sm
   },
-  intro: {
-    gap: spacing.xs,
-    marginBottom: spacing.sm
-  },
   title: {
-    ...typography.title,
-    color: colors.white
+    ...typography.display,
+    color: colors.white,
+    fontSize: 34,
+    fontWeight: "500",
+    lineHeight: 40,
+    textAlign: "center"
   },
-  subtitle: {
-    ...typography.body,
-    color: colors.transparentWhite
+  input: {
+    backgroundColor: "rgba(63,64,59,0.9)",
+    borderColor: "rgba(255,255,255,0.15)",
+    borderWidth: 1,
+    borderRadius: 20,
+    minHeight: 62,
+    paddingHorizontal: 20
+  },
+  inputFocused: {
+    backgroundColor: "rgba(75,75,71,0.96)",
+    borderColor: "rgba(255,255,255,0.38)"
   },
   label: {
     ...typography.label,
     color: colors.transparentWhite,
+    fontSize: 13,
     fontWeight: "700",
     marginTop: spacing.xs
-  },
-  input: {
-    backgroundColor: "#595958",
-    borderColor: "transparent",
-    borderRadius: 22,
-    minHeight: 58
   },
   message: {
     ...typography.body,
@@ -281,13 +300,26 @@ const styles = StyleSheet.create({
     width: 52,
     zIndex: 2
   },
-  terms: {
-    ...typography.label,
-    color: colors.transparentWhite,
-    marginTop: spacing.sm
-  },
   primary: {
-    marginTop: spacing.sm,
-    minHeight: 58
+    backgroundColor: "#BDBDBD",
+    marginTop: spacing.md,
+    minHeight: 62
+  },
+  loginBlock: {
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "center",
+    paddingBottom: spacing.xl,
+    paddingTop: spacing.lg
+  },
+  loginCopy: {
+    ...typography.body,
+    color: colors.transparentWhite
+  },
+  loginLink: {
+    ...typography.body,
+    color: colors.white,
+    fontWeight: "700",
+    textDecorationLine: "underline"
   }
 });
