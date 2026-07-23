@@ -1,4 +1,4 @@
-import { useCallback, useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { AppState, StyleSheet, useWindowDimensions, View } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { router } from "expo-router";
@@ -12,6 +12,7 @@ import { HomeGoalsSheet } from "../../src/components/home/HomeTransactionsSheet"
 import { LiquidGradientBackground } from "../../src/components/home/LiquidGradientBackground";
 import { useFinFlowStore } from "../../src/store/useFinFlowStore";
 import { useSessionStore } from "../../src/store/useSessionStore";
+import { layout } from "../../src/theme";
 import { overviewMetrics } from "../../src/utils/financeInsights";
 import { calculateFinancialInsights } from "../../src/utils/homeFinancialInsights";
 import { calculateCompletedMonthlyTransactions } from "../../src/utils/movementSummary";
@@ -30,6 +31,7 @@ function insightDateRange() {
 export default function Overview() {
   const insets = useSafeAreaInsets();
   const { height } = useWindowDimensions();
+  const [metricsBottom, setMetricsBottom] = useState(0);
   const { accounts, creditCards, events, goals, loadNotifications, loadOverview, loadTransactions, notifications, overview, recurringPayments, transactions } = useFinFlowStore();
   const { profile } = useSessionStore();
   const primaryCurrency = profile?.primary_currency || "UYU";
@@ -77,7 +79,7 @@ export default function Overview() {
       <StatusBar backgroundColor="transparent" translucent style="light" />
       <LiquidGradientBackground />
       <LinearGradient colors={["#1C1C1B", "#1C1C1B", "rgba(28,28,27,0)"]} locations={[0, 0.12, 0.38]} pointerEvents="none" style={StyleSheet.absoluteFill} />
-      <View style={[styles.content, { paddingTop: insets.top }]}>
+      <View style={[styles.content, { paddingTop: insets.top + layout.mainScreenTop }]}>
         <HomeHeader
           avatarUrl={profile?.avatar_url || profile?.avatarUrl}
           firstName={firstName}
@@ -88,13 +90,20 @@ export default function Overview() {
         />
         <AvailableMoney amount={monthlyTotals.balance} currency={primaryCurrency} />
       </View>
-      <View pointerEvents="none" style={[styles.metricLayer, { top: metricsTop }]}>
+      <View
+        onLayout={(event) => {
+          const { height: measuredHeight, y } = event.nativeEvent.layout;
+          setMetricsBottom(y + measuredHeight);
+        }}
+        pointerEvents="none"
+        style={[styles.metricLayer, { top: metricsTop }]}
+      >
         <HomeMetricCards
           currency={primaryCurrency}
           insights={cardInsights}
         />
       </View>
-      <HomeGoalsSheet goals={goals} />
+      <HomeGoalsSheet goals={goals} minimumCollapsedY={metricsBottom ? metricsBottom + 12 : undefined} />
     </View>
   );
 }

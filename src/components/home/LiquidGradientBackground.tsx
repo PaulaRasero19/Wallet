@@ -3,11 +3,13 @@ import { StyleSheet, useWindowDimensions, View } from "react-native";
 import { Canvas, Fill, Group, Shader, Skia, useClock } from "@shopify/react-native-skia";
 import { useDerivedValue } from "react-native-reanimated";
 
-const CYCLE_SECONDS = 26;
+const CYCLE_SECONDS = 17;
 
 const liquidShader = `
 uniform float2 resolution;
 uniform float time;
+uniform float2 sampleScale;
+uniform float2 sampleOffset;
 
 float hash(float2 p) {
   return fract(sin(dot(p, float2(127.1, 311.7))) * 43758.5453123);
@@ -46,7 +48,7 @@ float softBlob(float2 uv, float2 center, float2 scale, float phase, float warpSt
 }
 
 half4 main(float2 p) {
-  float2 screen = p / resolution;
+  float2 screen = (p / resolution) * sampleScale + sampleOffset;
   float aspect = resolution.x / max(resolution.y, 1.0);
   float2 uv = float2(screen.x * aspect, screen.y);
   float phase = time * 6.2831853 / ${CYCLE_SECONDS.toFixed(1)};
@@ -55,8 +57,8 @@ half4 main(float2 p) {
   float lowB = fbm(uv * 1.25 + float2(cos(phase * 0.62 + 1.7), sin(phase * 0.74 + 0.8)) * 0.42);
   float lowC = fbm(uv * 0.62 + float2(sin(phase * 0.41 + 2.4), cos(phase * 0.49 + 1.3)) * 0.56);
   float2 warped = uv;
-  warped.x += (lowA - 0.5) * 0.28 + (lowC - 0.5) * 0.16 + sin(uv.y * 2.4 + phase * 0.86) * 0.075;
-  warped.y += (lowB - 0.5) * 0.24 + (lowC - 0.5) * 0.13 + cos(uv.x * 2.1 - phase * 0.72) * 0.07;
+  warped.x += (lowA - 0.5) * 0.34 + (lowC - 0.5) * 0.2 + sin(uv.y * 2.4 + phase * 0.98) * 0.1;
+  warped.y += (lowB - 0.5) * 0.3 + (lowC - 0.5) * 0.17 + cos(uv.x * 2.1 - phase * 0.86) * 0.095;
 
   float topDark = softBlob(
     warped,
@@ -149,7 +151,17 @@ half4 main(float2 p) {
   return half4(color, 1.0);
 }`;
 
-export function LiquidGradientBackground() {
+export function LiquidGradientBackground({
+  sampleOffsetX = 0,
+  sampleOffsetY = 0,
+  sampleScaleX = 1,
+  sampleScaleY = 1
+}: {
+  sampleOffsetX?: number;
+  sampleOffsetY?: number;
+  sampleScaleX?: number;
+  sampleScaleY?: number;
+} = {}) {
   const { height, width } = useWindowDimensions();
   const clock = useClock();
   const source = useMemo(() => Skia.RuntimeEffect.Make(liquidShader), []);
@@ -169,8 +181,10 @@ export function LiquidGradientBackground() {
 
   const uniforms = useDerivedValue(() => ({
     resolution: [width, height],
+    sampleOffset: [sampleOffsetX, sampleOffsetY],
+    sampleScale: [sampleScaleX, sampleScaleY],
     time: clock.value * 0.001
-  }));
+  }), [height, sampleOffsetX, sampleOffsetY, sampleScaleX, sampleScaleY, width]);
 
   if (!source) return <View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.fallback]} />;
 

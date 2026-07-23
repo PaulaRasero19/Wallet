@@ -45,8 +45,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     flexDirection: "row",
     justifyContent: "space-between",
-    paddingHorizontal: 24,
-    paddingTop: 4
+    paddingHorizontal: 24
   },
   hello: {
     ...typography.body,

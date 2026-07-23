@@ -1,58 +1,107 @@
-import { useEffect } from "react";
+import { useMemo } from "react";
 import { StyleSheet, View } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
-import Animated, { Easing, useAnimatedStyle, useSharedValue, withRepeat, withTiming } from "react-native-reanimated";
 
-export function AnimatedWarmBackground({ intensity = "full" }: { intensity?: "full" | "soft" }) {
-  const drift = useSharedValue(0);
-  const breathe = useSharedValue(0);
+type Placement = "bottomLeft" | "bottomRight" | "topLeft" | "topRight";
 
-  useEffect(() => {
-    drift.value = withRepeat(withTiming(1, { duration: 12_000, easing: Easing.inOut(Easing.sin) }), -1, true);
-    breathe.value = withRepeat(withTiming(1, { duration: 8_000, easing: Easing.inOut(Easing.quad) }), -1, true);
-  }, [breathe, drift]);
+const gradients: Record<
+  Placement,
+  {
+    end: { x: number; y: number };
+    start: { x: number; y: number };
+  }
+> = {
+  bottomLeft: {
+    end: { x: 0.08, y: 1 },
+    start: { x: 0.78, y: 0 }
+  },
+  bottomRight: {
+    end: { x: 0.92, y: 1 },
+    start: { x: 0.22, y: 0 }
+  },
+  topLeft: {
+    end: { x: 0.82, y: 1 },
+    start: { x: 0.08, y: 0 }
+  },
+  topRight: {
+    end: { x: 0.18, y: 1 },
+    start: { x: 0.92, y: 0 }
+  }
+};
 
-  const lowerGlow = useAnimatedStyle(() => ({
-    opacity: (intensity === "full" ? 0.82 : 0.58) + breathe.value * 0.1,
-    transform: [{ translateY: 110 - drift.value * 190 }, { scale: 1 + breathe.value * 0.08 }]
-  }));
+export function AnimatedWarmBackground({
+  intensity = "full",
+  placement = "bottomLeft"
+}: {
+  intensity?: "full" | "soft";
+  placement?: Placement;
+}) {
+  const direction = gradients[placement];
+  const grain = useMemo(() => {
+    const random = (seed: number) => {
+      const value = Math.sin(seed * 12.9898) * 43758.5453;
+      return value - Math.floor(value);
+    };
 
-  const sideGlow = useAnimatedStyle(() => ({
-    opacity: (intensity === "full" ? 0.48 : 0.3) + drift.value * 0.08,
-    transform: [{ translateY: 90 - breathe.value * 120 }, { translateX: -20 + drift.value * 38 }]
-  }));
+    return Array.from({ length: 420 }, (_, index) => ({
+      left: random(index + 3) * 100,
+      opacity: 0.022 + random(index + 31) * 0.022,
+      size: 0.55 + random(index + 61) * 0.45,
+      top: random(index + 17) * 100
+    }));
+  }, []);
 
   return (
-    <View pointerEvents="none" style={StyleSheet.absoluteFill}>
-      <LinearGradient colors={["#1C1C1B", "#1C1C1B", "#180B07", "#100000"]} locations={[0, 0.48, 0.76, 1]} style={StyleSheet.absoluteFill} />
-      <Animated.View style={[styles.lowerGlow, lowerGlow]}>
-        <LinearGradient colors={["rgba(216,184,0,0)", "rgba(241,93,8,0.76)", "rgba(116,7,3,0.86)"]} end={{ x: 0.52, y: 0 }} start={{ x: 0.5, y: 1 }} style={StyleSheet.absoluteFill} />
-      </Animated.View>
-      <Animated.View style={[styles.sideGlow, sideGlow]}>
-        <LinearGradient colors={["rgba(255,176,0,0.68)", "rgba(220,48,4,0.34)", "rgba(74,0,0,0)"]} end={{ x: 0, y: 0 }} start={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />
-      </Animated.View>
-      <LinearGradient colors={["rgba(28,28,27,0.92)", "rgba(28,28,27,0.2)", "rgba(28,28,27,0.82)"]} locations={[0, 0.58, 1]} style={StyleSheet.absoluteFill} />
+    <View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.base]}>
+      <LinearGradient
+        colors={
+          intensity === "full"
+            ? ["#1C1C1B", "#281813", "#861301", "#D74902", "#FDC53B"]
+            : ["#1C1C1B", "#211C19", "#34231D", "#5A2818", "#7B3A18"]
+        }
+        end={direction.end}
+        locations={[0, 0.34, 0.58, 0.79, 1]}
+        start={direction.start}
+        style={StyleSheet.absoluteFill}
+      />
+      <LinearGradient
+        colors={["rgba(28,28,27,0.64)", "rgba(28,28,27,0.12)", "rgba(28,28,27,0.42)"]}
+        end={{ x: 0.5, y: 1 }}
+        locations={[0, 0.58, 1]}
+        start={{ x: 0.5, y: 0 }}
+        style={StyleSheet.absoluteFill}
+      />
+      <View style={styles.grain}>
+        {grain.map((dot, index) => (
+          <View
+            key={`${dot.left}-${dot.top}-${index}`}
+            style={[
+              styles.grainDot,
+              {
+                height: dot.size,
+                left: `${dot.left}%`,
+                opacity: dot.opacity,
+                top: `${dot.top}%`,
+                width: dot.size
+              }
+            ]}
+          />
+        ))}
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  lowerGlow: {
-    borderRadius: 360,
-    bottom: -260,
-    height: 760,
-    left: -170,
-    overflow: "hidden",
-    position: "absolute",
-    width: 760
+  base: {
+    backgroundColor: "#1C1C1B"
   },
-  sideGlow: {
-    borderRadius: 260,
-    bottom: 20,
-    height: 520,
-    overflow: "hidden",
-    position: "absolute",
-    right: -300,
-    width: 520
+  grain: {
+    ...StyleSheet.absoluteFillObject
+  },
+  grainDot: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 1,
+    position: "absolute"
   }
 });

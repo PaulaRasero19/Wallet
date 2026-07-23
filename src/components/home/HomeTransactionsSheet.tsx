@@ -25,11 +25,17 @@ function nearestSnap(value: number, velocityY: number, expandedY: number, collap
   return Math.abs(value - expandedY) < Math.abs(value - collapsedY) ? expandedY : collapsedY;
 }
 
-export function HomeGoalsSheet({ goals }: { goals: Goal[] }) {
+export function HomeGoalsSheet({
+  goals,
+  minimumCollapsedY
+}: {
+  goals: Goal[];
+  minimumCollapsedY?: number;
+}) {
   const { height, width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const expandedY = height * 0.36;
-  const collapsedY = height * 0.75;
+  const collapsedY = Math.max(height * 0.75, minimumCollapsedY ?? 0);
   const [expanded, setExpanded] = useState(false);
   const sheetY = useSharedValue(collapsedY);
   const startY = useSharedValue(collapsedY);

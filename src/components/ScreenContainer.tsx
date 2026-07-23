@@ -1,9 +1,9 @@
 import { ReactNode } from "react";
-import { ScrollView, StyleSheet, useWindowDimensions, ViewStyle } from "react-native";
+import { ScrollView, StyleProp, StyleSheet, useWindowDimensions, ViewStyle } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { colors, spacing } from "../theme";
 
-export function ScreenContainer({ backgroundColor, children, style }: { backgroundColor?: string; children: ReactNode; style?: ViewStyle }) {
+export function ScreenContainer({ backgroundColor, children, style }: { backgroundColor?: string; children: ReactNode; style?: StyleProp<ViewStyle> }) {
   const { width } = useWindowDimensions();
   const horizontalPadding = width < 360 ? spacing.md : spacing.lg;
 

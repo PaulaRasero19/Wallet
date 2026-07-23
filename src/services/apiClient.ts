@@ -27,6 +27,7 @@ export type ApiError = Error & {
 type ApiOptions = {
   body?: unknown;
   method?: "GET" | "POST" | "PATCH" | "DELETE";
+  networkRetry?: boolean;
   requireAuth?: boolean;
   retry?: boolean;
   timeoutMs?: number;
@@ -77,7 +78,9 @@ async function refreshSession() {
 
 export async function apiRequest<T>(path: string, options: ApiOptions = {}): Promise<T> {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), options.timeoutMs || 12000);
+  // Render's free instances can need about a minute to wake after inactivity.
+  // Keep the first request alive long enough for that cold start to complete.
+  const timeout = setTimeout(() => controller.abort(), options.timeoutMs || 75000);
 
   try {
     const token = options.requireAuth ? await getAccessToken() : null;
@@ -115,7 +118,16 @@ export async function apiRequest<T>(path: string, options: ApiOptions = {}): Pro
     return data as T;
   } catch (error) {
     if (error instanceof Error && error.name === "AbortError") {
-      throw new Error("El servidor tardó demasiado en responder.");
+      throw new Error("FinFlow está tardando en conectarse. Esperá unos segundos e intentá nuevamente.");
+    }
+
+    if (error instanceof TypeError) {
+      if (options.networkRetry !== false) {
+        await new Promise((resolve) => setTimeout(resolve, 1200));
+        return apiRequest<T>(path, { ...options, networkRetry: false });
+      }
+
+      throw new Error("No pudimos conectarnos. Revisá tu conexión a internet e intentá nuevamente.");
     }
     throw error;
   } finally {

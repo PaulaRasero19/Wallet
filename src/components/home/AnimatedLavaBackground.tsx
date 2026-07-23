@@ -32,7 +32,7 @@ export function AnimatedLavaBackground() {
     }
 
     progress.value = withRepeat(
-      withTiming(1, { duration: 26000, easing: Easing.inOut(Easing.sin) }),
+      withTiming(1, { duration: 17000, easing: Easing.inOut(Easing.sin) }),
       -1,
       true
     );
@@ -40,9 +40,9 @@ export function AnimatedLavaBackground() {
 
   const orangeBlob = useAnimatedStyle(() => ({
     transform: [
-      { translateX: interpolate(progress.value, [0, 1], [-26, 38]) },
-      { translateY: interpolate(progress.value, [0, 1], [36, -18]) },
-      { scale: interpolate(progress.value, [0, 1], [1, 1.18]) }
+      { translateX: interpolate(progress.value, [0, 1], [-38, 54]) },
+      { translateY: interpolate(progress.value, [0, 1], [48, -28]) },
+      { scale: interpolate(progress.value, [0, 1], [0.98, 1.22]) }
     ]
   }));
 
@@ -67,11 +67,11 @@ export function AnimatedLavaBackground() {
 
   return (
     <View pointerEvents="none" style={StyleSheet.absoluteFill}>
-      <LinearGradient colors={["#050505", "#270606", "#9C1809", "#FF6415", "#FFE56F"]} end={{ x: 1, y: 1 }} start={{ x: 0.12, y: 0.08 }} style={StyleSheet.absoluteFill} />
+      <LinearGradient colors={["#1C1C1B", "#861301", "#D74902", "#FDC53B", "#FFF3AB"]} end={{ x: 1, y: 1 }} start={{ x: 0.12, y: 0.08 }} style={StyleSheet.absoluteFill} />
       <Animated.View style={[styles.blob, styles.redBlob, redBlob]} />
       <Animated.View style={[styles.blob, styles.orangeBlob, orangeBlob]} />
       <Animated.View style={[styles.blob, styles.goldBlob, goldBlob]} />
-      <LinearGradient colors={["rgba(0,0,0,0.72)", "rgba(0,0,0,0.12)", "rgba(255,115,18,0.08)"]} end={{ x: 0.6, y: 1 }} start={{ x: 0.16, y: 0 }} style={StyleSheet.absoluteFill} />
+      <LinearGradient colors={["rgba(28,28,27,0.72)", "rgba(28,28,27,0.12)", "rgba(215,73,2,0.08)"]} end={{ x: 0.6, y: 1 }} start={{ x: 0.16, y: 0 }} style={StyleSheet.absoluteFill} />
       <View style={styles.grain}>
         {dots.map((dot, index) => (
           <View key={`${dot.left}-${dot.top}-${index}`} style={[styles.grainDot, { left: dot.left as DimensionValue, opacity: dot.opacity, top: dot.top as DimensionValue }]} />
@@ -86,7 +86,7 @@ const styles = StyleSheet.create({
     position: "absolute"
   },
   goldBlob: {
-    backgroundColor: "#FFDD55",
+    backgroundColor: "#FDC53B",
     borderRadius: 190,
     bottom: -110,
     height: 300,
@@ -105,7 +105,7 @@ const styles = StyleSheet.create({
     width: 1.4
   },
   orangeBlob: {
-    backgroundColor: "#FF4F18",
+    backgroundColor: "#D74902",
     borderRadius: 210,
     bottom: -84,
     height: 340,
@@ -114,7 +114,7 @@ const styles = StyleSheet.create({
     width: 340
   },
   redBlob: {
-    backgroundColor: "#6B0606",
+    backgroundColor: "#861301",
     borderRadius: 190,
     height: 300,
     opacity: 0.86,

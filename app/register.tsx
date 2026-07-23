@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { Alert, Keyboard, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { Alert, Keyboard, Pressable, StyleSheet, Text, TextInput, useWindowDimensions, View } from "react-native";
 import { Eye, EyeOff } from "lucide-react-native";
 import { router } from "expo-router";
 import Animated, { FadeInUp } from "react-native-reanimated";
@@ -21,6 +21,8 @@ type RegisterErrors = {
 };
 
 export default function Register() {
+  const { height, width } = useWindowDimensions();
+  const compact = height < 820 || width < 360;
   const { language, register, status } = useSessionStore();
   const nameInputRef = useRef<TextInput>(null);
   const emailInputRef = useRef<TextInput>(null);
@@ -111,16 +113,16 @@ export default function Register() {
   return (
     <View style={styles.screen}>
       <PreloginLiquidBackground variant="register" />
-      <ScreenContainer backgroundColor="transparent" style={styles.content}>
+      <ScreenContainer backgroundColor="transparent" style={[styles.content, compact && styles.compactContent]}>
         <Header title="" back />
-        <Animated.View entering={FadeInUp.duration(440)} style={styles.heading}>
+        <Animated.View entering={FadeInUp.duration(440)} style={[styles.heading, compact && styles.compactHeading]}>
           <Text accessibilityRole="header" style={styles.brand}>
             <Text style={styles.brandFin}>Fin</Text>
             <Text style={styles.brandFlow}>Flow</Text>
           </Text>
-          <Text style={styles.title}>Crear cuenta</Text>
+          <Text style={[styles.title, compact && styles.compactTitle]}>Crear cuenta</Text>
         </Animated.View>
-        <Animated.View entering={FadeInUp.delay(80).duration(460)} style={styles.form}>
+        <Animated.View entering={FadeInUp.delay(80).duration(460)} style={[styles.form, compact && styles.compactForm]}>
         <Text style={styles.label}>Nombre</Text>
         <InputField
           inputRef={nameInputRef}
@@ -169,6 +171,7 @@ export default function Register() {
         <Text style={styles.label}>Contraseña</Text>
         <View style={styles.passwordWrap}>
           <InputField
+            key={showPassword ? "password-visible" : "password-hidden"}
             inputRef={passwordInputRef}
             accessibilityLabel={t("auth.password")}
             autoComplete="password"
@@ -189,7 +192,7 @@ export default function Register() {
             textContentType="password"
             value={password}
           />
-          <Pressable accessibilityLabel={showPassword ? t("auth.hidePassword") : t("auth.showPassword")} accessibilityRole="button" onPress={() => setShowPassword((current) => !current)} style={styles.eyeButton}>
+          <Pressable accessibilityLabel={showPassword ? t("auth.hidePassword") : t("auth.showPassword")} accessibilityRole="button" hitSlop={10} onPress={() => setShowPassword((current) => !current)} style={styles.eyeButton}>
             {showPassword ? <EyeOff color={colors.white} size={20} /> : <Eye color={colors.white} size={20} />}
           </Pressable>
         </View>
@@ -197,6 +200,7 @@ export default function Register() {
         <Text style={styles.label}>Confirmar contraseña</Text>
         <View style={styles.passwordWrap}>
           <InputField
+            key={showConfirmPassword ? "confirm-visible" : "confirm-hidden"}
             inputRef={confirmPasswordInputRef}
             accessibilityLabel={t("auth.confirmPassword")}
             autoComplete="password"
@@ -215,7 +219,7 @@ export default function Register() {
             textContentType="password"
             value={confirmPassword}
           />
-          <Pressable accessibilityLabel={showConfirmPassword ? t("auth.hidePassword") : t("auth.showPassword")} accessibilityRole="button" onPress={() => setShowConfirmPassword((current) => !current)} style={styles.eyeButton}>
+          <Pressable accessibilityLabel={showConfirmPassword ? t("auth.hidePassword") : t("auth.showPassword")} accessibilityRole="button" hitSlop={10} onPress={() => setShowConfirmPassword((current) => !current)} style={styles.eyeButton}>
             {showConfirmPassword ? <EyeOff color={colors.white} size={20} /> : <Eye color={colors.white} size={20} />}
           </Pressable>
         </View>
@@ -239,20 +243,25 @@ const styles = StyleSheet.create({
   },
   content: {
     gap: spacing.md,
-    paddingHorizontal: 30
+    paddingBottom: 24,
+    paddingHorizontal: 30,
+    zIndex: 1
   },
+  compactContent: { paddingHorizontal: 22, paddingTop: 12 },
   heading: {
     alignItems: "center",
     gap: spacing.xl,
     marginBottom: 34,
     marginTop: 0
   },
+  compactHeading: { gap: spacing.md, marginBottom: 18, marginTop: 0 },
   brand: { ...typography.title, fontSize: 25, fontWeight: "700", letterSpacing: -0.7 },
   brandFin: { color: colors.white, fontWeight: "800" },
   brandFlow: { color: colors.brandOrange, fontWeight: "800" },
   form: {
     gap: spacing.sm
   },
+  compactForm: { gap: 6 },
   title: {
     ...typography.display,
     color: colors.white,
@@ -261,6 +270,7 @@ const styles = StyleSheet.create({
     lineHeight: 40,
     textAlign: "center"
   },
+  compactTitle: { fontSize: 30, lineHeight: 34 },
   input: {
     backgroundColor: "rgba(63,64,59,0.9)",
     borderColor: "rgba(255,255,255,0.15)",
@@ -293,12 +303,13 @@ const styles = StyleSheet.create({
   eyeButton: {
     alignItems: "center",
     bottom: 0,
+    elevation: 3,
     justifyContent: "center",
     position: "absolute",
     right: 0,
     top: 0,
-    width: 52,
-    zIndex: 2
+    width: 58,
+    zIndex: 4
   },
   primary: {
     backgroundColor: "#BDBDBD",

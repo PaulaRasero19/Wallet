@@ -5,7 +5,7 @@ type ScalableDefaults = {
   maxFontSizeMultiplier?: number;
 };
 
-const MAX_FONT_SCALE = 1.18;
+const MAX_FONT_SCALE = 1;
 
 export function configureResponsiveText() {
   const text = Text as typeof Text & { defaultProps?: ScalableDefaults };
@@ -13,13 +13,13 @@ export function configureResponsiveText() {
 
   text.defaultProps = {
     ...text.defaultProps,
-    allowFontScaling: true,
+    allowFontScaling: false,
     maxFontSizeMultiplier: MAX_FONT_SCALE
   };
 
   textInput.defaultProps = {
     ...textInput.defaultProps,
-    allowFontScaling: true,
+    allowFontScaling: false,
     maxFontSizeMultiplier: MAX_FONT_SCALE
   };
 }

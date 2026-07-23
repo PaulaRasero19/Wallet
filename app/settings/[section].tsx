@@ -11,8 +11,7 @@ const sections: Record<string, { title: string; rows: Array<{ label: string; val
     rows: [
       { label: "Nombre", value: "Se toma de tu cuenta autenticada" },
       { label: "Email", value: "Privado y asociado al usuario" },
-      { label: "País", value: "Uruguay" },
-      { label: "Idioma", value: "Español" }
+      { label: "País", value: "Uruguay" }
     ]
   },
   finance: {

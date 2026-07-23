@@ -4,7 +4,7 @@ import { router } from "expo-router";
 import { Bell } from "lucide-react-native";
 import { Header } from "../src/components/Header";
 import { ScreenContainer } from "../src/components/ScreenContainer";
-import { fetchNotifications, registerExpoPushToken } from "../src/services/notificationsService";
+import { fetchNotifications } from "../src/services/notificationsService";
 import { useFinFlowStore } from "../src/store/useFinFlowStore";
 import { colors, typography } from "../src/theme";
 import { FinFlowNotification } from "../src/types/finflow";
@@ -40,7 +40,6 @@ export default function Notifications() {
       setLoading(true);
       setLoadError("");
       try {
-        await registerExpoPushToken().catch(() => undefined);
         const next = await fetchNotifications();
         if (alive) {
           const rows = Array.isArray(next) ? next : [];

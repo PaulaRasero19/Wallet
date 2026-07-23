@@ -12,7 +12,7 @@ import { PrimaryButton } from "../../src/components/PrimaryButton";
 import { ScreenContainer } from "../../src/components/ScreenContainer";
 import { useFinFlowStore } from "../../src/store/useFinFlowStore";
 import { useSessionStore } from "../../src/store/useSessionStore";
-import { colors, spacing, typography } from "../../src/theme";
+import { colors, layout, spacing, typography } from "../../src/theme";
 import { Category, Currency } from "../../src/types/finflow";
 import { formatMoney } from "../../src/utils/money";
 
@@ -258,6 +258,7 @@ export function AddScreen({ initialMode = "menu", initialData }: { initialMode?:
 
   useEffect(() => {
     if ((mode === "expense" || mode === "goal") && !paymentMethod) setPaymentMethod("cash");
+    if (mode === "installment" && paymentMethod !== "credit_card") setPaymentMethod("credit_card");
   }, [mode, paymentMethod]);
 
   useEffect(() => {
@@ -350,7 +351,7 @@ export function AddScreen({ initialMode = "menu", initialData }: { initialMode?:
     const value = amountValue(amount);
     const validationErrors: Record<string, string> = {};
     if (!Number.isFinite(value) || value <= 0) validationErrors.amount = "Ingresá un monto mayor a cero.";
-    if (!merchant.trim()) validationErrors.merchant = type === "income" ? "Seleccioná una fuente." : "Ingresá un comercio o concepto.";
+    if (type === "income" && !merchant.trim()) validationErrors.merchant = "Seleccioná una fuente.";
     if (type === "income" && merchant === "Otro" && !customIncomeSource.trim()) validationErrors.customIncomeSource = "Ingresá el nombre de la fuente.";
     if (!category) validationErrors.category = "Seleccioná una categoría.";
     if (!accountId) validationErrors.account = type === "income" ? "Seleccioná una cuenta de destino." : "No hay una cuenta disponible para registrar el movimiento.";
@@ -365,7 +366,9 @@ export function AddScreen({ initialMode = "menu", initialData }: { initialMode?:
     if (Object.keys(validationErrors).length) return;
     setSubmitting(true);
     try {
-      const concept = type === "income" && merchant === "Otro" ? customIncomeSource.trim() : merchant.trim();
+      const concept = type === "income"
+        ? (merchant === "Otro" ? customIncomeSource.trim() : merchant.trim())
+        : merchant.trim() || category!.name;
       const transaction = await createTransaction({
         accountId,
         categoryId: category!.id,
@@ -381,7 +384,7 @@ export function AddScreen({ initialMode = "menu", initialData }: { initialMode?:
       });
       if (type === "expense" && recurring) {
         const payment = await createRecurringPayment({
-          merchant: merchant.trim(),
+          merchant: concept,
           amount: value,
           currency,
           frequency: recurrenceFrequency,
@@ -458,7 +461,7 @@ export function AddScreen({ initialMode = "menu", initialData }: { initialMode?:
     const totalAmount = amountValue(amount);
     const category = categories.find((item) => item.id === categoryId) || chooseCategory(categories, "expense", merchant);
     if (!merchant.trim() || !totalAmount || !category || !accountId || !creditCardName || total < 1 || !firstInstallmentDate) {
-      Alert.alert("FinFlow", "Completá comercio, monto, tarjeta, cuotas, primera cuota y categoría.");
+      Alert.alert("FinFlow", "Completá concepto, monto, tarjeta, cuotas, primera cuota y categoría.");
       return;
     }
     setSubmitting(true);
@@ -569,8 +572,8 @@ export function AddScreen({ initialMode = "menu", initialData }: { initialMode?:
     const detectedCategory = findCategoryByName(categories, "expense", categoryName);
     setCategoryId(detectedCategory?.id || "");
     setAiDetailDraft(nextMode === "expense" ? detectedCategory?.name || "" : detectedConcept);
-    const detectedPayment = inferPaymentMethod(aiText);
-    setPaymentMethod(detectedPayment);
+    const detectedPayment = nextMode === "installment" ? "credit_card" : inferPaymentMethod(aiText);
+    setPaymentMethod(detectedPayment || (nextMode === "expense" ? "cash" : ""));
     const detectedAccount = accounts.find((item) => lower.includes(item.name.toLowerCase()))
       || (/visa/i.test(lower) ? accounts.find((item) => /visa/i.test(item.name)) : undefined)
       || (/cuenta bancaria|mi cuenta/.test(lower) ? accounts.find((item) => item.type === "bank") : undefined);
@@ -584,6 +587,9 @@ export function AddScreen({ initialMode = "menu", initialData }: { initialMode?:
     }
     if (nextMode === "payment") { setFrequency("monthly"); setReminderDaysBefore(1); setPaymentCategory(categoryName ? normalizedCategoryName(categoryName) : ""); setAiDetailDraft(detectedConcept); }
     if (nextMode === "goal") { setGoalTargetDate(""); setAiDetailDraft(detectedConcept); }
+    if (nextMode === "expense" && !detectedConcept && detectedCategory) {
+      setMerchant(normalizedCategoryName(detectedCategory.name));
+    }
     const autoCompleted = [value ? "Monto" : "", detectedConcept || incomeSource ? (nextMode === "income" ? "Fuente" : "Comercio o concepto") : "", detectedCategory ? "Categoría" : "", detectedPayment ? "Medio de pago" : "", mentionedDate ? "Fecha" : "", detectedAccount || accounts[0] ? (nextMode === "income" ? "Cuenta de destino" : "") : ""].filter(Boolean);
     setProposal({ mode: nextMode, typeLabel, autoCompleted });
     setProposalExpanded(true);
@@ -624,7 +630,7 @@ export function AddScreen({ initialMode = "menu", initialData }: { initialMode?:
   }
 
   const proposalComplete = proposal?.mode === "expense"
-    ? amountValue(amount) > 0 && Boolean(merchant.trim() && categoryId && paymentMethod && date)
+    ? amountValue(amount) > 0 && Boolean(categoryId && paymentMethod && date)
     : proposal?.mode === "income"
       ? amountValue(amount) > 0 && Boolean(merchant.trim() && accountId && date)
       : proposal?.mode === "installment"
@@ -636,11 +642,11 @@ export function AddScreen({ initialMode = "menu", initialData }: { initialMode?:
             : false;
 
   const proposalPendingFields = proposal?.mode === "expense"
-    ? [!amountValue(amount) && "Monto", !merchant.trim() && "Comercio o concepto", !categoryId && "Categoría", !paymentMethod && "Medio de pago", !aiMentionedDate && "Fecha"].filter(Boolean)
+    ? [!amountValue(amount) && "Monto", !categoryId && "Categoría", !paymentMethod && "Medio de pago", !aiMentionedDate && "Fecha"].filter(Boolean)
     : proposal?.mode === "income"
       ? [!amountValue(amount) && "Monto", !merchant.trim() && "Fuente", !accountId && "Dónde recibiste el dinero", !aiMentionedDate && "Fecha"].filter(Boolean)
       : proposal?.mode === "installment"
-        ? [!amountValue(amount) && "Monto", !merchant.trim() && "Comercio", !categoryId && "Categoría", !accountId && "Tarjeta", !Number(installments) && "Cantidad de cuotas", !aiMentionedDate && "Fecha de la primera cuota"].filter(Boolean)
+        ? [!amountValue(amount) && "Monto", !merchant.trim() && "Compra o concepto", !categoryId && "Categoría", !accountId && "Tarjeta", !Number(installments) && "Cantidad de cuotas", !aiMentionedDate && "Fecha de la primera cuota"].filter(Boolean)
         : proposal?.mode === "payment"
           ? [!amountValue(amount) && "Monto", !merchant.trim() && "Concepto", !paymentCategory.trim() && "Categoría", !aiMentionedDate && "Fecha"].filter(Boolean)
           : proposal?.mode === "goal"
@@ -649,7 +655,7 @@ export function AddScreen({ initialMode = "menu", initialData }: { initialMode?:
 
   const proposalCategory = categories.find((category) => category.id === categoryId)?.name;
   const proposalDate = proposal?.mode === "goal" ? goalTargetDate : aiMentionedDate ? (proposal?.mode === "installment" ? firstInstallmentDate : date) : "";
-  const proposalDetailLabel = proposal?.mode === "income" ? "Fuente" : proposal?.mode === "goal" ? "Meta" : proposal?.mode === "payment" ? "Concepto" : proposal?.mode === "installment" ? "Comercio" : "Categoría";
+  const proposalDetailLabel = proposal?.mode === "income" ? "Fuente" : proposal?.mode === "goal" ? "Meta" : proposal?.mode === "payment" ? "Concepto" : proposal?.mode === "installment" ? "Compra o concepto" : "Categoría";
   const proposalDetailValue = proposal?.mode === "income" || proposal?.mode === "goal" || proposal?.mode === "payment" || proposal?.mode === "installment" ? merchant : proposalCategory || merchant;
 
   return (
@@ -747,7 +753,7 @@ export function AddScreen({ initialMode = "menu", initialData }: { initialMode?:
       {mode === "installment" ? (
         <View style={styles.incomeForm}>
           <IncomeAmountInput currency={currency} value={amount} onChangeText={setAmount} />
-          <IncomeSingleInput label="Comercio*" value={merchant} onChangeText={setMerchant} />
+          <IncomeSingleInput label="Compra o concepto*" value={merchant} onChangeText={setMerchant} />
           <IncomeDropdown label="Categoría*" open={categoryListOpen} onToggle={() => setCategoryListOpen((value) => !value)} value={expenseCategories.find((item) => item.id === categoryId) ? normalizedCategoryName(expenseCategories.find((item) => item.id === categoryId)!.name) : "Seleccionar categoría"}>
             {expenseCategories.map((category) => <IncomeDropdownOption key={category.id} label={normalizedCategoryName(category.name)} onPress={() => { setCategoryId(category.id); setCategoryListOpen(false); }} />)}
             <IncomeDropdownOption label="Agregar opción" onPress={() => { setCategoryListOpen(false); setCategoryModalOpen(true); }} />
@@ -842,25 +848,15 @@ function Action({ onPress, title }: { onPress: () => void; title: string }) {
 }
 
 function AnimatedMenuGlow() {
-  const grain = useMemo(() => {
-    const random = (seed: number) => {
-      const value = Math.sin(seed * 12.9898) * 43758.5453;
-      return value - Math.floor(value);
-    };
-    return Array.from({ length: 220 }, (_, index) => ({
-      left: random(index + 7) * 100,
-      opacity: 0.018 + random(index + 43) * 0.022,
-      size: 0.5 + random(index + 79) * 0.55,
-      top: random(index + 19) * 100
-    }));
-  }, []);
-
   return <View pointerEvents="none" style={styles.menuGlow}>
-    <LiquidGradientBackground />
-    <LinearGradient colors={["#191919", "#191919", "rgba(25,25,25,0.99)", "rgba(25,25,25,0.7)", "rgba(25,25,25,0)"]} end={{ x: 0.5, y: 1 }} locations={[0, 0.58, 0.7, 0.86, 1]} start={{ x: 0.5, y: 0 }} style={StyleSheet.absoluteFill} />
-    <LinearGradient colors={["rgba(25,25,25,0.86)", "rgba(25,25,25,0.68)", "rgba(25,25,25,0.24)", "rgba(25,25,25,0)"]} end={{ x: 1, y: 0.68 }} locations={[0, 0.5, 0.84, 1]} start={{ x: 0, y: 0.68 }} style={StyleSheet.absoluteFill} />
-    <LinearGradient colors={["rgba(16,0,0,0)", "rgba(52,4,1,0.78)", "rgba(108,20,4,0.92)", "rgba(166,49,11,0.96)", "rgba(198,139,43,0.96)"]} end={{ x: 0.96, y: 0.84 }} locations={[0, 0.4, 0.6, 0.77, 0.9]} start={{ x: 0.46, y: 0.5 }} style={StyleSheet.absoluteFill} />
-    <View style={styles.menuGrain}>{grain.map((dot, index) => <View key={index} style={[styles.menuGrainDot, { height: dot.size, left: `${dot.left}%`, opacity: dot.opacity, top: `${dot.top}%`, width: dot.size }]} />)}</View>
+    <LiquidGradientBackground sampleOffsetX={0.04} sampleOffsetY={0.05} sampleScaleX={0.45} sampleScaleY={0.5} />
+    <LinearGradient
+      colors={["#191919", "#191919", "rgba(25,25,25,0.8)", "rgba(25,25,25,0.12)", "rgba(25,25,25,0)"]}
+      end={{ x: 0.5, y: 1 }}
+      locations={[0, 0.44, 0.58, 0.74, 0.9]}
+      start={{ x: 0.5, y: 0 }}
+      style={StyleSheet.absoluteFill}
+    />
   </View>;
 }
 
@@ -1055,8 +1051,8 @@ const styles = StyleSheet.create({
   actions: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 22,
-    marginTop: 32
+    gap: 12,
+    marginTop: 24
   },
   actionTitle: {
     ...typography.body,
@@ -1292,18 +1288,10 @@ const styles = StyleSheet.create({
     top: -28,
     zIndex: 0
   },
-  menuGrain: {
-    ...StyleSheet.absoluteFillObject
-  },
-  menuGrainDot: {
-    backgroundColor: colors.white,
-    borderRadius: 1,
-    position: "absolute"
-  },
   menuScreen: {
     backgroundColor: "#191919",
     paddingHorizontal: 20,
-    paddingTop: 28
+    paddingTop: layout.mainScreenTop
   },
   menuTitle: {
     ...typography.title,
@@ -1316,7 +1304,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#1C1C1B",
     paddingBottom: 56,
     paddingHorizontal: 17,
-    paddingTop: 20
+    paddingTop: layout.mainScreenTop
   },
   incomeHeader: { alignItems: "center", flexDirection: "row", minHeight: 46 },
   incomeBack: { alignItems: "center", height: 40, justifyContent: "center", width: 20 },

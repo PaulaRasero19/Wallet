@@ -6,7 +6,7 @@ import { ScreenContainer } from "../src/components/ScreenContainer";
 import { colors, spacing, typography } from "../src/theme";
 
 const sections = [
-  { icon: UserRound, label: "Perfil", route: "/settings/account", value: "Nombre, email, país e idioma" },
+  { icon: UserRound, label: "Perfil", route: "/settings/account", value: "Nombre, email y país" },
   { icon: WalletCards, label: "Finanzas", route: "/settings/finance", value: "Monedas, ingresos, cuentas y categorías" },
   { icon: Bell, label: "Notificaciones", route: "/settings/notifications", value: "Push, WhatsApp, email y horarios" },
   { icon: Brain, label: "IA", route: "/settings/ai", value: "Análisis personalizado e historial" },

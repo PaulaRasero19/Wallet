@@ -6,7 +6,7 @@ import DateTimePicker, { DateTimePickerEvent } from "@react-native-community/dat
 import { ScreenContainer } from "../src/components/ScreenContainer";
 import { useFinFlowStore } from "../src/store/useFinFlowStore";
 import { useSessionStore } from "../src/store/useSessionStore";
-import { colors, spacing, typography } from "../src/theme";
+import { colors, layout, spacing, typography } from "../src/theme";
 import { Currency, InstallmentPurchase, RecurringPayment } from "../src/types/finflow";
 import { formatMoney } from "../src/utils/money";
 
@@ -350,7 +350,7 @@ const styles = StyleSheet.create({
   rowEnd: { alignItems: "flex-end", maxWidth: "44%", minWidth: 120 },
   rowMeta: { ...typography.label, color: "rgba(255,255,255,0.74)", marginTop: 3 },
   rowTitle: { ...typography.body, color: colors.white, fontWeight: "800" },
-  screen: { paddingHorizontal: 18, paddingTop: 14 },
+  screen: { paddingHorizontal: 18, paddingTop: layout.mainScreenTop },
   sectionTitle: { ...typography.title, color: colors.white, marginBottom: 14, marginTop: 34 },
   selectedDay: { backgroundColor: "#B93426" },
   selectedDayText: { color: "#1C1C1B", fontWeight: "900" },

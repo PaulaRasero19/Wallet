@@ -1,5 +1,7 @@
 package com.finflow.app
 
+import android.content.Context
+import android.content.res.Configuration
 import android.os.Build
 import android.os.Bundle
 
@@ -11,6 +13,15 @@ import com.facebook.react.defaults.DefaultReactActivityDelegate
 import expo.modules.ReactActivityDelegateWrapper
 
 class MainActivity : ReactActivity() {
+  override fun attachBaseContext(newBase: Context) {
+    val configuration = Configuration(newBase.resources.configuration)
+    // Keep FinFlow's carefully sized layouts stable when Android's display
+    // font is set to Extra large. Individual screens still respond to the
+    // available width and height.
+    configuration.fontScale = 1.0f
+    super.attachBaseContext(newBase.createConfigurationContext(configuration))
+  }
+
   override fun onCreate(savedInstanceState: Bundle?) {
     // Set the theme to AppTheme BEFORE onCreate to support
     // coloring the background, status bar, and navigation bar.

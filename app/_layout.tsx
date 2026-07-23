@@ -54,7 +54,7 @@ export default function RootLayout() {
         <Stack.Screen name="forecast" />
         <Stack.Screen name="goals" />
         <Stack.Screen name="insights" />
-        <Stack.Screen name="notifications" />
+        <Stack.Screen name="notifications" options={{ animation: "none" }} />
         <Stack.Screen name="profile" />
         <Stack.Screen name="settings" />
         <Stack.Screen name="settings/[section]" />

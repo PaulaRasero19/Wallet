@@ -1,4 +1,4 @@
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { BlurView } from "expo-blur";
 import { ArrowLeftRight, Brain, CalendarDays, Plus } from "lucide-react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -7,9 +7,9 @@ import { colors, typography } from "../../theme";
 import { DotGrid } from "../DotGrid";
 
 const routeOrder = ["overview", "transactions", "add", "plan", "ai"];
-const BAR_COLOR = "rgba(62,62,59,0.84)";
-const ACTIVE_COLOR = "#A44934";
-const INACTIVE_COLOR = "#4F4E49";
+const BAR_COLOR = "rgba(82,82,79,0.24)";
+const ACTIVE_COLOR = "#BC3426";
+const INACTIVE_COLOR = "rgba(224,224,220,0.76)";
 const BAR_HEIGHT = 76;
 const TOUCH_SIZE = 52;
 
@@ -46,7 +46,13 @@ export function FloatingTabBar({ navigation, state }: any) {
   return (
     <View pointerEvents="box-none" style={StyleSheet.absoluteFill}>
       <View style={[styles.wrap, { height: BAR_HEIGHT + Math.max(insets.bottom, 0), paddingBottom: Math.max(insets.bottom, 0) }]}>
-        <BlurView experimentalBlurMethod="dimezisBlurView" intensity={95} pointerEvents="none" style={StyleSheet.absoluteFill} tint="dark" />
+        <BlurView
+          experimentalBlurMethod={Platform.OS === "android" ? "dimezisBlurView" : undefined}
+          intensity={100}
+          pointerEvents="none"
+          style={StyleSheet.absoluteFill}
+          tint="dark"
+        />
         <View pointerEvents="none" style={styles.barTint} />
         <View style={styles.items}>
           {visibleRoutes.map((route: any) => {
@@ -82,7 +88,9 @@ export function FloatingTabBar({ navigation, state }: any) {
 const styles = StyleSheet.create({
   barTint: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: BAR_COLOR
+    backgroundColor: BAR_COLOR,
+    borderColor: "rgba(255,255,255,0.12)",
+    borderTopWidth: 1
   },
   items: {
     alignItems: "center",
@@ -126,10 +134,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 0,
     position: "absolute",
     right: 0,
+    elevation: 3,
     shadowColor: "#000",
-    shadowOffset: { height: -2, width: 0 },
-    shadowOpacity: 0.05,
-    shadowRadius: 6,
+    shadowOffset: { height: -1, width: 0 },
+    shadowOpacity: 0.08,
+    shadowRadius: 7,
     zIndex: 100,
     width: "100%"
   }

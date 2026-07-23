@@ -6,7 +6,7 @@ import { CalendarEventItem } from "../../src/components/CalendarEventItem";
 import { Header } from "../../src/components/Header";
 import { ScreenContainer } from "../../src/components/ScreenContainer";
 import { useFinFlowStore } from "../../src/store/useFinFlowStore";
-import { colors, spacing, typography } from "../../src/theme";
+import { colors, layout, spacing, typography } from "../../src/theme";
 
 export default function Planner() {
   const events = useFinFlowStore((state) => state.events);
@@ -18,7 +18,7 @@ export default function Planner() {
   }, [loadOverview]);
 
   return (
-    <ScreenContainer>
+    <ScreenContainer style={styles.screen}>
       <Header title="Plan" />
       <Text style={styles.lead}>Planificá lo que ya está comprometido antes de decidir nuevos gastos.</Text>
       <View style={styles.grid}>
@@ -47,6 +47,9 @@ function Shortcut({ icon, onPress, title }: { icon: React.ReactNode; onPress?: (
 }
 
 const styles = StyleSheet.create({
+  screen: {
+    paddingTop: layout.mainScreenTop
+  },
   lead: {
     ...typography.body,
     color: colors.transparentWhite,

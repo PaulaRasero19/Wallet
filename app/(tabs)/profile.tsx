@@ -1,18 +1,17 @@
-import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
+import { Alert, StyleSheet, Text, View } from "react-native";
 import { Bell, Brain, CircleHelp, CreditCard, LogOut, Settings, Shield, UserRound, WalletCards } from "lucide-react-native";
 import { router } from "expo-router";
-import { DotLogo } from "../../src/components/DotLogo";
 import { ProfileMenuItem } from "../../src/components/ProfileMenuItem";
 import { ScreenContainer } from "../../src/components/ScreenContainer";
-import { languageOptions, translate } from "../../src/i18n";
+import { FlowMark } from "../../src/components/prelogin/FlowMark";
+import { UserAvatar } from "../../src/components/profile/UserAvatar";
 import { useFinFlowStore } from "../../src/store/useFinFlowStore";
 import { useSessionStore } from "../../src/store/useSessionStore";
-import { colors, spacing, typography } from "../../src/theme";
+import { colors, layout, spacing, typography } from "../../src/theme";
 
 export default function Profile() {
   const clearFinancialData = useFinFlowStore((state) => state.clearFinancialData);
-  const { authUser, language, logout, profile, setLanguage } = useSessionStore();
-  const t = (key: string) => translate(language, key);
+  const { authUser, logout, profile } = useSessionStore();
 
   async function submitLogout() {
     try {
@@ -25,32 +24,21 @@ export default function Profile() {
   }
 
   return (
-    <ScreenContainer>
-      <View style={styles.header}>
-        <DotLogo light />
-        <View>
-          {profile?.is_demo ? <Text style={styles.demo}>{t("dashboard.demoMode")}</Text> : null}
+    <ScreenContainer backgroundColor="#1C1C1B" style={styles.screen}>
+      <View style={styles.brand}>
+        <FlowMark size={38} />
+        <Text style={styles.wordmark}><Text style={styles.wordmarkLight}>Fin</Text><Text style={styles.wordmarkAccent}>Flow</Text></Text>
+      </View>
+      <View style={styles.profileCard}>
+        <UserAvatar fullName={profile?.full_name || "FinFlow"} size={62} uri={profile?.avatar_url || profile?.avatarUrl} />
+        <View style={styles.profileCopy}>
+          {profile?.is_demo ? <Text style={styles.demo}>MODO DEMOSTRACIÓN</Text> : null}
           <Text style={styles.name}>{profile?.full_name || "FinFlow"}</Text>
           <Text style={styles.email}>{authUser?.email || "Cuenta FinFlow"}</Text>
         </View>
       </View>
-      <View style={styles.languagePanel}>
-        <Text style={styles.languageTitle}>{t("profile.language")}</Text>
-        <View style={styles.languageRow}>
-          {languageOptions.map((option) => (
-            <Pressable
-              accessibilityRole="button"
-              key={option.code}
-              onPress={() => void setLanguage(option.code)}
-              style={[styles.languageButton, language === option.code && styles.languageButtonActive]}
-            >
-              <Text style={[styles.languageText, language === option.code && styles.languageTextActive]}>{option.label}</Text>
-            </Pressable>
-          ))}
-        </View>
-      </View>
       <View style={styles.menu}>
-        <ProfileMenuItem icon={UserRound} title="Perfil" description="Nombre, email, país e idioma" onPress={() => router.push("/settings/account")} />
+        <ProfileMenuItem icon={UserRound} title="Perfil" description="Nombre, email y país" onPress={() => router.push("/settings/account")} />
         <ProfileMenuItem icon={WalletCards} title="Finanzas" description="Monedas, ingresos, cuentas y categorías" onPress={() => router.push("/settings/finance")} />
         <ProfileMenuItem icon={Bell} title="Notificaciones" description="Push, WhatsApp, email y horarios" onPress={() => router.push("/settings/notifications")} />
         <ProfileMenuItem icon={Brain} title="IA" description="Análisis personalizado e historial" onPress={() => router.push("/settings/ai")} />
@@ -60,23 +48,52 @@ export default function Profile() {
         <ProfileMenuItem icon={Settings} title="Todos los ajustes" description="Ver perfil y ajustes completos" onPress={() => router.push("/settings")} />
       </View>
       <Text onPress={submitLogout} style={styles.logout}>
-        {t("profile.logout")}
+        Cerrar sesión
       </Text>
     </ScreenContainer>
   );
 }
 
 const styles = StyleSheet.create({
-  header: {
+  screen: {
+    paddingTop: layout.mainScreenTop
+  },
+  brand: {
     alignItems: "center",
     flexDirection: "row",
+    gap: 6
+  },
+  wordmark: {
+    ...typography.title,
+    fontSize: 25,
+    fontWeight: "900",
+    letterSpacing: -1
+  },
+  wordmarkAccent: {
+    color: colors.brandOrange
+  },
+  wordmarkLight: {
+    color: colors.white
+  },
+  profileCard: {
+    alignItems: "center",
+    backgroundColor: "#292927",
+    borderColor: "rgba(191,48,32,0.5)",
+    borderRadius: 24,
+    borderWidth: 1,
+    flexDirection: "row",
     gap: spacing.md,
-    marginTop: spacing.lg
+    marginTop: spacing.lg,
+    padding: 18
+  },
+  profileCopy: {
+    flex: 1,
+    minWidth: 0
   },
   name: {
     ...typography.body,
     color: colors.white,
-    fontWeight: "600"
+    fontWeight: "800"
   },
   email: {
     ...typography.label,
@@ -84,56 +101,19 @@ const styles = StyleSheet.create({
   },
   demo: {
     ...typography.label,
-    color: colors.orange,
-    fontWeight: "700",
-    marginBottom: 2
-  },
-  languagePanel: {
-    backgroundColor: colors.appGrayDark,
-    borderColor: colors.appGrayBorder,
-    borderRadius: 8,
-    borderWidth: 1,
-    gap: spacing.sm,
-    marginTop: spacing.xl,
-    padding: spacing.md
-  },
-  languageTitle: {
-    ...typography.body,
-    color: colors.white,
-    fontWeight: "600"
-  },
-  languageRow: {
-    flexDirection: "row",
-    gap: spacing.sm
-  },
-  languageButton: {
-    borderColor: colors.appGrayBorder,
-    borderRadius: 16,
-    borderWidth: 1,
-    flex: 1,
-    minHeight: 38,
-    justifyContent: "center",
-    paddingHorizontal: spacing.sm
-  },
-  languageButtonActive: {
-    backgroundColor: colors.white,
-    borderColor: colors.white
-  },
-  languageText: {
-    ...typography.label,
-    color: colors.white,
-    textAlign: "center"
-  },
-  languageTextActive: {
-    color: colors.black
+    color: colors.brandOrange,
+    fontWeight: "900",
+    letterSpacing: 0.6,
+    marginBottom: 3
   },
   menu: {
-    marginTop: spacing.xl
+    marginTop: spacing.lg
   },
   logout: {
     ...typography.label,
-    color: colors.orange,
-    fontWeight: "600",
-    marginTop: spacing.lg
+    color: colors.brandOrange,
+    fontWeight: "800",
+    marginTop: spacing.md,
+    textAlign: "center"
   }
 });

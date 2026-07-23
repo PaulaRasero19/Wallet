@@ -15,7 +15,9 @@ export function ProfileMenuItem({
 }) {
   return (
     <Pressable accessibilityRole="button" onPress={onPress} style={styles.row}>
-      <Icon color={colors.white} size={18} strokeWidth={1.8} />
+      <View style={styles.icon}>
+        <Icon color={colors.white} size={19} strokeWidth={1.8} />
+      </View>
       <View style={styles.copy}>
         <Text style={styles.title}>{title}</Text>
         <Text style={styles.description}>{description}</Text>
@@ -28,15 +30,21 @@ export function ProfileMenuItem({
 const styles = StyleSheet.create({
   row: {
     alignItems: "center",
-    backgroundColor: colors.appGrayDark,
-    borderColor: colors.appGrayBorder,
-    borderRadius: 8,
-    borderWidth: 1,
+    backgroundColor: "#3D3D3B",
+    borderRadius: 18,
     flexDirection: "row",
     gap: spacing.md,
     marginBottom: spacing.sm,
-    minHeight: 66,
-    paddingHorizontal: spacing.md
+    minHeight: 72,
+    paddingHorizontal: 14
+  },
+  icon: {
+    alignItems: "center",
+    backgroundColor: "#242423",
+    borderRadius: 18,
+    height: 38,
+    justifyContent: "center",
+    width: 38
   },
   copy: {
     flex: 1
@@ -44,10 +52,11 @@ const styles = StyleSheet.create({
   title: {
     ...typography.body,
     color: colors.white,
-    fontWeight: "600"
+    fontWeight: "800"
   },
   description: {
     ...typography.label,
+    color: "rgba(255,255,255,0.52)",
     marginTop: 2
   }
 });

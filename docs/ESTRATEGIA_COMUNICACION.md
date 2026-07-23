@@ -52,9 +52,9 @@ La idea de flujo representa dinero en movimiento, decisiones constantes y una re
 
 ## User persona
 
-Paula, 24 anos, Montevideo.
+Lucía Fernández, 24 años, Montevideo.
 
-Trabaja part-time y estudia. Quiere ahorrar para viajar, pero siente que los gastos pequenos se le escapan. Necesita una app simple que le muestre alertas, recomendaciones y objetivos sin exigirle cargar datos complejos.
+Estudia y trabaja part-time. También recibe ingresos variables por trabajos ocasionales. Quiere ahorrar para viajar, continuar formándose y construir un fondo de emergencia, pero siente que los gastos pequeños se le escapan. Necesita una aplicación simple que le muestre alertas, compromisos, metas y respuestas basadas en sus datos sin exigirle conocimientos contables.
 
 ## Canales recomendados
 

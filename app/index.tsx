@@ -70,9 +70,9 @@ export default function Splash() {
 }
 
 const styles = StyleSheet.create({
-  screen: { alignItems: "center", backgroundColor: "#111110", flex: 1, justifyContent: "center", overflow: "hidden" },
+  screen: { alignItems: "center", backgroundColor: "#1C1C1B", flex: 1, justifyContent: "center", overflow: "hidden" },
   risingGradient: { ...StyleSheet.absoluteFillObject },
-  center: { alignItems: "center" },
+  center: { alignItems: "center", zIndex: 1 },
   markStage: { alignItems: "center", height: 130, justifyContent: "center", width: 150 },
   mark: { alignItems: "center", justifyContent: "center" },
   logo: { ...typography.display, color: colors.white, fontSize: 36, lineHeight: 40, marginTop: 6 },

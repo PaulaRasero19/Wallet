@@ -2,7 +2,7 @@
   "expo": {
     "name": "FinFlow",
     "slug": "finflow",
-    "version": "1.0.0",
+    "version": "1.0.9",
     "icon": "./assets/finflow-app-icon.png",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
@@ -12,6 +12,7 @@
     ],
     "android": {
       "package": "com.finflow.app",
+      "versionCode": 10,
       "adaptiveIcon": {
         "foregroundImage": "./assets/finflow-mark.png",
         "backgroundColor": "#1C1C1B"

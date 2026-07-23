@@ -11,14 +11,15 @@ import {
   TextInput,
   View
 } from "react-native";
-import { LinearGradient } from "expo-linear-gradient";
 import { router, useFocusEffect } from "expo-router";
+import { LinearGradient } from "expo-linear-gradient";
 import { ChevronLeft, Plus, SendHorizontal } from "lucide-react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { LiquidGradientBackground } from "../src/components/home/LiquidGradientBackground";
 import { clearAiChatHistory, StoredChatMessage } from "../src/services/aiChatHistory";
 import { askFinFlowAi } from "../src/services/aiService";
 import { useSessionStore } from "../src/store/useSessionStore";
-import { colors, spacing, typography } from "../src/theme";
+import { colors, layout, spacing, typography } from "../src/theme";
 
 const prompts = [
   "¿Cuánto puedo gastar por día?",
@@ -27,6 +28,11 @@ const prompts = [
   "¿Voy a cumplir mi meta?",
   "¿Cuáles son mis gastos hormiga?"
 ];
+const promptRows = [
+  [[prompts[0], 1.22], [prompts[1], 0.78]],
+  [[prompts[2], 1], [prompts[3], 1]],
+  [[prompts[4], 0]]
+] as const;
 
 function makeId() {
   return `${Date.now()}-${Math.round(Math.random() * 10000)}`;
@@ -116,11 +122,13 @@ export default function Insights() {
 
   return (
     <SafeAreaView edges={["top", "left", "right", "bottom"]} style={styles.safe}>
+      <View pointerEvents="none" style={styles.gradientBackground}>
+        <LiquidGradientBackground sampleOffsetX={0.04} sampleOffsetY={0.04} sampleScaleX={0.46} sampleScaleY={0.46} />
+      </View>
       <LinearGradient
-        colors={["#E7C34B", "#DB7504", "#C43705", "#711007", "#130202", "#000000"]}
-        locations={[0, 0.14, 0.29, 0.43, 0.56, 0.68]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 0.72, y: 1 }}
+        colors={["rgba(28,28,27,0.08)", "rgba(28,28,27,0.34)", "rgba(28,28,27,0.94)", "#1C1C1B"]}
+        locations={[0, 0.3, 0.57, 0.7]}
+        pointerEvents="none"
         style={StyleSheet.absoluteFill}
       />
       <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={styles.keyboard}>
@@ -139,16 +147,24 @@ export default function Insights() {
             <Text style={styles.welcomeTitle}>Hola{firstName ? `, ${firstName}` : ""}!</Text>
             <Text style={styles.welcomeTitle}>¿Cómo te puedo ayudar?</Text>
             <View style={styles.suggestions}>
-              {prompts.map((prompt) => (
-                <Pressable
-                  accessibilityRole="button"
-                  disabled={loading}
-                  key={prompt}
-                  onPress={() => void send(prompt)}
-                  style={({ pressed }) => [styles.prompt, pressed && styles.promptPressed]}
-                >
-                  <Text style={styles.promptText}>{prompt}</Text>
-                </Pressable>
+              {promptRows.map((row, rowIndex) => (
+                <View key={rowIndex} style={styles.suggestionRow}>
+                  {row.map(([prompt, flex]) => (
+                    <Pressable
+                      accessibilityRole="button"
+                      disabled={loading}
+                      key={prompt}
+                      onPress={() => void send(prompt)}
+                      style={({ pressed }) => [
+                        styles.prompt,
+                        flex ? { flex } : styles.lastPrompt,
+                        pressed && styles.promptPressed
+                      ]}
+                    >
+                      <Text adjustsFontSizeToFit numberOfLines={1} style={styles.promptText}>{prompt}</Text>
+                    </Pressable>
+                  ))}
+                </View>
               ))}
             </View>
           </View>
@@ -317,15 +333,19 @@ const styles = StyleSheet.create({
     alignItems: "flex-end",
     flexDirection: "row",
     gap: 8,
-    paddingBottom: 8,
+    paddingBottom: 24,
     paddingHorizontal: 22,
     paddingTop: 10
+  },
+  gradientBackground: {
+    ...StyleSheet.absoluteFillObject,
+    transform: [{ rotate: "180deg" }]
   },
   header: {
     alignItems: "center",
     flexDirection: "row",
     paddingHorizontal: 22,
-    paddingTop: 14
+    paddingTop: layout.mainScreenTop
   },
   headerTitle: {
     ...typography.body,
@@ -372,7 +392,9 @@ const styles = StyleSheet.create({
   },
   promptText: {
     ...typography.body,
-    color: "rgba(255,255,255,0.72)"
+    color: "rgba(255,255,255,0.72)",
+    fontSize: 13,
+    textAlign: "center"
   },
   retry: {
     ...typography.label,
@@ -407,12 +429,19 @@ const styles = StyleSheet.create({
     transform: [{ scale: 0.92 }]
   },
   suggestions: {
+    gap: 8,
+    marginTop: 34,
+    maxWidth: 390,
+    width: "100%"
+  },
+  suggestionRow: {
     flexDirection: "row",
-    flexWrap: "wrap",
     gap: 8,
     justifyContent: "center",
-    marginTop: 34,
-    maxWidth: 360
+    width: "100%"
+  },
+  lastPrompt: {
+    paddingHorizontal: 22
   },
   thread: {
     flex: 1,

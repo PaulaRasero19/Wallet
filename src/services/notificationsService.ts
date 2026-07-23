@@ -1,5 +1,6 @@
 import * as Device from "expo-device";
 import * as Notifications from "expo-notifications";
+import Constants from "expo-constants";
 import { Platform } from "react-native";
 import { apiRequest } from "./apiClient";
 import { FinFlowNotification } from "../types/finflow";
@@ -50,10 +51,17 @@ export async function registerExpoPushToken() {
     });
   }
   if (!Device.isDevice) return { registered: false, reason: "Push real requiere un dispositivo físico." };
+  const projectId = Constants.easConfig?.projectId || Constants.expoConfig?.extra?.eas?.projectId;
+  if (!projectId) {
+    return {
+      registered: false,
+      reason: "El proyecto no tiene un EAS projectId configurado para generar tokens push remotos."
+    };
+  }
   const current = await Notifications.getPermissionsAsync();
   const final = current.status === "granted" ? current : await Notifications.requestPermissionsAsync();
   if (final.status !== "granted") return { registered: false, reason: "Permiso de push no concedido." };
-  const token = (await Notifications.getExpoPushTokenAsync()).data;
+  const token = (await Notifications.getExpoPushTokenAsync({ projectId })).data;
   await apiRequest<{ ok: boolean }>("/devices/push-token", { body: { platform: Platform.OS, token }, method: "POST", requireAuth: true });
   return { registered: true, token };
 }
